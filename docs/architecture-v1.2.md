@@ -157,7 +157,11 @@ Topic retention is intentionally shorter for recomputable/derived candidate data
 
 Confluent Schema Registry stores Avro schemas with backward compatibility enforcement. Producers validate schemas at startup. A CI job runs schema compatibility checks against the registry on every pull request before merge.
 
-Schema evolution policy: backward compatible changes only in the main branch. New optional fields with defaults. No field removal. No type changes. Breaking changes require a new topic version.
+Schema evolution policy: new optional fields with defaults, no field removal, no type changes. Breaking changes require a new topic version.
+
+That policy is **FULL** compatibility, not BACKWARD, and the distinction is not academic. BACKWARD permits field removal, because a new reader simply ignores a field the old writer emitted. Only FULL rejects removal, and only FULL is safe during the rolling upgrades FR-02.3 requires, where two schema versions are live at once and an old consumer must read a new producer's output.
+
+Enforcement is in two places. At merge time, `SchemaCompatibilityTest` in the `contracts` module validates every schema against a committed baseline offline, with no broker or registry involved, so the result depends only on the commit under review (ADR-029). Accepting a deliberate break requires running `./gradlew updateSchemaBaseline`, which produces a reviewable diff. At runtime, Schema Registry remains the enforcement point for producers and consumers.
 
 ### Market Data Simulator
 
@@ -763,6 +767,7 @@ than one viable alternative, so this list is the register of decisions taken; a 
 - ADR-026: Deterministic and agentic performance/cost isolation
 - ADR-027: Per-record poison quarantine + event-fed market-data cache
 - ADR-028: Multi-module repository with independently deployable services
+- ADR-029: Offline FULL-compatibility schema gate against a committed baseline
 
 ---
 

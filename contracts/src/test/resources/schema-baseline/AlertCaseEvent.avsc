@@ -1,0 +1,18 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "AlertCaseEvent",
+  "doc": "Investigation case lifecycle transition. Actor identity comes from the authenticated principal.",
+  "fields": [
+    {"name": "caseId", "type": "string"},
+    {"name": "alertId", "type": "string"},
+    {"name": "state", "type": {"type": "enum", "name": "CaseState",
+     "symbols": ["OPEN", "ACKNOWLEDGED", "INVESTIGATING", "CLOSED", "FALSE_POSITIVE"]}},
+    {"name": "actorSubject", "type": "string"},
+    {"name": "actorRole", "type": "string"},
+    {"name": "reasonCode", "type": "string"},
+    {"name": "comment", "type": ["null", "string"], "default": null},
+    {"name": "eventTimestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlationId", "type": "string"}
+  ]
+}

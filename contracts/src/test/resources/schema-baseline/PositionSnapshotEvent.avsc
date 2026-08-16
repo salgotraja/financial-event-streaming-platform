@@ -1,0 +1,19 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "PositionSnapshotEvent",
+  "doc": "Position and exposure read model snapshot (ADR-017)",
+  "fields": [
+    {"name": "snapshotId", "type": "string"},
+    {"name": "accountId", "type": "string", "doc": "RESTRICTED"},
+    {"name": "traderId", "type": "string", "doc": "RESTRICTED"},
+    {"name": "ticker", "type": "string"},
+    {"name": "netQuantity", "type": "long"},
+    {"name": "grossBuyQuantity", "type": "long"},
+    {"name": "grossSellQuantity", "type": "long"},
+    {"name": "marketValue", "type": "double"},
+    {"name": "asOf", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "lastProcessedTradeId", "type": "string",
+     "doc": "Idempotency marker. Reprocessing this trade must not double-count (FR-11.3)."}
+  ]
+}

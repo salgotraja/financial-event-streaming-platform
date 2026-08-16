@@ -1,0 +1,23 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "RiskRuleLifecycleEvent",
+  "doc": "Immutable risk-rule lifecycle transition under maker-checker governance (ADR-016)",
+  "fields": [
+    {"name": "ruleId", "type": "string"},
+    {"name": "version", "type": "long"},
+    {"name": "state", "type": {"type": "enum", "name": "RuleState",
+     "symbols": ["DRAFT", "PENDING_APPROVAL", "ACTIVE", "RETIRED", "REJECTED"]}},
+    {"name": "ruleType", "type": "string"},
+    {"name": "parameters", "type": {"type": "map", "values": "string"}},
+    {"name": "makerSubject", "type": "string",
+     "doc": "Identity that proposed the change"},
+    {"name": "checkerSubject", "type": ["null", "string"], "default": null,
+     "doc": "Approving identity. Must never equal makerSubject (FR-12.2)."},
+    {"name": "reason", "type": "string"},
+    {"name": "effectiveAt", "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}],
+     "default": null},
+    {"name": "eventTimestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlationId", "type": "string"}
+  ]
+}

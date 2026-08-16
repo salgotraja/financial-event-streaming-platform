@@ -1,0 +1,33 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "AgentDecisionEvent",
+  "doc": "Structured agent investigation decision. Authorization and workflow are driven by the typed fields; the narrative is a presentation artifact. Raw chain-of-thought is never carried here (ADR-025).",
+  "fields": [
+    {"name": "decisionId", "type": "string"},
+    {"name": "candidateId", "type": "string"},
+    {"name": "outcome", "type": {"type": "enum", "name": "AgentOutcome",
+     "symbols": ["FLAG", "NO_FLAG", "ESCALATE", "INCONCLUSIVE"]},
+     "doc": "Tool failure or budget exhaustion must yield ESCALATE, never NO_FLAG (FR-20.5)"},
+    {"name": "severity", "type": {"type": "enum", "name": "AgentSeverity",
+     "symbols": ["INFO", "WARNING", "CRITICAL"]}},
+    {"name": "confidence", "type": {"type": "enum", "name": "AgentConfidence",
+     "symbols": ["LOW", "MEDIUM", "HIGH", "NOT_APPLICABLE"]}},
+    {"name": "reasonCodes", "type": {"type": "array", "items": "string"}},
+    {"name": "evidenceRefs", "type": {"type": "array", "items": "string"}},
+    {"name": "precedentRefs", "type": {"type": "array", "items": "string"}, "default": [],
+     "doc": "Empty when Neo4j is unavailable. Absence is disclosed, not silently treated as no precedent (ADR-022)."},
+    {"name": "toolStatus", "type": {"type": "map", "values": "string"}, "default": {}},
+    {"name": "narrative", "type": "string"},
+    {"name": "critiqueApplied", "type": "boolean"},
+    {"name": "critiqueTrigger", "type": ["null", "string"], "default": null},
+    {"name": "modelId", "type": "string"},
+    {"name": "promptVersion", "type": "string"},
+    {"name": "toolsetVersion", "type": "string"},
+    {"name": "inputTokens", "type": "long"},
+    {"name": "outputTokens", "type": "long"},
+    {"name": "estimatedCostUsd", "type": "double"},
+    {"name": "decidedAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlationId", "type": "string"}
+  ]
+}

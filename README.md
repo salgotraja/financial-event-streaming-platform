@@ -60,6 +60,11 @@ scripts/                repository tooling
 
 Build with `./gradlew build`. Java 25, Gradle 9.5.1, Spring Boot 4.1.0. Tests require Docker.
 
+Two gates run on every pull request and both fail the build rather than warn:
+`./gradlew :contracts:test` enforces FULL schema compatibility against a committed baseline (ADR-029),
+and `./gradlew checkPlaneIsolation` enforces that no deterministic-plane module depends on the agent
+plane, Neo4j or an LLM provider (ADR-026, ADR-028).
+
 ## Start here
 
 - `docs/requirements-v1.2.md`

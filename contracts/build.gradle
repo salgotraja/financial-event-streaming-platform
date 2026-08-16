@@ -7,8 +7,24 @@ dependencies {
     api 'org.apache.avro:avro:1.12.1'
 
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params'
     testImplementation 'org.assertj:assertj-core'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// FR-02.2 schema evolution gate. SchemaCompatibilityTest asserts every schema can read data written
+// by the accepted baseline. Accepting a deliberate break is an explicit, reviewable action (ADR-029).
+tasks.register('updateSchemaBaseline', Copy) {
+    group = 'contracts'
+    description = 'Accepts the current schemas as the new compatibility baseline. Review the diff.'
+
+    from 'src/main/avro'
+    into 'src/test/resources/schema-baseline'
+    include '**/*.avsc'
+
+    doLast {
+        logger.lifecycle('Schema baseline updated. Commit the diff and justify any breaking change.')
+    }
 }
 
 avro {
