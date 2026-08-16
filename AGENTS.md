@@ -33,7 +33,11 @@ AWS CDK (Java) for ECS Fargate, Helm for EKS.
 (`apache/kafka-native`), PostgreSQL, Zipkin and the Grafana LGTM stack.
 
 There is no Maven build here. Ignore any `./mvnw` reference. No formatter and no linter are
-configured; `check` maps to `test` only. Spotless is not on this build.
+configured; `check` maps to `test` plus `checkPlaneIsolation`. Spotless is not on this build.
+
+`./gradlew checkPlaneIsolation` enforces the central invariant: no ingestion, streaming or audit
+module may depend on an agent module, on Neo4j, or on an LLM provider. It reports how many modules it
+inspected, so a vacuous pass is visible rather than silent.
 
 ## Architecture: five planes and one invariant
 
