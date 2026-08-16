@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: market-data-simulator
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      properties:
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+        auto.register.schemas: false
+
+# Durability (acks=all, idempotence, batching, lz4) is applied by platform-common's
+# ProducerDurabilityConfiguration, not here, so a service cannot ship with weaker settings.
+
+fes:
+  market-data-simulator:
+    topic: market-data.ticks
+    # FR-01.4 load simulation mode. Off by default: this is a mode, not boot behaviour.
+    generation:
+      enabled: ${MARKET_DATA_GENERATION_ENABLED:false}
+      rate-per-second: ${MARKET_DATA_RATE_PER_SECOND:1000}
+      batch-interval: 10ms
+    # ADR-006. Annualised drift and volatility; Pareto shape is fixed at 1.5 by the ADR.
+    model:
+      drift-annual: 0.08
+      volatility-annual: 0.25
+      step-seconds: 1.0
+      spread-bps: 5.0
+      pareto-shape: 1.5
+      pareto-scale: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs

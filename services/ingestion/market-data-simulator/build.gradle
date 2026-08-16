@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// FR-01.2, publish path only. The configurable rate driver and the FR-01.4 GBM/Pareto load mode are
+// not built yet.
+// Workload identity: market-data-simulator. Kafka permission: connect and write market-data.ticks
+// only. It must not be able to read that topic.
+
+description = 'Publishes synthetic market price ticks to market-data.ticks'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'io.confluent:kafka-avro-serializer:7.9.1'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
