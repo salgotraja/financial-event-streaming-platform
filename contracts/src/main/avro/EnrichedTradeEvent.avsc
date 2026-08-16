@@ -20,7 +20,7 @@
      "doc": "When enrichment completed"},
     {"name": "enrichmentLatencyMs", "type": "long",
      "doc": "Milliseconds from consume to enriched publish"},
-    {"name": "marketDataAgeMs", "type": ["null", "long"], "default": null,
-     "doc": "Age of the Redis market-state entry used. Freshness policy input (ADR-027)."}
+    {"name": "marketDataAgeMs", "type": "long",
+     "doc": "Age of the Redis market-state entry used for enrichment. Non-null by design: this is the freshness-policy input (ADR-027), and an unknown age is the state that policy exists to prevent. A trade with no usable cache entry does not produce an EnrichedTradeEvent, it takes the REFERENCE_DATA_UNAVAILABLE retry and DLQ path."}
   ]
 }
