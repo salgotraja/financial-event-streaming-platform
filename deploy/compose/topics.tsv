@@ -1,0 +1,37 @@
+# Topic inventory for the local stack. Tab-separated so the bootstrap script needs no parser.
+#
+# docs/architecture-v1.2.md is authoritative and is mirrored in .claude/rules/kafka.md. Neither is
+# tracked in git, so this file exists to give the tracked stack a tracked inventory. When a topic
+# changes there, change it here in the same commit; nothing checks the two agree.
+#
+# Replication is 3 for every topic, matching min.insync.replicas=2 and the producers' acks=all.
+# Twelve partitions is the scaling ceiling for trade-path consumer groups; control-plane topics use
+# fewer deliberately, because ordering and auditability matter more than throughput there.
+#
+# name	partitions	extra config (comma separated, empty as -)
+
+trades.raw	12	retention.ms=604800000
+trades.enriched	12	retention.ms=604800000
+market-data.ticks	12	retention.ms=86400000
+corporate-actions	6	retention.ms=2592000000
+reference-data.instruments	6	cleanup.policy=compact
+positions.snapshots	12	retention.ms=604800000
+notifications.alerts	6	retention.ms=259200000
+risk-rules.events	6	retention.ms=31536000000
+alert-cases.events	6	retention.ms=31536000000
+controls.reconciliation	6	retention.ms=31536000000
+security.events	6	retention.ms=31536000000
+legacy.trades.cdc	6	retention.ms=259200000
+reconciliation.observations	6	retention.ms=604800000
+anomaly.candidates	6	retention.ms=259200000
+agent.decisions	6	retention.ms=2592000000
+review.decisions	6	retention.ms=31536000000
+remediation.requested	6	retention.ms=2592000000
+precedent.graph.sync	6	retention.ms=604800000
+
+# Dead-letter topics, source-aligned partitions, 30 days. Only the topics that have a consumer today
+# need one; the rest arrive with their consumers.
+trades.raw.dlq	12	retention.ms=2592000000
+market-data.ticks.dlq	12	retention.ms=2592000000
+corporate-actions.dlq	6	retention.ms=2592000000
+reference-data.instruments.dlq	6	retention.ms=2592000000

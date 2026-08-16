@@ -1,0 +1,116 @@
+# Local stack (FR-09.1). Bring it up with scripts/local-stack.sh rather than by hand: the profile
+# needs certificates, topics, schema subjects and ACLs provisioned in order, and none of that is
+# expressible in compose alone.
+#
+# Three brokers, not one. The shared producer profile ships acks=all with min.insync.replicas=2, and
+# a single-broker stack silently downgrades that to a durability guarantee the platform does not
+# actually have. Local Kafka is self-managed here and MSK in the cloud (ADR-001).
+#
+# The strict-security profile is a separate overlay file. This one is plaintext and is never evidence
+# of production security.
+
+name: fes-local
+
+x-kafka-common: &kafka-common
+  image: apache/kafka:4.1.0
+  environment: &kafka-env
+    CLUSTER_ID: fes-local-cluster-0001
+    KAFKA_PROCESS_ROLES: broker,controller
+    KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+    KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+    KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+    KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+    # Replication that matches the durability profile the producers are configured for.
+    KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+    KAFKA_MIN_INSYNC_REPLICAS: 2
+    KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+    KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+    KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+    # Topics come from deploy/compose/topics.tsv with explicit partition counts. Auto-creation would
+    # quietly produce single-partition topics that do not match the inventory.
+    KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+  healthcheck:
+    test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:19092 >/dev/null 2>&1"]
+    interval: 5s
+    timeout: 10s
+    retries: 30
+    start_period: 15s
+
+services:
+  kafka1:
+    <<: *kafka-common
+    container_name: fes-kafka1
+    hostname: kafka1
+    ports: ["29092:9092"]
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: INTERNAL://:19092,CONTROLLER://:9093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka1:19092,EXTERNAL://localhost:29092
+    volumes: ["kafka1-data:/var/lib/kafka/data"]
+
+  kafka2:
+    <<: *kafka-common
+    container_name: fes-kafka2
+    hostname: kafka2
+    ports: ["29093:9092"]
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 2
+      KAFKA_LISTENERS: INTERNAL://:19092,CONTROLLER://:9093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka2:19092,EXTERNAL://localhost:29093
+    volumes: ["kafka2-data:/var/lib/kafka/data"]
+
+  kafka3:
+    <<: *kafka-common
+    container_name: fes-kafka3
+    hostname: kafka3
+    ports: ["29094:9092"]
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 3
+      KAFKA_LISTENERS: INTERNAL://:19092,CONTROLLER://:9093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka3:19092,EXTERNAL://localhost:29094
+    volumes: ["kafka3-data:/var/lib/kafka/data"]
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.9.1
+    container_name: fes-schema-registry
+    hostname: schema-registry
+    depends_on:
+      kafka1: {condition: service_healthy}
+      kafka2: {condition: service_healthy}
+      kafka3: {condition: service_healthy}
+    ports: ["8081:8081"]
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka1:19092,PLAINTEXT://kafka2:19092,PLAINTEXT://kafka3:19092
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 3
+      # FULL, matching the merge-time gate in contracts. A registry that accepts what the build
+      # rejects would make the gate advisory (ADR-029).
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: full
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects >/dev/null"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: fes-kafka-ui
+    depends_on:
+      kafka1: {condition: service_healthy}
+    ports: ["8080:8080"]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: fes-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka1:19092,kafka2:19092,kafka3:19092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      DYNAMIC_CONFIG_ENABLED: "true"
+
+volumes:
+  kafka1-data:
+  kafka2-data:
+  kafka3-data:

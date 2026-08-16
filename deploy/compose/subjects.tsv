@@ -1,0 +1,36 @@
+# Which schema is registered under which subject. Tab-separated, no parser needed.
+#
+# Production runs auto.register.schemas=false so a deploy cannot introduce a schema version that
+# routed around the compatibility gate (ADR-029). That makes registration a provisioning step, and
+# this file is what performs it. A topic whose subject is missing fails at the first record, not at
+# startup, which is how the audit service's dead-letter path stayed broken until it was written down.
+#
+# A schema that names another record type carries a reference to that type's subject, so the registry
+# holds one definition of it rather than two that can drift. Referenced subjects must be listed first.
+#
+# topic	schema file under contracts/src/main/avro	reference as type=subject, or - for none
+
+trades.raw	TradeEvent.avsc	-
+trades.enriched	EnrichedTradeEvent.avsc	dev.engnotes.fes.events.TradeEvent=trades.raw-value
+market-data.ticks	MarketDataTickEvent.avsc	-
+corporate-actions	CorporateActionEvent.avsc	-
+reference-data.instruments	InstrumentReferenceEvent.avsc	-
+positions.snapshots	PositionSnapshotEvent.avsc	-
+notifications.alerts	RiskAlertEvent.avsc	-
+risk-rules.events	RiskRuleLifecycleEvent.avsc	-
+alert-cases.events	AlertCaseEvent.avsc	-
+controls.reconciliation	ReconciliationEvent.avsc	-
+security.events	SecurityEvent.avsc	-
+reconciliation.observations	ReconciliationObservationEvent.avsc	-
+anomaly.candidates	AnomalyCandidateEvent.avsc	-
+agent.decisions	AgentDecisionEvent.avsc	-
+review.decisions	HumanReviewDecisionEvent.avsc	-
+
+# Every dead-letter topic carries DeadLetterEvent. These are the ones with a consumer today.
+trades.raw.dlq	DeadLetterEvent.avsc	-
+market-data.ticks.dlq	DeadLetterEvent.avsc	-
+corporate-actions.dlq	DeadLetterEvent.avsc	-
+reference-data.instruments.dlq	DeadLetterEvent.avsc	-
+
+# Deliberately absent: legacy.trades.cdc carries the Debezium connector's own envelope rather than a
+# schema this repo owns; remediation.requested and precedent.graph.sync have no schema yet.
