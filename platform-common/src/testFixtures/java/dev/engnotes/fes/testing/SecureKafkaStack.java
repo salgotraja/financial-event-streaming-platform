@@ -44,6 +44,13 @@ import org.testcontainers.utility.DockerImageName;
  *
  * <p>The broker denies by default. {@code allow.everyone.if.no.acl.found=false} is what makes an
  * absent grant a denial rather than a pass, and it is the single setting this whole fixture rests on.
+ *
+ * <p><strong>Grants are additive and nothing revokes them, so one authorization test class per JVM.</strong>
+ * {@link #apply} only ever creates ACLs; the container is static and never reset. Gradle forks a test
+ * JVM per module, so today each module's single authorization class gets a clean broker. Put two
+ * such classes in one JVM and the second inherits the first's grants, which turns a denial assertion
+ * into a pass without failing anything. If a module ever needs two, add a revoke step rather than
+ * assuming isolation.
  */
 public final class SecureKafkaStack {
 
