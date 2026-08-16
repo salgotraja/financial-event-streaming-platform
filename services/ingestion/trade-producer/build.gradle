@@ -1,0 +1,29 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// FR-01.1. Publishes trade execution events to trades.raw.
+// Workload identity: trade-producer. Kafka permission: connect and write trades.raw only. It must
+// not be able to read the topic it writes (see the security negative-test matrix).
+
+description = 'Publishes synthetic trade execution events to trades.raw'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'io.confluent:kafka-avro-serializer:7.9.1'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}

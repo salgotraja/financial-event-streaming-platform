@@ -17,3 +17,6 @@ include 'platform-common'
 //
 // Add each with include 'services:<group>:<service>' when the phase that needs it starts.
 // Do not create empty modules ahead of that.
+
+// Phase 1: core event spine
+include 'services:ingestion:trade-producer'
