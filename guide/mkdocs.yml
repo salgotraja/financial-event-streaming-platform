@@ -92,6 +92,7 @@ nav:
   - Boundaries:
       - Specified, not built: not-built.md
       - Glossary: glossary.md
+  - Maintaining this guide: maintaining.md
 
 extra_css:
   - stylesheets/extra.css
