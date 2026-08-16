@@ -43,3 +43,5 @@ out/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
 .claude/budget.txt
+/docs/
+/scripts/sync-agent-config.sh
