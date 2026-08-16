@@ -46,7 +46,7 @@ public final class KafkaAclScriptRenderer {
                     lines.add("--allow-principal User:%s --operation %s --%s %s".formatted(
                             policy.principal(),
                             operation.name(),
-                            grant.resourceType().name().toLowerCase(),
+                            resourceFlag(grant.resourceType()),
                             grant.name()));
                 }
             }
@@ -54,6 +54,17 @@ public final class KafkaAclScriptRenderer {
 
         Files.createDirectories(output.getParent());
         Files.write(output, lines);
+
         System.out.println("Rendered " + (lines.size()) + " lines from " + policies.size() + " policies to " + output);
+    }
+
+    /**
+     * Kafka's resource flags are hyphenated where the enum name is not: {@code TRANSACTIONAL_ID} is
+     * {@code --transactional-id}. Lowercasing alone would emit a flag {@code kafka-acls.sh} rejects,
+     * and only for resource types no policy uses yet, which is the kind of break that surfaces in
+     * someone else's session.
+     */
+    private static String resourceFlag(org.apache.kafka.common.resource.ResourceType resourceType) {
+        return resourceType.name().toLowerCase().replace('_', '-');
     }
 }

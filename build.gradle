@@ -119,6 +119,9 @@ tasks.register('renderKafkaAcls', JavaExec) {
 
 tasks.register('check') {
     dependsOn 'checkPlaneIsolation'
+    // Renders on every build so a malformed or unrenderable policy fails here, rather than when
+    // someone brings up the strict-security stack days later.
+    dependsOn 'renderKafkaAcls'
     dependsOn subprojects.collect { "${it.path}:check" }
 }
 
