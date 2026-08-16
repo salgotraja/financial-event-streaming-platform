@@ -5,17 +5,20 @@ allowed-tools: Read, Bash, Edit, Glob
 ---
 
 ## Steps
-1. Identify target: class name, package, type (Service/Controller/Repository/Utility)
-2. Derive paths:
-   - Implementation: `src/main/java/{package}/{ClassName}.java`
-   - Test: `src/test/java/{package}/{ClassName}Test.java`
-3. Check if test exists: `find src/test -name "{ClassName}Test.java" 2>/dev/null`
-4. If test EXISTS: read it, note coverage, then proceed with implementation
-5. If test DOES NOT EXIST: create skeleton BEFORE writing implementation
+
+1. Identify target: class name, package, owning service module, and type
+   (Service / Controller / Consumer / Producer / Repository / Utility)
+2. Derive paths inside the owning module:
+   - Implementation: `{module}/src/main/java/dev/engnotes/fes/{service}/{ClassName}.java`
+   - Test: `{module}/src/test/java/dev/engnotes/fes/{service}/{ClassName}Test.java`
+3. Check if the test exists: `find . -name "{ClassName}Test.java" -not -path "./build/*"`
+4. If the test EXISTS: read it, note coverage, then proceed with implementation
+5. If the test DOES NOT EXIST: create the skeleton BEFORE writing implementation
 
 ## Test Skeleton
+
 ```java
-package {package};
+package dev.engnotes.fes.{service};
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,10 +44,26 @@ class {ClassName}Test {
 }
 ```
 
-6. After creating skeleton, stop and ask: "What behaviour should the first test verify?"
+6. After creating the skeleton, stop and ask: "What behaviour should the first test verify?"
 7. Write implementation only after at least one failing test exists
 
+## Mandatory Cases by Class Type
+
+Before the class is done, these must be covered. Do not treat the happy path as sufficient.
+
+- **Kafka consumer**: same event processed twice yields one effect (at-least-once, ADR-019);
+  a malformed record goes to `{topic}.dlq` and the partition keeps moving (ADR-027).
+- **Kafka producer**: message key set, trace context injected into headers.
+- **Controller on the admin control plane**: one ALLOW and two DENY authorization cases; actor
+  identity taken from the authenticated principal, never from the request body.
+- **Agent tool**: unknown tool name denied, undeclared argument rejected, tool failure escalates
+  rather than returning `NO_FLAG` (ADR-023).
+- **Read model**: rebuild from event history produces the same state and reports reconciliation.
+
 ## Rules
-- Use AssertJ (assertThat) — not JUnit assertEquals
-- Use @ExtendWith(MockitoExtension.class) — not @SpringBootTest for unit tests
-- Naming: should_{expectedBehaviour}_when_{condition} in snake_case
+
+- Use AssertJ (`assertThat`), not JUnit `assertEquals`
+- Use `@ExtendWith(MockitoExtension.class)`, not `@SpringBootTest`, for unit tests
+- Use `@MockitoBean` where a Spring context is genuinely needed, not the removed `@MockBean`
+- Kafka and PostgreSQL integration tests use Testcontainers, not `@EmbeddedKafka` and not H2
+- Naming: `should_{expectedBehaviour}_when_{condition}` in snake_case
