@@ -1,0 +1,16 @@
+# Grafana datasources, provisioned so the stack is useful on first start rather than after a
+# click-through. Dashboards belong in observability/ at the repo root when they land.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100

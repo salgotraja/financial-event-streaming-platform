@@ -1,0 +1,54 @@
+# OpenTelemetry Collector for the local stack.
+#
+# Services push OTLP and the collector fans out: metrics are exposed for Prometheus to scrape, logs
+# go to Loki. This works for services run from an IDE as well as containerised ones, because the
+# services push rather than being scraped.
+#
+# Two deliberate departures from docs/specification-v1.2.md's collector configuration, which was
+# written against an older collector and no longer starts:
+#
+#   - the `jaeger` exporter was removed from the collector; Jaeger takes OTLP directly now
+#   - the `loki` exporter was removed in favour of OTLP over HTTP, which Loki ingests at /otlp
+#
+# Traces are received and logged rather than stored. FR-09.1 lists no trace backend, so there is
+# nowhere to put them; adding Tempo or Jaeger is a decision for whoever first needs trace search.
+# Receiving them keeps a service's tracing export from failing against a dead endpoint.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

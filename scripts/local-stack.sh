@@ -43,12 +43,16 @@ compose() {
 }
 
 # Every Kafka CLI call needs client configuration under strict-security and none under dev.
+#
+# The ${extra[@]+"${extra[@]}"} form is not decoration. macOS ships bash 3.2, where expanding an
+# empty array under `set -u` is an unbound-variable error, so the plain form made every dev-profile
+# call fail while strict-security worked.
 kafka_cli() {
   local script="$1"; shift
   local extra=()
   [ "$PROFILE" = "strict-security" ] && extra=(--command-config "$ADMIN_CONFIG")
   compose exec -T kafka1 "/opt/kafka/bin/$script" --bootstrap-server "$BOOTSTRAP_INTERNAL" \
-    "${extra[@]}" "$@" </dev/null
+    ${extra[@]+"${extra[@]}"} "$@" </dev/null
 }
 
 require_tools() {
@@ -116,13 +120,26 @@ create_topics() {
       done
     fi
 
-    if kafka_cli kafka-topics.sh "${args[@]}" 2>/dev/null | grep -q Created; then
-      created=$((created + 1))
-    else
-      existing=$((existing + 1))
+    # Failure has to be told apart from "already exists". Counting a failed create as existing is
+    # how this script once reported 22 topics present against a broker that had none.
+    local output status
+    set +e
+    output="$(kafka_cli kafka-topics.sh "${args[@]}" 2>&1)"
+    status=$?
+    set -e
+    if [ $status -ne 0 ]; then
+      die "could not create topic $name: $output"
     fi
+    case "$output" in
+      *Created*) created=$((created + 1)) ;;
+      *)         existing=$((existing + 1)) ;;
+    esac
   done < "$COMPOSE_DIR/topics.tsv"
   log "topics: $created created, $existing already present"
+
+  local actual
+  actual="$(kafka_cli kafka-topics.sh --list 2>/dev/null | grep -cv '^_' || true)"
+  log "topics on the broker: $actual"
 }
 
 register_subjects() {
@@ -266,6 +283,10 @@ Local stack is up (profile: $PROFILE).
   Kafka            localhost:29092, localhost:29093, localhost:29094
   Schema Registry  http://localhost:8081
   Kafka UI         http://localhost:8080
+  Grafana          http://localhost:3000
+  Prometheus       http://localhost:9090
+  Loki             http://localhost:3100
+  OTLP endpoint    localhost:4317 (grpc), localhost:4318 (http)
 BANNER
 
   if [ "$PROFILE" = "strict-security" ]; then
