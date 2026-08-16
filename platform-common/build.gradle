@@ -25,6 +25,14 @@ dependencies {
     // Shared Testcontainers wiring, consumed by services as testImplementation
     // testFixtures(project(':platform-common')). Testcontainers over @EmbeddedKafka and over H2 so
     // tests run against the same Kafka and PostgreSQL implementations as the deployed system.
+    // Reads each service's committed security/kafka-acls.yml. Version comes from the Boot BOM.
+    testFixturesApi 'org.yaml:snakeyaml'
+
+    // The authorization contract each service module extends is a fixture, so its test framework
+    // has to be on the fixture's own compile classpath rather than only the consumers'.
+    testFixturesApi 'org.junit.jupiter:junit-jupiter-api'
+    testFixturesApi 'org.assertj:assertj-core'
+
     testFixturesApi 'org.springframework.boot:spring-boot-test'
     testFixturesApi 'org.springframework.boot:spring-boot-testcontainers'
     testFixturesApi 'org.testcontainers:testcontainers-junit-jupiter'
