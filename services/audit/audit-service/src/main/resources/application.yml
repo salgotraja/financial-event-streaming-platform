@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: audit-service
+  kafka:
+    properties:
+      schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+    consumer:
+      # The group name is the service name, fixed by specification-v1.2 line 737 and by the IAM
+      # policy and KEDA query that scope it. Never suffixed.
+      group-id: audit-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Bytes, not Avro: the archive stores the payload that was published, and a schema failure
+      # belongs inside the listener as one quarantined record rather than in the deserialiser as a
+      # stalled partition.
+      value-deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+    producer:
+      # Producing is limited to {topic}.dlq. This service never writes onto a financial topic.
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      properties:
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+        auto.register.schemas: false
+
+# enable.auto.commit=false and MANUAL_IMMEDIATE come from platform-common's
+# ConsumerAcknowledgementConfiguration, not from here, so this service cannot ship weaker offset
+# management by omission. isolation.level is deliberately unset (ADR-019).
+
+fes:
+  audit-service:
+    # FR-05.1 lists every evidence topic. This is the subset with a producer today; the rest join as
+    # their services land, and the enrichment, risk, control, security and agent topics are not
+    # archived yet because nothing writes them.
+    topics: trades.raw,market-data.ticks,corporate-actions,reference-data.instruments
+    consumer-instance: ${HOSTNAME:audit-service-local}
+    recent-record-window: 100000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs

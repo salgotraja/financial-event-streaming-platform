@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// FR-05. Archival consumer for every topic whose contents are evidence.
+// Workload identity: audit-service. Consumer group: audit-service (specification-v1.2 line 737).
+// Kafka permission: read the evidence topics, write only {topic}.dlq. It never produces onto a
+// financial topic.
+//
+// This module is the archival consumer skeleton. The S3 Parquet writer, the sidecar manifest, the
+// KMS signature and Object Lock retention are Phase 3 and are deliberately absent: an AuditSink port
+// with a logging implementation stands in their place, so nothing here can be mistaken for evidence
+// storage that exists.
+
+description = 'Archives evidence topics; skeleton, sink is not yet durable storage'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'io.confluent:kafka-avro-serializer:7.9.1'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
