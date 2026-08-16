@@ -1,0 +1,11 @@
+plugins {
+    id 'java-library'
+}
+
+// Shared event contracts. Avro schema files live in src/main/avro/ and are the single definition of
+// every topic payload (ADR-002, ADR-028). Namespace: dev.engnotes.fes.events.
+//
+// This module holds contracts only. No business logic, no Spring wiring, no service code.
+// The Avro code-generation plugin is added when the first schema lands in README Phase 1.
+
+description = 'Avro event contracts shared by every producer and consumer'

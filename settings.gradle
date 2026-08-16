@@ -1,1 +1,19 @@
 rootProject.name = 'financial-event-streaming-platform'
+
+// Shared modules. The only code any service is permitted to depend on (ADR-028).
+include 'contracts'
+include 'platform-common'
+
+// Service modules land per README phase, grouped by architectural plane:
+//
+//   services/ingestion   trade-producer, market-data-simulator, corporate-action-producer,
+//                        reference-data-service, migration-normalizer
+//   services/streaming   market-data-cache-projector, trade-enrichment-service,
+//                        risk-alert-service, position-exposure-service
+//   services/audit       audit-service, reconciliation-service
+//   services/control     alert-case-service, risk-rule-governance-service,
+//                        anomaly-candidate-service, reconciliation-simulator, admin-control-plane
+//   services/agent       agent-investigation-service, human-review-service, precedent-sync-service
+//
+// Add each with include 'services:<group>:<service>' when the phase that needs it starts.
+// Do not create empty modules ahead of that.

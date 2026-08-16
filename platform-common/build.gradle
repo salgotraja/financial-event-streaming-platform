@@ -1,0 +1,37 @@
+plugins {
+    id 'java-library'
+    id 'java-test-fixtures'
+}
+
+// Cross-cutting mechanics shared by every service: Kafka producer and consumer defaults,
+// deterministic idempotency keys, the DLQ publisher, structured logging, and OpenTelemetry and
+// security-telemetry conventions (ADR-028).
+//
+// Charter: mechanics only. No business logic. A change that wants to add domain behaviour here
+// belongs in a service module instead.
+
+description = 'Cross-cutting platform mechanics shared by every service'
+
+dependencies {
+    api project(':contracts')
+
+    api 'org.springframework.boot:spring-boot-starter-actuator'
+    api 'org.springframework.boot:spring-boot-starter-kafka'
+    api 'org.springframework.boot:spring-boot-starter-opentelemetry'
+
+    runtimeOnly 'io.micrometer:micrometer-registry-otlp'
+    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+
+    // Shared Testcontainers wiring, consumed by services as testImplementation
+    // testFixtures(project(':platform-common')). Testcontainers over @EmbeddedKafka and over H2 so
+    // tests run against the same Kafka and PostgreSQL implementations as the deployed system.
+    testFixturesApi 'org.springframework.boot:spring-boot-test'
+    testFixturesApi 'org.springframework.boot:spring-boot-testcontainers'
+    testFixturesApi 'org.testcontainers:testcontainers-junit-jupiter'
+    testFixturesApi 'org.testcontainers:testcontainers-kafka'
+    testFixturesApi 'org.testcontainers:testcontainers-postgresql'
+    testFixturesApi 'org.testcontainers:testcontainers-grafana'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
