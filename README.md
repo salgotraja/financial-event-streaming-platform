@@ -1,83 +1,108 @@
-# Financial Event Streaming Platform — v1.2
+# Financial Event Streaming Platform
 
-**Security-first financial streaming + migration + controlled agentic investigation**
+A security-first Kafka platform for financial event processing: trade enrichment, real-time risk
+evaluation, immutable audit, legacy-to-streaming migration, and a bounded, human-gated AI
+investigation layer.
 
-## What v1.2 demonstrates
+All market data and financial identifiers are synthetic. The platform performs no money movement, no
+trade execution, and no regulatory reporting.
 
-1. **Deterministic financial streaming** — Kafka/Avro, enrichment, risk, position/exposure, immutable audit, DLQ/replay, 50k events/sec target.
-2. **Enterprise security/IAM** — workload identity, OIDC human identity, least privilege, MSK IAM, policy enforcement, KMS signing, Object Lock, negative security tests.
-3. **Financial control/governance** — maker/checker rule changes, alert cases, reconciliation/control evidence.
-4. **Legacy modernization** — PostgreSQL + Debezium CDC -> canonical Kafka event stream, coexistence/backfill/cutover evidence.
-5. **AI investigation** — bounded agent over anomaly candidates, read-only tools, human review, Neo4j precedent graph.
-6. **AI reliability** — versioned golden/adversarial datasets, deterministic assertions, calibrated judge only where required, CI regression gate.
-7. **Architecture honesty** — no claim that the LLM handles 50k events/sec, no claim that 15 examples prove production accuracy, no claim that Neo4j is required by scale, and no real money movement.
+## What it does
 
-## Recommended implementation order
+Trade executions, market-data ticks, corporate actions and instrument reference data enter as Avro
+events on Kafka. Trades are enriched with market state, evaluated against governed risk rules, and
+projected into position and exposure read models. Every event is archived to immutable, tamper-evident
+object storage with signed manifests, and a reconciliation control proves the archive covers the stream.
 
-### Phase 0 — Identity, trust and threat model
-Commit the identity/trust matrix, threat model and policy boundaries first.
+Separately and asynchronously, deterministic screening promotes a small subset of events to an
+investigation queue, where a capability-bounded LLM agent gathers evidence through read-only tools and
+prepares a structured case for human review. The agent can propose. It cannot act.
 
-### Phase 1 — Core event spine
-Kafka/Schema Registry + Trade/Market/Corporate producers + audit skeleton.
+## Architecture
 
-### Phase 2 — Market-data projection, enrichment, deterministic risk, position/exposure
-Prove event-fed cache freshness, per-record poison handling, correctness, dependency failure behavior and observability before AI.
+Five planes, with different reliability, latency and cost characteristics:
 
-### Phase 3 — Security enforcement
-MSK IAM, per-workload roles, locked/signed audit, human OIDC control plane, negative authorization tests.
+| Plane | Responsibility |
+| --- | --- |
+| Ingestion | Synthetic producers and Debezium CDC from a legacy PostgreSQL source |
+| Streaming | Enrichment, risk evaluation, position and exposure read models |
+| Audit | Immutable archive, signed manifests, reconciliation controls |
+| Control | Anomaly screening, alert cases, maker-checker rule governance |
+| Agent | Bounded LLM investigation, precedent graph, human review |
 
-### Phase 4 — CDC migration
-Real Debezium snapshot/change capture + normalizer + dedup/cutover report.
+**The invariant that governs most design choices:** the agent plane is asynchronous and optional. A
+model provider outage, throttling, graph unavailability or budget exhaustion must never block the
+deterministic path or add an availability dependency to it. The two planes carry separate service
+objectives, and the throughput target belongs to deterministic streaming alone, never to the LLM.
 
-### Phase 5 — Reconciliation/candidate layer
-Reconciliation observations + deterministic anomaly candidates.
+The build enforces the structural half of this: no ingestion, streaming or audit module may depend on
+an agent module, on Neo4j, or on an LLM provider.
 
-### Phase 6 — Agent investigation
-Typed tool gateway + human review + decision trace.
+## Stack
 
-### Phase 7 — Graph precedent + eval
-Neo4j projection, golden/adversarial regression suite, CI gate.
+Java 25, Spring Boot 4.1, Gradle 9.5. Apache Kafka with Avro and Confluent Schema Registry.
+PostgreSQL, Redis, S3 with Object Lock, Neo4j. Debezium for change capture. OpenTelemetry, Prometheus,
+Grafana and Loki for observability. AWS CDK for ECS Fargate, Helm for EKS.
 
-### Phase 8 — Performance/failure evidence
-50k deterministic load test, broker/connector failures, agent/provider outage isolation, cost report.
+## Getting started
+
+Requires JDK 25 and a running Docker daemon. Integration tests start real Kafka and Schema Registry
+containers, so the first run pulls images and takes a few minutes.
+
+```bash
+./gradlew build                    # compile, test, and run both build gates
+./gradlew test                     # tests only
+./gradlew checkPlaneIsolation      # plane dependency rule on its own
+./gradlew :contracts:test          # schema compatibility gate on its own
+```
+
+## Build gates
+
+Two rules fail the build rather than warn, and both run on every pull request.
+
+**Schema compatibility.** Every Avro schema must stay fully compatible with the accepted baseline in
+`contracts/src/test/resources/schema-baseline/`. FULL rather than BACKWARD, because backward
+compatibility alone permits field removal, and two schema versions must interoperate during rolling
+upgrades. Accepting a deliberate break is explicit: `./gradlew updateSchemaBaseline` produces a
+reviewable diff.
+
+**Plane isolation.** The dependency rule described above, checked across the whole module graph.
 
 ## Repository structure
 
-Independently deployable services as Gradle modules, grouped by plane (ADR-028). Modules land per
-phase; only `contracts` and `platform-common` exist today.
+Each service is independently deployable with its own container image, workload identity, consumer
+group, scaling policy and database schema. They share only the two modules below, and neither carries
+business logic. Modules are added as the work reaches them rather than scaffolded in advance.
 
 ```text
-contracts/              Avro event contracts, dev.engnotes.fes.events
-platform-common/        Kafka defaults, idempotency, DLQ publisher, logging, OTel conventions
-services/ingestion/     Phase 1 and 4
-services/streaming/     Phase 2
-services/audit/         Phase 1 skeleton, Phase 3 enforcement
-services/control/       Phase 5
-services/agent/         Phase 6 and 7
-docs/                   authoritative v1.2 specification and ADRs (docs/archive is superseded)
-scripts/                repository tooling
+contracts/            Avro event contracts and generated types
+platform-common/      Kafka defaults, shared test infrastructure, cross-cutting conventions
+services/
+  ingestion/          producers and CDC migration normalizer
+  streaming/          enrichment, risk evaluation, position and exposure
+  audit/              archive writer and reconciliation
+  control/            anomaly screening, cases, rule governance
+  agent/              investigation, precedent sync, human review
 ```
 
-Build with `./gradlew build`. Java 25, Gradle 9.5.1, Spring Boot 4.1.0. Tests require Docker.
+## Status
 
-Two gates run on every pull request and both fail the build rather than warn:
-`./gradlew :contracts:test` enforces FULL schema compatibility against a committed baseline (ADR-029),
-and `./gradlew checkPlaneIsolation` enforces that no deterministic-plane module depends on the agent
-plane, Neo4j or an LLM provider (ADR-026, ADR-028).
+Early implementation. The event contracts and the first producer are built and tested; the remaining
+services are designed but not yet written.
 
-## Start here
+- [x] Avro event contracts with build-time code generation and a compatibility gate
+- [x] Trade producer publishing to `trades.raw`
+- [ ] Market-data and corporate-action producers, audit skeleton
+- [ ] Market-data projection, enrichment, risk evaluation, position and exposure
+- [ ] Security enforcement: workload identity, signed audit, authorization control plane
+- [ ] CDC migration with Debezium
+- [ ] Reconciliation observations and deterministic anomaly candidates
+- [ ] Agent investigation with a typed tool gateway and human review
+- [ ] Precedent graph and the evaluation regression suite
+- [ ] Load, failure and cost evidence
 
-- `docs/requirements-v1.2.md`
-- `docs/architecture-v1.2.md`
-- `docs/specification-v1.2.md`
-- `docs/adr/ADR-028-multi-module-independently-deployable-services.md`
-- `docs/security/identity-trust-matrix.md`
-- `docs/adr/ADR-021-deterministic-before-agent.md`
-- `docs/evals/golden-dataset-design-notes-v1.1.md`
+## Scope
 
-## Additional design documents
-
-- `docs/reconciliation-agent-v1.2.md`
-- `docs/portfolio-positioning-v1.2.md`
-- `docs/adr/ADR-022-graph-layer-detailed.md`
-- `docs/evals/evaluation-regression-harness-v1.2.md`
+Out of scope by design: order management, order routing, execution against real exchanges, settlement,
+money movement, automatic correction of financial ledgers, regulatory reporting, licensed market-data
+feeds, autonomous agent remediation, and storage of real personal data.
