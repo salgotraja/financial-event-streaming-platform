@@ -10,6 +10,18 @@ trade execution, and no regulatory reporting.
 Under active development. Not every service described here is implemented yet; read the source before
 assuming a component exists.
 
+## Learning guide
+
+`guide/` holds a code-accurate walkthrough of what is actually built: the trade-to-archive spine, the
+event contracts and their compatibility gate, the per-service Kafka authorization model, the build
+gates, the local stack, and a map from each behaviour to the test that proves it. It follows the
+source rather than the specification, and marks the difference where they diverge.
+
+```bash
+pip install -r guide/requirements.txt
+mkdocs serve -f guide/mkdocs.yml
+```
+
 ## What it does
 
 Trade executions, market-data ticks, corporate actions and instrument reference data enter as Avro

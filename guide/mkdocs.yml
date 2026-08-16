@@ -1,0 +1,93 @@
+site_name: Financial Event Streaming Platform
+site_description: A code-accurate learning guide to the delivered platform, its build gates and its authorization model.
+site_author: Jagdish Salgotra
+site_url: https://salgotraja.github.io/financial-event-streaming-platform/
+repo_url: https://github.com/salgotraja/financial-event-streaming-platform
+repo_name: financial-event-streaming-platform
+edit_uri: edit/main/guide/docs/
+
+docs_dir: docs
+site_dir: ../build/guide
+
+theme:
+  name: material
+  icon:
+    logo: material/transit-connection-variant
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+validation:
+  links:
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Start here: index.md
+  - Follow one trade: spine.md
+  - The map:
+      - Five planes: planes.md
+      - Modules and the isolation rule: modules.md
+      - Topics and schemas: topics.md
+  - Reference:
+      - Event contracts: contracts.md
+      - The four producers: producers.md
+      - The audit consumer: audit.md
+      - Workload authorization: authorization.md
+      - Build gates and CI: gates.md
+      - The local stack: local-stack.md
+  - Proof:
+      - Code to proof map: proof.md
+      - Gotchas: gotchas.md
+  - Boundaries:
+      - Specified, not built: not-built.md
+      - Glossary: glossary.md
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/salgotraja

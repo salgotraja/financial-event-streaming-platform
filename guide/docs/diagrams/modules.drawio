@@ -1,0 +1,96 @@
+<mxGraphModel dx="1200" dy="800" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="1360" pageHeight="820" math="0" shadow="0" adaptiveColors="auto">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;" value="Gradle modules and the one dependency rule the build enforces">
+      <mxGeometry x="40" y="20" width="900" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="Every module in settings.gradle, and nothing else. Modules land per phase; empty modules are not scaffolded ahead of the work.">
+      <mxGeometry x="40" y="50" width="1100" height="20" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="shared" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;" value="Shared code &#183; the only two modules a service may depend on (ADR-028)">
+      <mxGeometry x="40" y="90" width="780" height="200" as="geometry"/>
+    </mxCell>
+    <mxCell id="contracts" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=12;verticalAlign=top;spacingTop=8;" value="contracts&#10;&#10;16 .avsc files under src/main/avro&#10;31 generated Java types, namespace dev.engnotes.fes.events&#10;Task: updateSchemaBaseline&#10;No Spring, no business logic">
+      <mxGeometry x="65" y="126" width="330" height="145" as="geometry"/>
+    </mxCell>
+    <mxCell id="common" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;align=left;spacingLeft=12;verticalAlign=top;spacingTop=8;" value="platform-common&#10;&#10;ProducerDurabilityConfiguration&#10;ConsumerAcknowledgementConfiguration&#10;DeadLetterPublisher, FailureTracker&#10;testFixtures: KafkaAvroStack, SecureKafkaStack,&#10;KafkaAclPolicy, KafkaProducerAuthorizationContract">
+      <mxGeometry x="425" y="126" width="370" height="145" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="deterministic" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;" value="Deterministic planes &#183; checkPlaneIsolation inspects every module under these paths">
+      <mxGeometry x="40" y="330" width="800" height="290" as="geometry"/>
+    </mxCell>
+    <mxCell id="ingestion-grp" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b3b3b3;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=2;" value="services:ingestion">
+      <mxGeometry x="65" y="366" width="490" height="226" as="geometry"/>
+    </mxCell>
+    <mxCell id="m-trade" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="trade-producer">
+      <mxGeometry x="85" y="396" width="220" height="38" as="geometry"/>
+    </mxCell>
+    <mxCell id="m-mds" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="market-data-simulator">
+      <mxGeometry x="315" y="396" width="220" height="38" as="geometry"/>
+    </mxCell>
+    <mxCell id="m-ca" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="corporate-action-producer">
+      <mxGeometry x="85" y="444" width="220" height="38" as="geometry"/>
+    </mxCell>
+    <mxCell id="m-ref" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="reference-data-service">
+      <mxGeometry x="315" y="444" width="220" height="38" as="geometry"/>
+    </mxCell>
+    <mxCell id="m-mig" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=11;" value="migration-normalizer &#183; not in settings.gradle">
+      <mxGeometry x="85" y="492" width="450" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="m-stream" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=11;" value="services:streaming &#183; four modules, none in settings.gradle">
+      <mxGeometry x="85" y="536" width="450" height="34" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="audit-grp" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b3b3b3;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=2;" value="services:audit">
+      <mxGeometry x="575" y="366" width="240" height="226" as="geometry"/>
+    </mxCell>
+    <mxCell id="m-audit" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" value="audit-service">
+      <mxGeometry x="595" y="396" width="200" height="38" as="geometry"/>
+    </mxCell>
+    <mxCell id="m-recon" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=11;" value="reconciliation-service&#10;not in settings.gradle">
+      <mxGeometry x="595" y="444" width="200" height="44" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="agent-grp" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b85450;dashed=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#b85450;" value="services:agent and its libraries &#183; forbidden as a dependency">
+      <mxGeometry x="880" y="330" width="440" height="290" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-inv" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=11;" value="agent-investigation-service, human-review-service, precedent-sync-service">
+      <mxGeometry x="905" y="370" width="390" height="50" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-libs" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=12;verticalAlign=top;spacingTop=8;" value="Dependency group prefixes the check rejects&#10;&#10;org.neo4j&#10;com.anthropic&#10;dev.langchain4j&#10;io.github.ollama4j">
+      <mxGeometry x="905" y="436" width="390" height="130" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="dep1" parent="1" source="ingestion-grp" target="contracts" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#6c8ebf;endArrow=open;dashed=0;">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="dep2" parent="1" source="audit-grp" target="common" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#6c8ebf;endArrow=open;">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="dep3" parent="1" source="common" target="contracts" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#6c8ebf;endArrow=open;">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="forbidden" parent="1" source="deterministic" target="agent-grp" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;strokeWidth=3;endArrow=block;dashed=1;">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="forbidden-x" parent="1" vertex="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#b85450;strokeColor=#b85450;fontColor=#ffffff;fontSize=18;fontStyle=1;" value="X">
+      <mxGeometry x="842" y="455" width="36" height="36" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="rule" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=12;verticalAlign=top;spacingTop=8;fontSize=11;" value="The rule, as code&#10;&#10;build.gradle collects violations at configuration time into plain serializable data, so the task body never touches Project and the configuration cache can store the result. Two kinds of edge fail it: a ProjectDependency whose path starts with :services:agent, and any dependency whose group starts with one of the four prefixes on the right.&#10;&#10;The task prints how many modules it inspected, so a vacuous pass is never mistaken for a verified one.">
+      <mxGeometry x="880" y="90" width="440" height="200" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="cmd" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;align=left;spacingLeft=12;fontSize=12;fontFamily=Courier New;" value="./gradlew checkPlaneIsolation&#10;&gt; Plane isolation: 7 deterministic-plane module(s) checked">
+      <mxGeometry x="40" y="650" width="800" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="cmdnote" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=11;fontColor=#666666;" value="Seven, not five: the count includes the intermediate container projects :services:ingestion and :services:audit.">
+      <mxGeometry x="40" y="714" width="800" height="30" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>

@@ -1,0 +1,116 @@
+# Learn the platform by following one event
+
+A code-accurate companion to the Financial Event Streaming Platform: what is built, how it works, and
+how to prove each claim from the repository.
+
+!!! warning "What this guide covers, and what it does not"
+
+    `docs/` holds roughly 6,000 lines of specification describing about twenty services. Six modules
+    exist. This guide follows the **code**, not the specification. Every file path, class name, topic,
+    setting and number below was read out of the source tree, and where the specification describes a
+    target the code has not reached, the guide says so in that section rather than in a footnote.
+
+    One page, [Specified, not built](not-built.md), covers the rest. Nothing on any other page is a plan.
+
+!!! info "About the `docs/` citations in this guide"
+
+    The authoritative specifications and the ADRs are untracked by repository policy: `/docs/` and
+    every Markdown file except the root README are in `.gitignore`. They exist in a maintainer's
+    working tree and are not in a clone.
+
+    So a citation to `docs/architecture-v1.2.md`, `docs/task-status.md` or `docs/adr/ADR-019-*.md` is a
+    pointer for whoever holds those files, not a link you can follow. Everything cited under
+    `contracts/`, `platform-common/`, `services/`, `deploy/`, `scripts/` and `.github/` is in the
+    repository and can be opened.
+
+## What the platform is
+
+Trade executions, market-data ticks, corporate actions and instrument reference data enter as Avro
+events on Kafka. The design calls for enrichment, governed risk evaluation, position read models, an
+immutable evidence archive, and a separate, optional, human-gated LLM investigation layer.
+
+What runs today is the spine of that design: four producers, one consumer, the shared durability and
+offset profiles both of them inherit, an authenticated local broker with per-service authorization,
+and two build gates that fail rather than warn.
+
+All market data and financial identifiers are synthetic. The platform performs no money movement, no
+trade execution and no regulatory reporting.
+
+## Delivery state at a glance
+
+| Area | State |
+| --- | --- |
+| Event contracts, 16 Avro schemas, 31 generated types | Built |
+| Schema compatibility gate, FULL, offline | Built |
+| Plane isolation gate | Built |
+| Shared producer durability profile | Built |
+| Shared consumer offset profile and DLQ publisher | Built |
+| Four ingestion producers | Built |
+| Audit archival consumer | Built, writing to a logging stand-in rather than to S3 |
+| Per-service Kafka policy, authenticated broker, negative authorization tests | Built |
+| Local stack, both profiles, with observability | Built |
+| Deterministic streaming, CDC migration, control plane, agent plane | Not started |
+| Throughput and latency evidence | Not measured |
+
+The two rows at the bottom matter as much as the rest. The architecture states a 50,000 events/sec
+deterministic target and a sub-200ms risk latency budget. No sustained-throughput run has been done,
+so this guide never repeats those numbers as achievements.
+
+## Start here
+
+Pick the route that matches your question.
+
+**You want the shape of the thing.** Read [Follow one trade](spine.md), slowly, once. It is the spine:
+a single `TradeEvent` from a publisher call to an archived record, and to the dead-letter topic when
+the payload cannot be decoded. If only one page makes the platform legible, it is that one.
+
+**You want to know why the layout is what it is.** Read [Five planes](planes.md), then
+[Modules and the isolation rule](modules.md). The plane model explains almost every structural
+decision in the repository, including one the build enforces.
+
+**You are about to change a schema.** Read [Event contracts](contracts.md) first. Two independent
+checks stand between an edited `.avsc` and a running producer, and one of them will fail your build.
+
+**You are adding a service.** Read [Workload authorization](authorization.md). A service is not
+complete until it commits a least-privilege policy and proves one allowed path and two denied ones.
+
+**You want to run it.** Read [The local stack](local-stack.md). One script, two profiles, and a
+provisioning sequence that Compose alone cannot express.
+
+**You hit something strange.** Read [Gotchas](gotchas.md). Every entry cost someone real time.
+
+## Prerequisites
+
+JDK 25 and a running Docker daemon. The integration tests start real Kafka and Schema Registry
+containers, so the first run pulls images and takes a few minutes.
+
+```bash
+./gradlew build                    # compile, test, and run every gate
+./gradlew test                     # tests only
+./gradlew checkPlaneIsolation      # the plane dependency rule on its own
+./gradlew :contracts:test          # the schema compatibility gate on its own
+scripts/local-stack.sh up dev      # the local stack, plaintext profile
+```
+
+Gradle, not Maven. There is no `mvnw` in this repository.
+
+## How the guide is organised
+
+Each page answers one question and cites the file that answers it. Where a design decision has an ADR,
+the ADR number appears next to the claim, and the ADR itself lives in `docs/adr/` in the working tree.
+
+The [Code to proof map](proof.md) is the shortest path from a behaviour you want to trust to the test
+that demonstrates it. A useful habit with this codebase: read the implementation, then its focused
+unit test, then the integration test that runs it against a real broker. The three layers give you
+intent, local behaviour and the broker-shaped boundary in that order.
+
+## The one invariant worth memorising
+
+The agent plane is asynchronous and optional. A model provider outage, throttling, graph
+unavailability or budget exhaustion must never block the deterministic path or add an availability
+dependency to it. The two planes carry separate service objectives, and the throughput target belongs
+to deterministic streaming alone.
+
+The build enforces the structural half of this. No module under `services/ingestion`,
+`services/streaming` or `services/audit` may depend on an agent module, on Neo4j, or on an LLM
+provider, and `./gradlew checkPlaneIsolation` fails rather than warns.

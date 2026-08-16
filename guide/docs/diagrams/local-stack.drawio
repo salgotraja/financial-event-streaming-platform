@@ -1,0 +1,70 @@
+<mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="1480" pageHeight="900" math="0" shadow="0" adaptiveColors="auto">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;" value="The local stack, and the two profiles it runs as">
+      <mxGeometry x="40" y="20" width="900" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="Compose project fes-local. The profiles differ in listener security protocol, so switching between them needs destroy first.">
+      <mxGeometry x="40" y="50" width="1300" height="20" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="host" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;" value="Developer machine, Docker daemon required">
+      <mxGeometry x="40" y="100" width="1400" height="520" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="brokers" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;" value="KRaft cluster fes-local-cluster-0001 &#183; broker and controller roles combined">
+      <mxGeometry x="65" y="140" width="640" height="230" as="geometry"/>
+    </mxCell>
+    <mxCell id="k1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="fes-kafka1&#10;node 1&#10;host 29092&#10;INTERNAL kafka1:19092">
+      <mxGeometry x="85" y="176" width="190" height="100" as="geometry"/>
+    </mxCell>
+    <mxCell id="k2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="fes-kafka2&#10;node 2&#10;host 29093&#10;INTERNAL kafka2:19092">
+      <mxGeometry x="290" y="176" width="190" height="100" as="geometry"/>
+    </mxCell>
+    <mxCell id="k3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="fes-kafka3&#10;node 3&#10;host 29094&#10;INTERNAL kafka3:19092">
+      <mxGeometry x="495" y="176" width="190" height="100" as="geometry"/>
+    </mxCell>
+    <mxCell id="knote" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" value="Three brokers, not one: default.replication.factor=3 with min.insync.replicas=2. A single-broker stack silently downgrades acks=all to a guarantee the platform does not have. Auto topic creation is off; partition counts come from topics.tsv.">
+      <mxGeometry x="85" y="286" width="600" height="70" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="sr" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="fes-schema-registry&#10;confluentinc/cp-schema-registry:7.9.1&#10;host 8081&#10;compatibility level FULL, matching the merge-time gate">
+      <mxGeometry x="740" y="140" width="330" height="105" as="geometry"/>
+    </mxCell>
+    <mxCell id="ui" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="fes-kafka-ui&#10;provectuslabs/kafka-ui:v0.7.2&#10;host 8080">
+      <mxGeometry x="1100" y="140" width="315" height="105" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="obs" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;" value="Observability &#183; services push, nothing scrapes them, so an IDE run is instrumented too">
+      <mxGeometry x="740" y="265" width="675" height="230" as="geometry"/>
+    </mxCell>
+    <mxCell id="otel" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="fes-otel-collector&#10;OTLP in on 4317 grpc, 4318 http&#10;metrics out on 8889&#10;logs to Loki over OTLP&#10;traces to the debug exporter">
+      <mxGeometry x="760" y="300" width="300" height="110" as="geometry"/>
+    </mxCell>
+    <mxCell id="prom" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="fes-prometheus&#10;host 9090&#10;scrapes the collector, not the services">
+      <mxGeometry x="1085" y="300" width="150" height="110" as="geometry"/>
+    </mxCell>
+    <mxCell id="loki" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="fes-loki&#10;host 3100">
+      <mxGeometry x="1250" y="300" width="150" height="110" as="geometry"/>
+    </mxCell>
+    <mxCell id="graf" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;spacingLeft=10;" value="fes-grafana &#183; host 3000 &#183; anonymous admin, a convenience of the local profile only">
+      <mxGeometry x="760" y="425" width="640" height="50" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="script" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;" value="scripts/local-stack.sh &#183; the sequence compose cannot express&#10;&#10;up &#8594; wait for three healthy brokers and the registry &#8594; create topics from topics.tsv with explicit partition counts &#8594; register subjects from subjects.tsv &#8594; on strict-security only: render ACLs, apply them, then verify least privilege before declaring success&#10;&#10;down keeps volumes, destroy deletes them, status reports the profile and the registered subject count">
+      <mxGeometry x="65" y="390" width="640" height="205" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="profiles" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;" value="The two profiles">
+      <mxGeometry x="40" y="640" width="400" height="24" as="geometry"/>
+    </mxCell>
+    <mxCell id="dev" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=12;verticalAlign=top;spacingTop=10;" value="dev&#10;scripts/local-stack.sh up dev&#10;&#10;PLAINTEXT on every listener, no authentication, no authorizer&#10;22 topics, 19 subjects&#10;&#10;A convenience for iteration. It is never evidence of production security, and the script says so on the way up.">
+      <mxGeometry x="40" y="674" width="680" height="190" as="geometry"/>
+    </mxCell>
+    <mxCell id="strict" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=12;verticalAlign=top;spacingTop=10;" value="strict-security&#10;scripts/local-stack.sh up strict-security&#10;&#10;SASL_SSL with SASL/PLAIN on the client, inter-broker and controller listeners, against a generated local CA&#10;StandardAuthorizer with allow.everyone.if.no.acl.found=false&#10;13 ACLs rendered from the committed per-service policies&#10;Least privilege asserted in both directions before the banner prints&#10;&#10;Certificates and credentials are generated into gitignored paths by scripts/generate-dev-security-material.sh">
+      <mxGeometry x="760" y="674" width="680" height="190" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>

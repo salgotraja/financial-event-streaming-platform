@@ -1,0 +1,54 @@
+name: guide
+
+# Builds the learning guide on every pull request and publishes it to GitHub Pages from main.
+# The build runs with --strict, so a broken internal link or a diagram that is referenced but not
+# committed fails here rather than shipping as a dead page.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'guide/**'
+      - '.github/workflows/guide.yml'
+  pull_request:
+    paths:
+      - 'guide/**'
+      - '.github/workflows/guide.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guide-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: guide/requirements.txt
+      - run: pip install -r guide/requirements.txt
+      - run: mkdocs build --strict
+        working-directory: guide
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/guide
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
