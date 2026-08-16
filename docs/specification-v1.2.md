@@ -2,7 +2,12 @@
 
 Financial Event Streaming Platform
 
-Version 1.2 Status: Draft — Security-First + Agentic Investigation Revision
+Version 1.2 Status: Accepted — Security-First + Agentic Investigation Revision
+
+> **Repository paths in this document describe the target layout, not the current tree.** The
+> platform is design-complete and implementation has not started. Directories such as `schemas/`,
+> `observability/`, `load-tests/`, `results/` and the service modules under `services/` are created
+> as the corresponding README phase lands. Only `docs/` is populated today.
 
 ---
 
@@ -18,11 +23,11 @@ This document is the authoritative technical specification for the security-firs
 
 ## Event Schema Specification
 
-All events are serialised using Apache Avro. Schemas are registered in Confluent Schema Registry and versioned. The schema files live in `schemas/` at the repository root.
+All events are serialised using Apache Avro. Schemas are registered in Confluent Schema Registry and versioned. The schema files live in the shared `contracts` module at `contracts/src/main/avro/`, which every producer and consumer service depends on (ADR-028).
 
 ### TradeEvent
 
-Topic: `trades.raw`
+Topic: `trades.raw`
 
 ```
 {
@@ -64,7 +69,7 @@ Topic: `trades.raw`
 
 ### EnrichedTradeEvent
 
-Topic: `trades.enriched`
+Topic: `trades.enriched`
 
 Extends TradeEvent with market data at execution time. The enrichment service adds the following fields to the original TradeEvent payload:
 
@@ -98,7 +103,7 @@ Extends TradeEvent with market data at execution time. The enrichment service ad
 
 ### RiskAlertEvent
 
-Topic: `notifications.alerts`
+Topic: `notifications.alerts`
 
 ```
 {
@@ -137,7 +142,7 @@ Topic: `notifications.alerts`
 
 ### DeadLetterEvent
 
-Topic: `{source-topic}.dlq`
+Topic: `{source-topic}.dlq`
 
 ```
 {
@@ -502,9 +507,9 @@ message.max.bytes=10485760
 
 ```
 
-`min.insync.replicas=2` with `acks=all` on producers means a message is only acknowledged after it is written to at least 2 of 3 replicas. This prevents data loss when one broker fails. The cost is slightly higher producer latency.
+`min.insync.replicas=2` with `acks=all` on producers means a message is only acknowledged after it is written to at least 2 of 3 replicas. This prevents data loss when one broker fails. The cost is slightly higher producer latency.
 
-`unclean.leader.election.enable=false` prevents a broker that fell behind from becoming leader. Without this, a lagging broker elected as leader can cause message loss. In a financial system this is non-negotiable.
+`unclean.leader.election.enable=false` prevents a broker that fell behind from becoming leader. Without this, a lagging broker elected as leader can cause message loss. In a financial system this is non-negotiable.
 
 ### Producer Configuration
 
@@ -540,7 +545,6 @@ The **production acceptance** load test uses `acks=all` with idempotence enabled
 # Offset management
 enable.auto.commit=false
 auto.offset.reset=earliest
-isolation.level=read_committed
 
 # Performance
 fetch.min.bytes=1
@@ -560,9 +564,11 @@ specific.avro.reader=true
 
 ```
 
-`enable.auto.commit=false` requires the consumer to commit offsets explicitly after processing. Spring Kafka handles this in `MANUAL_IMMEDIATE` acknowledge mode. This ensures that a consumer crash before commit results in reprocessing, not message loss.
+`enable.auto.commit=false` requires the consumer to commit offsets explicitly after processing. Spring Kafka handles this in `MANUAL_IMMEDIATE` acknowledge mode. This ensures that a consumer crash before commit results in reprocessing, not message loss.
 
-`isolation.level=read_committed` ensures consumers only read messages from committed transactions. This matters when producers use transactional APIs, which is the case for exactly-once delivery paths.
+`isolation.level` is deliberately omitted, leaving the Kafka default `read_uncommitted`. Per ADR-019 the platform uses at-least-once delivery with idempotent producers and deterministic idempotency keys, and no producer uses the transactional API. Configuring `read_committed` would imply a transactional write path that does not exist.
+
+If a future path demonstrates a concrete multi-topic atomicity requirement, that path introduces transactions and `read_committed` together under a new ADR. Until then the platform's application semantics are at-least-once with deduplication by deterministic key, and the system is never described as exactly-once.
 
 ---
 
@@ -630,7 +636,7 @@ A Redis miss never causes a direct HTTP call to the simulator in the production/
 
 ### Trade Enrichment Service
 
-Consumer group: `trade-enrichment-service` Input topic: `trades.raw` Output topic: `trades.enriched` DLQ topic: `trades.raw.dlq`
+Consumer group: `trade-enrichment-service` Input topic: `trades.raw` Output topic: `trades.enriched` DLQ topic: `trades.raw.dlq`
 
 Spring Kafka listener configuration:
 
@@ -686,7 +692,7 @@ A single bad event must never open a circuit for an entire event type.
 
 ### Risk Alert Service
 
-Consumer group: `risk-alert-service` Input topic: `trades.enriched` Output topic: `notifications.alerts`
+Consumer group: `risk-alert-service` Input topic: `trades.enriched` Output topic: `notifications.alerts`
 
 Rule engine interface:
 
@@ -699,7 +705,7 @@ public interface RiskRule {
 
 ```
 
-Rule configuration in `application.yml`:
+Rule configuration in `application.yml`:
 
 ```
 risk:
@@ -722,7 +728,21 @@ risk:
 
 ### Audit Service
 
-Consumer group: `audit-service` Input topics: `trades.raw`, `trades.enriched`, `market-data.ticks`, `corporate-actions`, `notifications.alerts`
+Consumer group: `audit-service`
+
+Input topics, matching FR-05.1 and the architecture's "all financial, control and security topics". The Audit Service is the single archival consumer for every topic whose contents are evidence:
+
+| Class | Topics |
+| --- | --- |
+| Financial event | `trades.raw`, `trades.enriched`, `market-data.ticks`, `corporate-actions`, `reference-data.instruments`, `positions.snapshots`, `notifications.alerts` |
+| Control and governance | `risk-rules.events`, `alert-cases.events`, `controls.reconciliation` |
+| Security | `security.events` |
+| Migration and investigation | `legacy.trades.cdc`, `reconciliation.observations`, `anomaly.candidates`, `agent.decisions`, `review.decisions`, `remediation.requested` |
+| Failure | every `{source-topic}.dlq` |
+
+Archiving the control, security and review topics is what makes FR-16 integrity verification and the FR-14 reconciliation control meaningful. Omitting them leaves the governance trail outside the immutable archive.
+
+`precedent.graph.sync` is excluded: it carries a derived, rebuildable projection whose authoritative source, `review.decisions`, is already archived.
 
 S3 write specification:
 
@@ -1363,9 +1383,9 @@ spec:
 
 ```
 
-`activationThreshold: "10"` means KEDA does not scale out until lag exceeds 10. This prevents unnecessary scaling on brief traffic spikes.
+`activationThreshold: "10"` means KEDA does not scale out until lag exceeds 10. This prevents unnecessary scaling on brief traffic spikes.
 
-`cooldownPeriod: 120` means KEDA waits 120 seconds after lag drops below threshold before scaling in. This prevents thrashing where instances are created and destroyed repeatedly during variable load.
+`cooldownPeriod: 120` means KEDA waits 120 seconds after lag drops below threshold before scaling in. This prevents thrashing where instances are created and destroyed repeatedly during variable load.
 
 ### ScaledObject for Risk Alert Service
 
@@ -1408,13 +1428,17 @@ Repository:
 
 ```text
 docs/evals/
-  golden-dataset-v1.original.json
-  golden-dataset-v1.1.json
-  golden-dataset-design-notes-v1.1.md
-  adversarial-dataset-v1.json
-  judge-rubric-v1.md
-  eval-run.schema.json
+  golden-dataset-v1.original.json          present
+  golden-dataset-v1.1.json                 present
+  golden-dataset-design-notes-v1.1.md      present
+  adversarial-dataset-v1.json              present
+  evaluation-regression-harness-v1.2.md    present
+  judge-rubric-v1.md                       lands with the judge, README Phase 7
+  eval-run.schema.json                     lands with the harness, README Phase 7
 ```
+
+Harness code lives in `evals/` at the repository root; `docs/evals/` holds the datasets and their
+design notes.
 
 The normalized case format separates machine-checkable outcome from prose rationale:
 
@@ -1562,7 +1586,7 @@ The test passes only if deterministic risk-alert p99 remains within its original
 
 ### Pass/Fail Criteria
 
-The load test passes and results are committed to `results/` if all of the following are met:
+The load test passes and results are committed to `results/` if all of the following are met:
 
 At 10,000 events per second sustained load:
 
@@ -1678,7 +1702,7 @@ Each module is considered complete when all of the following are true:
 
 Code compiles and all unit tests pass in CI.
 
-Integration tests pass against embedded Kafka (using `spring-kafka-test`).
+Integration tests pass against a Testcontainers Kafka broker (`apache/kafka-native`), not `@EmbeddedKafka`. Tests run against the same broker implementation as the deployed system, which is the same reason Testcontainers PostgreSQL is used instead of H2.
 
 Docker image builds successfully and runs in Docker Compose.
 
@@ -1692,9 +1716,9 @@ For modules that introduce Avro schemas: schema compatibility check passes in CI
 
 For modules that introduce new services: the service appears in the pipeline health Grafana dashboard.
 
-For Module 7 (load test): results files are committed to `results/` with the run timestamp, event counts, and p50/p95/p99 latency for each phase.
+For Module 7 (load test): results files are committed to `results/` with the run timestamp, event counts, and p50/p95/p99 latency for each phase.
 
-For Module 8 (EKS): screenshots of KEDA scaling, Grafana dashboards, and the X-Ray or Jaeger service map are committed to `docs/screenshots/` before the cluster is destroyed.
+For Module 8 (EKS): screenshots of KEDA scaling, Grafana dashboards, and the X-Ray or Jaeger service map are committed to `docs/screenshots/` before the cluster is destroyed.
 
 ### Additional v1.2 Security / AI Completion Gates
 

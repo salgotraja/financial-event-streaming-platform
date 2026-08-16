@@ -2,7 +2,7 @@
 
 Financial Event Streaming Platform
 
-Version 1.2 Status: Draft — Security-First + Agentic Investigation Revision
+Version 1.2 Status: Accepted — Security-First + Agentic Investigation Revision
 
 ---
 
@@ -67,11 +67,11 @@ The platform covers the following boundaries.
 
 The platform must produce three categories of financial events to Kafka topics.
 
-FR-01.1: The Trade Producer must publish trade execution events to the `trades.raw` topic. Each event must include trade ID, ticker symbol, quantity, price, side (buy or sell), trader ID, timestamp, and correlation ID.
+FR-01.1: The Trade Producer must publish trade execution events to the `trades.raw` topic. Each event must include trade ID, ticker symbol, quantity, price, side (buy or sell), trader ID, timestamp, and correlation ID.
 
-FR-01.2: The Market Data Producer must publish price tick events to the `market-data.ticks` topic at configurable rates. Each event must include ticker symbol, bid price, ask price, last traded price, volume, and timestamp.
+FR-01.2: The Market Data Producer must publish price tick events to the `market-data.ticks` topic at configurable rates. Each event must include ticker symbol, bid price, ask price, last traded price, volume, and timestamp.
 
-FR-01.3: The Corporate Action Producer must publish corporate action events to the `corporate-actions` topic. Supported action types: dividend declaration, stock split, earnings announcement, rights issue.
+FR-01.3: The Corporate Action Producer must publish corporate action events to the `corporate-actions` topic. Supported action types: dividend declaration, stock split, earnings announcement, rights issue.
 
 FR-01.4: In load simulation mode, the Market Data Simulator must sustain a configurable production rate from 1,000 to 50,000 events per second using a Geometric Brownian Motion price model and Pareto-distributed volume.
 
@@ -91,15 +91,15 @@ FR-03.1: The service must consume from `trades.raw` and enrich each trade with c
 
 FR-03.2: Enrichment must add: mid-price at execution time, spread at execution time, volume-weighted average price for the ticker over the last 5 minutes, and market capitalisation.
 
-FR-03.3: Enriched events must be published to `trades.enriched`.
+FR-03.3: Enriched events must be published to `trades.enriched`.
 
-FR-03.4: If enrichment fails after 3 retry attempts with exponential backoff, the event must be published to `trades.raw.dlq`with the failure reason, original payload, retry count, and timestamp of first failure.
+FR-03.4: If enrichment fails after 3 retry attempts with exponential backoff, the event must be published to `trades.raw.dlq`with the failure reason, original payload, retry count, and timestamp of first failure.
 
 FR-03.5: Poison-pill handling must be per record. Permanently invalid events are quarantined after bounded retry and must not block the partition or cause an event-type-wide circuit breaker. Circuit breakers apply only to dependency failures.
 
 ### FR-04: Risk Alert Service
 
-FR-04.1: The service must consume from `trades.enriched` and evaluate each trade against configurable risk rules.
+FR-04.1: The service must consume from `trades.enriched` and evaluate each trade against configurable risk rules.
 
 FR-04.2: The following risk rules must be supported:
 
@@ -111,7 +111,7 @@ Price deviation: alert when execution price deviates more than 2 percent from th
 
 Wash trade detection: alert when buy and sell of the same ticker by related accounts occur within 60 seconds.
 
-FR-04.3: Risk alerts must be published to `notifications.alerts` with severity (INFO, WARNING, CRITICAL), alert type, triggering trade ID, and evaluated rule parameters.
+FR-04.3: Risk alerts must be published to `notifications.alerts` with severity (INFO, WARNING, CRITICAL), alert type, triggering trade ID, and evaluated rule parameters.
 
 FR-04.4: Rules must be configurable at runtime without service restart.
 
@@ -129,7 +129,7 @@ FR-05.5: Audit records must be queryable via Athena within 5 minutes of event pr
 
 ### FR-06: Dead Letter Queue Management
 
-FR-06.1: Every primary topic must have a corresponding DLQ topic with the naming convention `{topic}.dlq`.
+FR-06.1: Every primary topic must have a corresponding DLQ topic with the naming convention `{topic}.dlq`.
 
 FR-06.2: DLQ events must include: original topic, original partition, original offset, failure reason, exception class, stack trace summary, retry count, first failure timestamp, last failure timestamp.
 
@@ -141,17 +141,17 @@ FR-06.4: DLQ depth must be monitored and an alert must fire when any DLQ exceeds
 
 FR-07.1: All services must emit OpenTelemetry traces with spans for Kafka produce, Kafka consume, external cache access, and database access.
 
-FR-07.2: All services must expose Prometheus metrics on a `/actuator/prometheus` endpoint.
+FR-07.2: All services must expose Prometheus metrics on a `/actuator/prometheus` endpoint.
 
 FR-07.3: The following custom metrics must be present in every consumer service:
 
-`kafka_consumer_lag_by_partition` with labels for topic, partition, and consumer group.
+`kafka_consumer_lag_by_partition` with labels for topic, partition, and consumer group.
 
-`event_processing_duration_seconds` histogram with labels for service and event type.
+`event_processing_duration_seconds` histogram with labels for service and event type.
 
-`events_processed_total` counter with labels for service, topic, and status (success, failure, dlq).
+`events_processed_total` counter with labels for service, topic, and status (success, failure, dlq).
 
-`dlq_events_total` counter with labels for topic and failure reason.
+`dlq_events_total` counter with labels for topic and failure reason.
 
 FR-07.4: Four Grafana dashboards must be committed to the repository as JSON: pipeline health, service latency, business/control signals, and security/identity.
 
@@ -472,11 +472,13 @@ NFR-05.20: The EKS advanced-security profile must demonstrate workload attestati
 
 ### NFR-06: Maintainability
 
-NFR-06.1: Every architecture decision with more than one viable alternative must be documented in an ADR under `docs/adr/`.
+NFR-06.1: Every architecture decision with more than one viable alternative must be documented in an ADR under `docs/adr/`.
 
 NFR-06.2: A runbook must be maintained covering at least: consumer lag spike, DLQ depth alarm, broker loss, schema deployment/rollback, consumer restart, authorised DLQ replay, alert investigation, EKS KEDA scaling verification, ECS autoscaling verification, MSK broker replacement, workload-identity failure, operator-access failure, audit-integrity failure, and reconciliation failure.
 
-NFR-06.3: CI must run on every pull request and must include: compilation, unit tests, integration tests with embedded Kafka, schema compatibility check, and Docker image build.
+NFR-06.3: CI must run on every pull request and must include: compilation, unit tests, integration tests against a Testcontainers Kafka broker, schema compatibility check, plane-isolation dependency check, and Docker image build.
+
+NFR-06.5: The build must enforce the plane isolation invariant mechanically. No module in the ingestion, streaming or audit groups may declare a compile or runtime dependency on any module in the agent group. A violation must fail the build rather than produce a review comment.
 
 NFR-06.4: All Grafana dashboards must be version-controlled as JSON. No dashboard changes without a corresponding pull request.
 
@@ -589,7 +591,9 @@ NFR-16.4: A controlled failure test must stop/restart the connector during live 
 
 ## Constraints
 
-The platform must be implemented in Java 25 with Spring Boot for all producer and consumer services.
+The platform must be implemented in Java 25 with Spring Boot 4.1 for all producer and consumer services. Java 25 is the current LTS release; the toolchain is pinned in the Gradle build so the language level does not drift with the installed JDK.
+
+Each service must be an independently deployable unit with its own container image, its own workload identity, its own consumer group, and its own scaling policy. Services are organised as Gradle modules in a single repository grouped by architectural plane (`ingestion`, `streaming`, `audit`, `control`, `agent`), sharing only the `contracts` and `platform-common` modules. Independent deployability is a hard requirement; the shared repository is a build-and-release convenience and must never become a shared runtime or a shared database (ADR-028).
 
 Infrastructure as code must use AWS CDK for ECS/cloud AWS resources and Helm for EKS deployment. Security policies and identity mappings must be represented as code and version-controlled.
 

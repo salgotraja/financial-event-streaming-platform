@@ -2,7 +2,7 @@
 
 Financial Event Streaming Platform
 
-Version 1.2 Status: Draft — Security-First + Agentic Investigation Revision
+Version 1.2 Status: Accepted — Security-First + Agentic Investigation Revision
 
 ---
 
@@ -198,13 +198,13 @@ This profile is used for the headline throughput/latency result and broker-failu
 
 ### Trade Enrichment Service
 
-Consumes from `trades.raw`. For each event: retrieves current market data from Redis cache, computes derived fields, publishes enriched event to `trades.enriched`.
+Consumes from `trades.raw`. For each event: retrieves current market data from Redis cache, computes derived fields, publishes enriched event to `trades.enriched`.
 
 Market-data cache population is event-driven: a cache projector consumes `market-data.ticks` and maintains the latest market state in Redis. The Trade Enrichment Service does not call the simulator synchronously.
 
 On a cache miss, enrichment follows a bounded policy: retry/read a permitted recent value only when freshness policy allows it; otherwise emit an explicit `REFERENCE_DATA_UNAVAILABLE` failure to the retry/DLQ path. Cache misses, stale-value use, and data age are metrics.
 
-Retry policy: 3 attempts with exponential backoff starting at 100ms. After the third failure, the event is published to `trades.raw.dlq` with full failure context.
+Retry policy: 3 attempts with exponential backoff starting at 100ms. After the third failure, the event is published to `trades.raw.dlq` with full failure context.
 
 Poison-pill handling is **per record**, not per event type. A malformed or permanently invalid record is quarantined after bounded retry and its offset is advanced so one bad event cannot block the partition. Circuit breakers are reserved for failing downstream dependencies (for example Redis/PostgreSQL), where opening the circuit protects the service from a cascading dependency failure.
 
@@ -212,13 +212,13 @@ Consumer group: `trade-enrichment-service`. One consumer group, 12 partitions, s
 
 ### Risk Alert Service
 
-Consumes from `trades.enriched`. Evaluates each trade against a configurable rule engine. Rules are loaded from a YAML configuration file and refreshed at runtime via Spring Cloud Config or a ConfigMap in Kubernetes.
+Consumes from `trades.enriched`. Evaluates each trade against a configurable rule engine. Rules are loaded from a YAML configuration file and refreshed at runtime via Spring Cloud Config or a ConfigMap in Kubernetes.
 
 Rule evaluation is stateful: position tracking requires a running total per trader per ticker. State is maintained in PostgreSQL with optimistic locking. The service uses a consistent hash of the ticker symbol to route events to the same partition, ensuring the same consumer instance handles all trades for a given ticker and avoids cross-instance state coordination.
 
-Alert routing: CRITICAL alerts are published to `notifications.alerts` with immediate flush. WARNING and INFO alerts are batched and published every 5 seconds.
+Alert routing: CRITICAL alerts are published to `notifications.alerts` with immediate flush. WARNING and INFO alerts are batched and published every 5 seconds.
 
-Consumer group: `risk-alert-service`.
+Consumer group: `risk-alert-service`.
 
 ### Audit Service
 
@@ -465,7 +465,7 @@ Observability is not a layer added after the services are built. It is designed 
 
 ### OpenTelemetry
 
-The OpenTelemetry Java agent is attached to every service via the `JAVA_TOOL_OPTIONS` environment variable. Auto-instrumentation covers Spring Boot, Kafka client, JDBC, and Redis.
+The OpenTelemetry Java agent is attached to every service via the `JAVA_TOOL_OPTIONS` environment variable. Auto-instrumentation covers Spring Boot, Kafka client, JDBC, and Redis.
 
 Manual instrumentation adds business-level spans around:
 
@@ -509,7 +509,7 @@ audit_records_written_total{event_type}
 
 ```
 
-KEDA reads `kafka_consumer_lag_by_partition` directly from Prometheus to make scaling decisions. The metric must be available and accurate for autoscaling to function.
+KEDA reads `kafka_consumer_lag_by_partition` directly from Prometheus to make scaling decisions. The metric must be available and accurate for autoscaling to function.
 
 
 Security metrics added in v1.1:
@@ -537,7 +537,7 @@ maker_checker_denials_total{reason}
 
 ### Grafana
 
-Four dashboards committed as JSON under `observability/grafana/dashboards/`.
+Four dashboards committed as JSON under `observability/grafana/dashboards/`.
 
 Pipeline health dashboard: consumer lag per partition (heatmap), throughput per topic (time series), error rate per service (gauge), DLQ depth per topic (stat), and active replica/task count per service (time series). This is the dashboard open during deployments and incidents.
 
@@ -547,7 +547,7 @@ Security & identity dashboard: authentication failures, authorization denials, p
 
 Business signals dashboard: trades processed per minute (time series), risk alerts by severity over time (stacked bar), corporate actions processed (counter), audit lag (the time between event production and S3 availability), DLQ events by failure reason (pie chart). This is the dashboard a business stakeholder reads.
 
-Alert rules in `observability/prometheus/alerts.yml`:
+Alert rules in `observability/prometheus/alerts.yml`:
 
 ```
 - alert: HighConsumerLag
@@ -581,7 +581,7 @@ Alert rules in `observability/prometheus/alerts.yml`:
 
 All services log JSON to stdout. The Docker Compose and ECS configurations ship stdout to Loki via the OpenTelemetry Collector log pipeline.
 
-Every log line includes: `timestamp`, `level`, `service`, `correlationId`, `traceId`, `spanId`, `topic`, `partition`, `offset`, `processingLatencyMs`, `eventType`, `environment`.
+Every log line includes: `timestamp`, `level`, `service`, `correlationId`, `traceId`, `spanId`, `topic`, `partition`, `offset`, `processingLatencyMs`, `eventType`, `environment`.
 
 Useful Loki queries:
 
@@ -732,7 +732,8 @@ Provider timeout, graph outage, required tool failure, budget exhaustion, or ite
 
 ## Architecture Decision Records
 
-The following decisions are documented under `docs/adr/`:
+Decisions are recorded under `docs/adr/`. NFR-06.1 requires an ADR for every decision with more
+than one viable alternative, so this list is the register of decisions taken; a file exists for each.
 
 - ADR-001: MSK over self-managed Kafka for cloud deployments
 - ADR-002: Avro over JSON for financial event serialisation
@@ -761,15 +762,79 @@ The following decisions are documented under `docs/adr/`:
 - ADR-025: Structured decision/evidence trace instead of raw chain-of-thought logging
 - ADR-026: Deterministic and agentic performance/cost isolation
 - ADR-027: Per-record poison quarantine + event-fed market-data cache
+- ADR-028: Multi-module repository with independently deployable services
+
+---
+
+## Module and Deployment Structure
+
+Each service is an independently deployable unit: its own container image, workload identity,
+consumer group, scaling policy and release cadence. Modules live in one repository and are grouped by
+plane so that the plane isolation invariant is visible in the build graph and enforceable by a
+dependency rule (ADR-028).
+
+```text
+contracts/                          Avro schemas + generated types, dev.engnotes.fes.events
+platform-common/                    Kafka defaults, idempotency keys, DLQ publisher,
+                                    structured logging, OTel and security-telemetry conventions
+
+services/ingestion/                 Plane 1
+  trade-producer
+  market-data-simulator
+  corporate-action-producer
+  reference-data-service
+  migration-normalizer
+
+services/streaming/                 Plane 2
+  market-data-cache-projector
+  trade-enrichment-service
+  risk-alert-service
+  position-exposure-service
+
+services/audit/                     Plane 3
+  audit-service
+  reconciliation-service
+
+services/control/                   Plane 4
+  alert-case-service
+  risk-rule-governance-service
+  anomaly-candidate-service
+  reconciliation-simulator
+  admin-control-plane
+
+services/agent/                     Plane 5
+  agent-investigation-service
+  human-review-service
+  precedent-sync-service
+
+infrastructure/                     AWS CDK (Java) for the ECS/cloud profile
+deploy/compose/                     local stack (FR-09.1)
+deploy/helm/                        EKS chart with dev/staging/prod values (FR-09.4)
+observability/                      Grafana dashboards, Prometheus rules
+evals/                              evaluation and regression harness code
+load-tests/k6/                      throughput and latency scenarios
+results/                            committed load, security and evaluation evidence
+```
+
+**Enforced dependency rule.** No module under `services/ingestion`, `services/streaming` or
+`services/audit` may declare a compile or runtime dependency on any module under `services/agent`,
+nor on the Neo4j or LLM-provider libraries. This turns the Plane 5 isolation invariant from prose
+into a build failure. `services/control` sits on the boundary: the anomaly-candidate service writes
+`anomaly.candidates` and must not depend on anything that reads it.
+
+Every dependency between services at runtime is a Kafka topic or a versioned HTTP contract. Shared
+code is limited to `contracts` and `platform-common`, and neither may contain business logic. No two
+services share a database schema.
 
 ---
 
 ## Technology Stack
 
-| LayerTechnologyVersionRationale |                        |      |                                           |
+| Layer                           | Technology             | Version | Rationale                              |
 | ------------------------------- | ---------------------- | ---- | ----------------------------------------- |
-| Language                        | Java                   | 25   | LTS, virtual threads, AOT caches          |
-| Framework                       | Spring Boot            | 3.4  | Spring Kafka, Actuator, Cloud Config      |
+| Language                        | Java                   | 25   | LTS, virtual threads, scoped values, AOT caches |
+| Framework                       | Spring Boot            | 4.1  | Spring Kafka, Actuator, Cloud Config      |
+| Build                           | Gradle                 | 9.5  | Multi-module, toolchain pinning, dependency rules |
 | Messaging                       | Apache Kafka           | 3.7  | Industry standard, MSK compatible         |
 | Schema                          | Avro + Schema Registry | 7.6  | Backward compatibility enforcement        |
 | Cache                           | Redis                  | 7.2  | Sub-millisecond market data lookup        |
