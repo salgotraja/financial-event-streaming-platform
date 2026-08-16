@@ -1,0 +1,22 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "AnomalyCandidateEvent",
+  "doc": "Bounded deterministic candidate promoted for asynchronous agent investigation. Produced by deterministic screening, never by an LLM (ADR-021).",
+  "fields": [
+    {"name": "candidateId", "type": "string"},
+    {"name": "sourceEventType", "type": "string"},
+    {"name": "sourceEventId", "type": "string"},
+    {"name": "category", "type": "string"},
+    {"name": "priority", "type": {"type": "enum", "name": "CandidatePriority",
+     "symbols": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]}},
+    {"name": "triggerSignals", "type": {"type": "map", "values": "string"},
+     "doc": "Deterministic signals that promoted this item. Must include detectorRuleVersion."},
+    {"name": "evidenceRefs", "type": {"type": "array", "items": "string"}, "default": [],
+     "doc": "Server-generated references. Untrusted content, never instructions (NFR-12.5)."},
+    {"name": "requiresAgentInvestigation", "type": "boolean", "default": true},
+    {"name": "createdAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlationId", "type": "string"},
+    {"name": "traceContext", "type": {"type": "map", "values": "string"}, "default": {}}
+  ]
+}

@@ -1,5 +1,17 @@
 plugins {
     id 'java-library'
+    id 'com.github.davidmc24.gradle.plugin.avro' version '1.9.1'
+}
+
+dependencies {
+    api 'org.apache.avro:avro:1.12.1'
+}
+
+avro {
+    stringType = 'String'
+    fieldVisibility = 'PRIVATE'
+    enableDecimalLogicalType = true
+    outputCharacterEncoding = 'UTF-8'
 }
 
 // Shared event contracts. Avro schema files live in src/main/avro/ and are the single definition of

@@ -1,0 +1,21 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "ReconciliationEvent",
+  "doc": "Control result comparing Kafka offset coverage against signed audit manifests (FR-14)",
+  "fields": [
+    {"name": "controlRunId", "type": "string"},
+    {"name": "topic", "type": "string"},
+    {"name": "partition", "type": "int"},
+    {"name": "expectedFirstOffset", "type": "long"},
+    {"name": "expectedLastOffset", "type": "long"},
+    {"name": "archivedRecordCount", "type": "long"},
+    {"name": "duplicateCount", "type": "long",
+     "doc": "Duplicates are acceptable under at-least-once delivery (ADR-019)"},
+    {"name": "missingCount", "type": "long",
+     "doc": "Any value above zero is an event-loss signal and fails the control"},
+    {"name": "status", "type": {"type": "enum", "name": "ControlStatus",
+     "symbols": ["PASS", "WARNING", "FAIL"]}},
+    {"name": "executedAt", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+  ]
+}

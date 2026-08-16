@@ -1,0 +1,33 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "RiskAlertEvent",
+  "doc": "Risk rule breach emitted by the risk alert service",
+  "fields": [
+    {"name": "alertId", "type": "string"},
+    {"name": "correlationId", "type": "string"},
+    {"name": "triggeringTradeId", "type": "string"},
+    {"name": "alertType", "type": {"type": "enum", "name": "AlertType", "symbols": [
+      "POSITION_LIMIT_BREACH",
+      "UNUSUAL_VOLUME",
+      "PRICE_DEVIATION",
+      "WASH_TRADE_DETECTED"
+    ]}},
+    {"name": "severity", "type": {"type": "enum", "name": "Severity",
+     "symbols": ["INFO", "WARNING", "CRITICAL"]}},
+    {"name": "ticker", "type": "string"},
+    {"name": "traderId", "type": "string", "doc": "RESTRICTED"},
+    {"name": "description", "type": "string",
+     "doc": "Human-readable description of the alert condition"},
+    {"name": "ruleParameters", "type": {"type": "map", "values": "string"},
+     "doc": "Rule thresholds that triggered this alert"},
+    {"name": "measuredValues", "type": {"type": "map", "values": "string"},
+     "doc": "Actual values that breached the thresholds"},
+    {"name": "ruleId", "type": "string",
+     "doc": "Governed rule that produced this alert (ADR-016)"},
+    {"name": "ruleVersion", "type": "long",
+     "doc": "Approved rule version in force at evaluation time"},
+    {"name": "alertTimestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "traceContext", "type": {"type": "map", "values": "string"}, "default": {}}
+  ]
+}

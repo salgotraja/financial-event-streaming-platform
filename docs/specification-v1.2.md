@@ -23,7 +23,13 @@ This document is the authoritative technical specification for the security-firs
 
 ## Event Schema Specification
 
-All events are serialised using Apache Avro. Schemas are registered in Confluent Schema Registry and versioned. The schema files live in the shared `contracts` module at `contracts/src/main/avro/`, which every producer and consumer service depends on (ADR-028).
+All events are serialised using Apache Avro. Schemas are registered in Confluent Schema Registry and versioned. The schema files live in the shared `contracts` module at `contracts/src/main/avro/`, which every producer and consumer service depends on (ADR-028). Java types are generated at build time; do not hand-write an event class.
+
+**The committed `.avsc` files are the authoritative form.** The listings below are the same contracts in readable form. Where they differ, the file wins. Three corrections were applied when the schemas were committed:
+
+1. **Logical type placement.** Several listings below write `{"name": "x", "type": "long", "logicalType": "timestamp-millis"}`. That is not valid Avro: `logicalType` must sit inside the type object, as `{"type": {"type": "long", "logicalType": "timestamp-millis"}}`. The committed schemas use the nested form and generate `java.time.Instant`.
+2. **Fields added to satisfy requirements that the original listings did not carry.** `RiskAlertEvent.ruleId` and `RiskAlertEvent.ruleVersion`, because FR-13.5 requires the case timeline to show the evaluated rule version and FR-12.3 requires alerts traceable to an approved version. `DeadLetterEvent.correlationId`, because the FR-06.3 replay API filters by it. `EnrichedTradeEvent.marketDataAgeMs`, because ADR-027 makes cache-entry age an observable freshness input.
+3. **Two contracts written that the specification omitted.** `MarketDataTickEvent` (FR-01.2) and `CorporateActionEvent` (FR-01.3) had named topics and required fields but no schema. Both are derived directly from the requirement text and marked as such in their `doc` fields.
 
 ### TradeEvent
 

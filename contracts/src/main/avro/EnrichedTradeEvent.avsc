@@ -1,0 +1,26 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "EnrichedTradeEvent",
+  "doc": "Trade event enriched with market state at execution time",
+  "fields": [
+    {"name": "trade", "type": "dev.engnotes.fes.events.TradeEvent",
+     "doc": "Original trade event, preserved for downstream consumers"},
+    {"name": "midPriceAtExecution", "type": "double",
+     "doc": "Mid-price (bid+ask)/2 at time of trade execution"},
+    {"name": "spreadAtExecution", "type": "double",
+     "doc": "Bid-ask spread in INR at time of trade execution"},
+    {"name": "vwap5Min", "type": "double",
+     "doc": "Volume-weighted average price over the last 5 minutes"},
+    {"name": "marketCap", "type": "double",
+     "doc": "Market capitalisation of the ticker in INR crores"},
+    {"name": "priceDeviation", "type": "double",
+     "doc": "Percentage deviation of execution price from mid-price"},
+    {"name": "enrichedAt", "type": {"type": "long", "logicalType": "timestamp-millis"},
+     "doc": "When enrichment completed"},
+    {"name": "enrichmentLatencyMs", "type": "long",
+     "doc": "Milliseconds from consume to enriched publish"},
+    {"name": "marketDataAgeMs", "type": ["null", "long"], "default": null,
+     "doc": "Age of the Redis market-state entry used. Freshness policy input (ADR-027)."}
+  ]
+}

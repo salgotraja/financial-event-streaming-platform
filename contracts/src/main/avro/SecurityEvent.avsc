@@ -1,0 +1,19 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "SecurityEvent",
+  "doc": "Security decision or privileged action. Must never contain credentials, bearer tokens, passwords, secret values or private keys (NFR-05.16).",
+  "fields": [
+    {"name": "securityEventId", "type": "string"},
+    {"name": "subjectType", "type": "string", "doc": "HUMAN or WORKLOAD"},
+    {"name": "subjectId", "type": "string"},
+    {"name": "action", "type": "string"},
+    {"name": "resource", "type": "string"},
+    {"name": "decision", "type": {"type": "enum", "name": "Decision",
+     "symbols": ["ALLOW", "DENY", "ERROR"]}},
+    {"name": "reason", "type": "string"},
+    {"name": "sourceService", "type": "string"},
+    {"name": "correlationId", "type": "string"},
+    {"name": "eventTimestamp", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+  ]
+}

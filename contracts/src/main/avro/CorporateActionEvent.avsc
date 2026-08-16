@@ -1,0 +1,24 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "CorporateActionEvent",
+  "doc": "Corporate action affecting an instrument. Action types follow FR-01.3. This schema was absent from specification-v1.2 and is derived from the requirement.",
+  "fields": [
+    {"name": "corporateActionId", "type": "string"},
+    {"name": "ticker", "type": "string"},
+    {"name": "actionType", "type": {"type": "enum", "name": "CorporateActionType", "symbols": [
+      "DIVIDEND_DECLARATION",
+      "STOCK_SPLIT",
+      "EARNINGS_ANNOUNCEMENT",
+      "RIGHTS_ISSUE"
+    ]}},
+    {"name": "attributes", "type": {"type": "map", "values": "string"}, "default": {},
+     "doc": "Type-specific detail, for example splitRatio or dividendPerShare"},
+    {"name": "announcedAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "effectiveAt", "type": {"type": "long", "logicalType": "timestamp-millis"},
+     "doc": "Scheduled-event context the agent uses to reject false-positive traps"},
+    {"name": "producedAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlationId", "type": "string"},
+    {"name": "traceContext", "type": {"type": "map", "values": "string"}, "default": {}}
+  ]
+}

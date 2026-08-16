@@ -1,0 +1,22 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "HumanReviewDecisionEvent",
+  "doc": "Authenticated human verdict on an agent flag or escalation. Reviewer identity comes from the authenticated principal, never from the request body (FR-21.2).",
+  "fields": [
+    {"name": "reviewId", "type": "string"},
+    {"name": "decisionId", "type": "string"},
+    {"name": "reviewerId", "type": "string"},
+    {"name": "verdict", "type": {"type": "enum", "name": "ReviewVerdict", "symbols": [
+      "CONFIRM_FLAG",
+      "REJECT_FLAG",
+      "REQUEST_MORE_EVIDENCE",
+      "ESCALATE",
+      "CLOSE"
+    ]}},
+    {"name": "reasonCode", "type": "string"},
+    {"name": "notes", "type": ["null", "string"], "default": null},
+    {"name": "reviewedAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlationId", "type": "string"}
+  ]
+}

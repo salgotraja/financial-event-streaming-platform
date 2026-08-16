@@ -1,0 +1,25 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "DeadLetterEvent",
+  "doc": "Quarantined record published to {source-topic}.dlq after bounded retry (ADR-027)",
+  "fields": [
+    {"name": "originalTopic", "type": "string"},
+    {"name": "originalPartition", "type": "int"},
+    {"name": "originalOffset", "type": "long"},
+    {"name": "originalPayload", "type": "bytes",
+     "doc": "Raw Avro bytes of the original failed event"},
+    {"name": "failureReason", "type": "string"},
+    {"name": "exceptionClass", "type": "string"},
+    {"name": "exceptionMessage", "type": "string"},
+    {"name": "stackTraceSummary", "type": "string",
+     "doc": "First 500 characters of the stack trace"},
+    {"name": "retryCount", "type": "int"},
+    {"name": "firstFailureAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "lastFailureAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "consumerGroup", "type": "string"},
+    {"name": "consumerInstance", "type": "string"},
+    {"name": "correlationId", "type": ["null", "string"], "default": null,
+     "doc": "Correlation ID of the failed event where it could be extracted"}
+  ]
+}

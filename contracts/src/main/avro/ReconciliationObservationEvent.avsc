@@ -1,0 +1,31 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "ReconciliationObservationEvent",
+  "doc": "Synthetic internal-versus-external reconciliation observation. Observes and compares synthetic records only; models no money movement, settlement finality or ledger correction (FR-18.3).",
+  "fields": [
+    {"name": "observationId", "type": "string"},
+    {"name": "referenceId", "type": "string"},
+    {"name": "observationType", "type": {"type": "enum", "name": "ReconciliationObservationType", "symbols": [
+      "DUPLICATE_REFERENCE",
+      "AMOUNT_MISMATCH",
+      "CONFLICTING_STATE",
+      "MISSING_PARTICIPANT",
+      "TIMING_UNCERTAINTY",
+      "ROUNDING_OR_FEE_CANDIDATE"
+    ]}},
+    {"name": "internalSourceRef", "type": ["null", "string"], "default": null},
+    {"name": "externalSourceRef", "type": ["null", "string"], "default": null},
+    {"name": "internalAmount", "type": ["null", "double"], "default": null},
+    {"name": "externalAmount", "type": ["null", "double"], "default": null},
+    {"name": "observedState", "type": {"type": "map", "values": "string"}, "default": {}},
+    {"name": "expectedParticipants", "type": ["null", "int"], "default": null},
+    {"name": "participantsObserved", "type": ["null", "int"], "default": null},
+    {"name": "completeness", "type": {"type": "enum", "name": "ObservationCompleteness",
+     "symbols": ["COMPLETE", "INCOMPLETE_EXPECTED", "INCOMPLETE_UNKNOWN"]},
+     "doc": "Distinguishes a proven mismatch from data that may still be in flight (FR-18.4)"},
+    {"name": "observedAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "correlationId", "type": "string"},
+    {"name": "traceContext", "type": {"type": "map", "values": "string"}, "default": {}}
+  ]
+}

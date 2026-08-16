@@ -1,0 +1,20 @@
+{
+  "namespace": "dev.engnotes.fes.events",
+  "type": "record",
+  "name": "InstrumentReferenceEvent",
+  "doc": "Instrument master record. Kafka key is instrumentId; topic cleanup policy is compact.",
+  "fields": [
+    {"name": "instrumentId", "type": "string"},
+    {"name": "ticker", "type": "string"},
+    {"name": "exchange", "type": "string"},
+    {"name": "isin", "type": "string", "doc": "Synthetic ISIN"},
+    {"name": "securityType", "type": "string"},
+    {"name": "currency", "type": "string", "default": "INR"},
+    {"name": "sector", "type": "string"},
+    {"name": "sharesOutstanding", "type": "long"},
+    {"name": "referenceVersion", "type": "long"},
+    {"name": "effectiveAt", "type": {"type": "long", "logicalType": "timestamp-millis"}},
+    {"name": "producerIdentity", "type": "string",
+     "doc": "Workload identity that produced this version (FR-10.5)"}
+  ]
+}
