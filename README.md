@@ -7,6 +7,9 @@ investigation layer.
 All market data and financial identifiers are synthetic. The platform performs no money movement, no
 trade execution, and no regulatory reporting.
 
+Under active development. Not every service described here is implemented yet; read the source before
+assuming a component exists.
+
 ## What it does
 
 Trade executions, market-data ticks, corporate actions and instrument reference data enter as Avro
@@ -84,22 +87,6 @@ services/
   control/            anomaly screening, cases, rule governance
   agent/              investigation, precedent sync, human review
 ```
-
-## Status
-
-Early implementation. The event contracts and the first producer are built and tested; the remaining
-services are designed but not yet written.
-
-- [x] Avro event contracts with build-time code generation and a compatibility gate
-- [x] Trade producer publishing to `trades.raw`
-- [ ] Market-data and corporate-action producers, audit skeleton
-- [ ] Market-data projection, enrichment, risk evaluation, position and exposure
-- [ ] Security enforcement: workload identity, signed audit, authorization control plane
-- [ ] CDC migration with Debezium
-- [ ] Reconciliation observations and deterministic anomaly candidates
-- [ ] Agent investigation with a typed tool gateway and human review
-- [ ] Precedent graph and the evaluation regression suite
-- [ ] Load, failure and cost evidence
 
 ## Scope
 
