@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: reference-data-service
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      properties:
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+        auto.register.schemas: false
+
+# Durability (acks=all, idempotence, batching, lz4) is applied by platform-common's
+# ProducerDurabilityConfiguration, not here, so a service cannot ship with weaker settings.
+
+fes:
+  reference-data-service:
+    topic: reference-data.instruments
+    # FR-10.5. Stamped onto every record; never taken from the caller.
+    producer-identity: reference-data-service
+    # FR-10.1. Off by default so a restart does not re-announce the whole master.
+    seed:
+      enabled: ${REFERENCE_DATA_SEED_ENABLED:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
