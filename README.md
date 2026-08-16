@@ -41,11 +41,31 @@ Neo4j projection, golden/adversarial regression suite, CI gate.
 ### Phase 8 — Performance/failure evidence
 50k deterministic load test, broker/connector failures, agent/provider outage isolation, cost report.
 
+## Repository structure
+
+Independently deployable services as Gradle modules, grouped by plane (ADR-028). Modules land per
+phase; only `contracts` and `platform-common` exist today.
+
+```text
+contracts/              Avro event contracts, dev.engnotes.fes.events
+platform-common/        Kafka defaults, idempotency, DLQ publisher, logging, OTel conventions
+services/ingestion/     Phase 1 and 4
+services/streaming/     Phase 2
+services/audit/         Phase 1 skeleton, Phase 3 enforcement
+services/control/       Phase 5
+services/agent/         Phase 6 and 7
+docs/                   authoritative v1.2 specification and ADRs (docs/archive is superseded)
+scripts/                repository tooling
+```
+
+Build with `./gradlew build`. Java 25, Gradle 9.5.1, Spring Boot 4.1.0. Tests require Docker.
+
 ## Start here
 
-- `requirements-v1.2.md`
-- `architecture-v1.2.md`
-- `specification-v1.2.md`
+- `docs/requirements-v1.2.md`
+- `docs/architecture-v1.2.md`
+- `docs/specification-v1.2.md`
+- `docs/adr/ADR-028-multi-module-independently-deployable-services.md`
 - `docs/security/identity-trust-matrix.md`
 - `docs/adr/ADR-021-deterministic-before-agent.md`
 - `docs/evals/golden-dataset-design-notes-v1.1.md`
