@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf*)",
+      "Edit(.env*)"
+    ],
+    "ask": [
+      "Bash(cdk deploy*)",
+      "Bash(git push*)"
+    ],
+    "allow": [
+      "Bash(./mvnw*)",
+      "Bash(cdk synth*)",
+      "Bash(cdk diff*)",
+      "Bash(git commit*)",
+      "Bash(git add*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(sdk env*)"
+    ]
+  }
+}
