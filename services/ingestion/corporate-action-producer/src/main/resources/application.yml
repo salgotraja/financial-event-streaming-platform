@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: corporate-action-producer
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      properties:
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+        auto.register.schemas: false
+
+# Durability (acks=all, idempotence, batching, lz4) is applied by platform-common's
+# ProducerDurabilityConfiguration, not here, so a service cannot ship with weaker settings.
+
+fes:
+  corporate-action-producer:
+    topic: corporate-actions
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs

@@ -1,0 +1,31 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// FR-01.3. Publishes corporate action events to corporate-actions.
+// Workload identity: corporate-action-producer. Kafka permission: connect and write
+// corporate-actions only. It must not be able to read that topic.
+// Topic shape (6 partitions, 30 day retention) is broker-side configuration, not producer
+// configuration, and is not encoded here.
+
+description = 'Publishes corporate action events to corporate-actions'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'io.confluent:kafka-avro-serializer:7.9.1'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}

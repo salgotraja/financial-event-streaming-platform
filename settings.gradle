@@ -21,3 +21,4 @@ include 'platform-common'
 // Phase 1: core event spine
 include 'services:ingestion:trade-producer'
 include 'services:ingestion:market-data-simulator'
+include 'services:ingestion:corporate-action-producer'
