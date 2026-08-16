@@ -5,23 +5,15 @@ how to prove each claim from the repository.
 
 !!! warning "What this guide covers, and what it does not"
 
-    `docs/` holds roughly 6,000 lines of specification describing about twenty services. Six modules
-    exist. This guide follows the **code**, not the specification. Every file path, class name, topic,
-    setting and number below was read out of the source tree, and where the specification describes a
-    target the code has not reached, the guide says so in that section rather than in a footnote.
+    The design describes about twenty services. Six modules exist. This guide follows the **code**, not
+    the design: every file path, class name, topic, setting and number below was read out of the source
+    tree, and where the design describes a target the code has not reached, the guide says so in that
+    section rather than in a footnote.
 
     One page, [Specified, not built](not-built.md), covers the rest. Nothing on any other page is a plan.
 
-!!! info "About the `docs/` citations in this guide"
-
-    The authoritative specifications and the ADRs are untracked by repository policy: `/docs/` and
-    every Markdown file except the root README are in `.gitignore`. They exist in a maintainer's
-    working tree and are not in a clone.
-
-    So a citation to `docs/architecture-v1.2.md`, `docs/task-status.md` or `docs/adr/ADR-019-*.md` is a
-    pointer for whoever holds those files, not a link you can follow. Everything cited under
-    `contracts/`, `platform-common/`, `services/`, `deploy/`, `scripts/` and `.github/` is in the
-    repository and can be opened.
+    Every path this guide cites is in the repository and can be opened. Design documents that are not
+    committed are never cited as files, so there is nothing here to chase that you do not have.
 
 ## What the platform is
 
@@ -97,7 +89,11 @@ Gradle, not Maven. There is no `mvnw` in this repository.
 ## How the guide is organised
 
 Each page answers one question and cites the file that answers it. Where a design decision has an ADR,
-the ADR number appears next to the claim, and the ADR itself lives in `docs/adr/` in the working tree.
+the ADR number appears next to the claim. The same numbers appear in the source comments, so you can
+see from the code itself which decision a given line rests on.
+
+This guide grows with the platform. What it does not cover yet, and the discipline for keeping it
+true as the code changes, is in [Maintaining this guide](maintaining.md).
 
 The [Code to proof map](proof.md) is the shortest path from a behaviour you want to trust to the test
 that demonstrates it. A useful habit with this codebase: read the implementation, then its focused

@@ -1,13 +1,11 @@
 # Specified, not built
 
-Everything on this page exists as specification, ADR text, or an Avro schema, and has no
+Everything on this page exists as a design decision, a requirement, or an Avro schema, and has no
 implementation in the repository. It is here so the rest of the guide can stay free of plans.
 
-The authoritative documents are `docs/requirements-v1.2.md`, `docs/architecture-v1.2.md`,
-`docs/specification-v1.2.md` and the ADRs in `docs/adr/`. Those files are untracked by policy and live
-in the working tree. Anything under `docs/archive/` is superseded and must not be implemented from.
-
-The durable roadmap is `docs/task-status.md`.
+The one thing on this page you *can* open today is the schema set: eleven of the sixteen files in
+`contracts/src/main/avro/` are contracts for services that do not exist yet, and they are already under
+the compatibility gate.
 
 ## Phase 2, deterministic streaming
 
@@ -102,20 +100,18 @@ Until this phase runs, every throughput and latency figure in the specification 
 
 ## Known gaps in what is built
 
-From `docs/task-status.md`, and repeated here because they qualify claims made elsewhere in this
-guide:
+These qualify claims made elsewhere in this guide:
 
-- The topic inventory and subject map exist twice, in `docs/architecture-v1.2.md` and in
-  `deploy/compose/*.tsv`, and nothing checks that the two agree.
+- The topic inventory and subject map exist twice, in the architecture specification and in
+  `deploy/compose/topics.tsv` and `subjects.tsv`, and nothing checks that the two agree.
 - The audit archive has no durable sink, and the other 13 evidence topics in FR-05.1 are unsubscribed
   because nothing writes them.
-- `docs/security/identity-trust-matrix.md` has entries for 11 services; 8 more arrive with their
-  phases.
+- The identity trust matrix has entries for 11 services; 8 more arrive with their phases.
 - There is no runtime validation of Schema Registry subject naming or per-subject compatibility
   configuration.
 - PostgreSQL and Redis are absent from the local stack, so FR-09.1 is partly met.
-- Every IAM control is specified and none is built. `docs/security/iam-coverage.md` tracks the two
-  states separately, and ADR-030 fixes what is in scope at all: workload identity, authorization,
+- Every IAM control is specified and none is built. Specified and Built are tracked as separate states
+  so the distinction stays visible, and ADR-030 fixes what is in scope at all: workload identity, authorization,
   privileged control, agent identity, evidence and identity observability are in; workforce identity,
   identity governance, customer identity and federation breadth are excluded by decision rather than
   by backlog.

@@ -169,8 +169,8 @@ that each identity can do only what its file allows.
 
 **Not proven.** That a deployed service authenticates as its own principal. The services are not
 containerised yet, so nothing exercises the binding between a running process and a Kafka identity.
-That is the last step before per-workload Kafka authorization is genuinely built, and
-`docs/task-status.md` keeps it open rather than counting it.
+That is the last step before per-workload Kafka authorization is genuinely built, and it is tracked as
+open rather than counted as done.
 
 Cloud deployments authorise with MSK IAM scoped per topic, per consumer group, per identity (ADR-009).
 ACLs exist for the local strict-security profile. A test here proves the policy, not the deployment.
@@ -180,7 +180,7 @@ ACLs exist for the local strict-security profile. A test here proves the policy,
 A security feature is not done until the repository shows both an allowed path and a denied path. For
 a new service that means:
 
-1. A row in `docs/security/identity-trust-matrix.md`.
+1. A row in the identity trust matrix.
 2. A committed `src/main/resources/security/kafka-acls.yml`.
 3. The principal added to `SecureKafkaStack.PRINCIPALS`, so the broker has its credential.
 4. At least one ALLOW and two DENY tests, driven by the committed file.

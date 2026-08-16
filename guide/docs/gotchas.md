@@ -154,11 +154,12 @@ looks at.
 
 ## The OTel Collector configuration in the spec no longer starts
 
-`docs/specification-v1.2.md` names the `jaeger` and `loki` exporters. Both were removed upstream:
-Jaeger takes OTLP directly now, and Loki ingests OTLP over HTTP at `/otlp`.
+The specification this stack was written against names the `jaeger` and `loki` exporters. Both were
+removed upstream: Jaeger takes OTLP directly now, and Loki ingests OTLP over HTTP at `/otlp`.
 
-The stack's configuration departs from the specification on purpose, and the file says so at the top.
-Traces go to the debug exporter, because FR-09.1 names no trace backend.
+`deploy/compose/observability/otel-collector.yaml` therefore departs from the specification on purpose,
+and says so at the top of the file. Traces go to the debug exporter, because FR-09.1 names no trace
+backend.
 
 ## A test that reads the wall clock is a test that fails at 3am
 

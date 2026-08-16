@@ -126,9 +126,10 @@ Prometheus scrapes the collector, not the services. The per-service scrape jobs 
 only resolve once the services run as containers in this stack, which they do not yet. A
 `static_configs` job gets added per service as each one is containerised.
 
-Two deliberate departures from `docs/specification-v1.2.md`'s collector configuration, which was
-written against an older collector and no longer starts: the `jaeger` exporter was removed upstream,
-and the `loki` exporter was replaced by OTLP over HTTP, which Loki ingests at `/otlp`.
+Two deliberate departures from the collector configuration in the specification, which was written
+against an older collector and no longer starts: the `jaeger` exporter was removed upstream, and the
+`loki` exporter was replaced by OTLP over HTTP, which Loki ingests at `/otlp`. The reasoning is written
+into `deploy/compose/observability/otel-collector.yaml`.
 
 Traces are received and sent to the debug exporter rather than stored. FR-09.1 names no trace backend,
 so there is nowhere to put them. Receiving them keeps a service's tracing export from failing against

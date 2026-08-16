@@ -132,5 +132,4 @@ written into `subjects.tsv`.
 ## What is not checked yet
 
 There is no runtime validation of subject naming or of the registry's per-subject compatibility
-configuration. The merge-time gate covers schema algebra only. `docs/task-status.md` lists this as an
-open gap.
+configuration. The merge-time gate covers schema algebra only, and this remains an open gap.

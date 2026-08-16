@@ -3,8 +3,9 @@
 Terms as this repository uses them. Where a term has a general meaning and a narrower local one, the
 local one is what the code means.
 
-**ADR.** Architecture Decision Record. One file per decision in `docs/adr/`, ADR-001 through ADR-030.
-Cited by number throughout this guide and in the source comments.
+**ADR.** Architecture Decision Record. ADR-001 through ADR-030, one per decision. Cited by number
+throughout this guide, and by the same number in the source comments, which is where you can see which
+decision a given line of code rests on.
 
 **At-least-once.** The delivery contract. Idempotent producers, explicit offset commits, and
 deduplication by a deterministic key. Duplicates arrive, and every consumer must tolerate them. The

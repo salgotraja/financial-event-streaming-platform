@@ -84,9 +84,9 @@ is the one store whose writer is real and whose destination is not.
 Plane 1 has four working producers and one absent one. Plane 3 has a consumer whose sink logs and
 discards. Planes 2, 4 and 5 have specifications and no source.
 
-The uneven shape is deliberate rather than accidental: the sequencing in `docs/task-status.md` puts
-the event spine first, then a security slice ahead of streaming, on the argument that authorization
-proven late is authorization retrofitted. What that costs is visible in this guide. There is an
+The uneven shape is deliberate rather than accidental. The sequencing puts the event spine first, then
+a security slice ahead of streaming, on the argument that authorization proven late is authorization
+retrofitted. What that costs is visible in this guide. There is an
 authorization story worth reading and no enrichment story at all.
 
 For the full list of what each unbuilt plane is specified to do, see

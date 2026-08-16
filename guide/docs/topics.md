@@ -83,12 +83,12 @@ Three topics have no subject on purpose:
 
 ## The duplication that exists, and is known
 
-The topic inventory and the subject map exist twice: authoritatively in `docs/architecture-v1.2.md`,
-and again in `deploy/compose/topics.tsv` and `subjects.tsv`.
+The topic inventory and the subject map exist twice: in the architecture specification, and again in
+`deploy/compose/topics.tsv` and `subjects.tsv`.
 
-The reason is that `docs/` is not tracked in git by policy, and the tracked stack needs a tracked
-inventory. Nothing checks that the two agree. `docs/task-status.md` lists this under known gaps rather
-than pretending it is a design.
+The stack needs an inventory it can read at provisioning time, so the `.tsv` files are the copy that
+runs. Nothing checks that the two agree, and that is recorded as a known gap rather than presented as
+a design. When a topic changes, change it in both places in the same commit.
 
 ## Consumer group naming
 

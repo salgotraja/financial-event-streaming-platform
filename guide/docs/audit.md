@@ -51,8 +51,8 @@ Decoding never produces the archived bytes. The class exists to classify.
 
 ## Deduplication, and what it does not claim
 
-The key is `topic + "-" + partition + "-" + offset`, which `docs/architecture-v1.2.md` fixes as the
-canonical event idempotency key for the audit path. Broker coordinates make a duplicate recognisable
+The key is `topic + "-" + partition + "-" + offset`, the canonical event idempotency key for the
+audit path. Broker coordinates make a duplicate recognisable
 without the archive understanding any event's payload.
 
 The window is bounded:
