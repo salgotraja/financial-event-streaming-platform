@@ -3,10 +3,10 @@
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="The local stack, and the two profiles it runs as">
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="The local stack, and the two profiles it runs as">
       <mxGeometry x="30" y="22" width="920" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Compose project fes-local. The profiles differ in listener security protocol, so switching needs destroy first.">
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Compose project fes-local. The profiles differ in listener security protocol, so switching needs destroy first.">
       <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 

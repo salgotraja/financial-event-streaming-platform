@@ -52,6 +52,10 @@ so this guide never repeats those numbers as achievements.
 
 Pick the route that matches your question.
 
+**You want to know what this is and why it exists.** Read
+[What this platform is for](purpose.md), then [Target architecture](architecture.md). Those two pages
+describe intent; every other page describes code that exists.
+
 **You want the shape of the thing.** Read [Follow one trade](spine.md), slowly, once. It is the spine:
 a single `TradeEvent` from a publisher call to an archived record, and to the dead-letter topic when
 the payload cannot be decoded. If only one page makes the platform legible, it is that one.

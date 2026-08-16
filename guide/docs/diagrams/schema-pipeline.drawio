@@ -3,10 +3,10 @@
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="From a .avsc file to a subject a producer can use">
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="From a .avsc file to a subject a producer can use">
       <mxGeometry x="30" y="22" width="900" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Two independent checks: a merge-time gate that needs no registry, and a provisioning step that needs no producer.">
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Two independent checks: a merge-time gate that needs no registry, and a provisioning step that needs no producer.">
       <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 

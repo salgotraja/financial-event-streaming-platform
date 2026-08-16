@@ -3,10 +3,10 @@
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="Modules, and the one dependency rule the build enforces">
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="Modules, and the one dependency rule the build enforces">
       <mxGeometry x="30" y="22" width="920" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Everything in settings.gradle, and nothing else. Modules land per phase; empty ones are not scaffolded ahead of the work.">
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Everything in settings.gradle, and nothing else. Modules land per phase; empty ones are not scaffolded ahead of the work.">
       <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 
@@ -23,7 +23,7 @@
     <mxCell id="det" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;" value="Deterministic planes &#183; checkPlaneIsolation inspects every module under these paths">
       <mxGeometry x="30" y="336" width="920" height="320" as="geometry"/>
     </mxCell>
-    <mxCell id="ingrp" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#666666;" value="services:ingestion">
+    <mxCell id="ingrp" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#666666;" value="services:ingestion">
       <mxGeometry x="52" y="374" width="400" height="22" as="geometry"/>
     </mxCell>
     <mxCell id="m1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;align=left;spacingLeft=14;" value="trade-producer">
@@ -45,7 +45,7 @@
       <mxGeometry x="52" y="600" width="430" height="34" as="geometry"/>
     </mxCell>
 
-    <mxCell id="augrp" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#666666;" value="services:audit">
+    <mxCell id="augrp" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=2;fontColor=#666666;" value="services:audit">
       <mxGeometry x="498" y="374" width="400" height="22" as="geometry"/>
     </mxCell>
     <mxCell id="m7" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;align=left;spacingLeft=14;" value="audit-service">
@@ -57,7 +57,7 @@
     <mxCell id="cmd" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;align=left;spacingLeft=14;fontSize=13;fontFamily=Courier New;verticalAlign=middle;" value="$ ./gradlew checkPlaneIsolation&lt;br&gt;Plane isolation: 7 deterministic-plane module(s) checked">
       <mxGeometry x="498" y="494" width="430" height="70" as="geometry"/>
     </mxCell>
-    <mxCell id="cmdnote" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" value="Seven, not five: the count includes the container projects :services:ingestion and :services:audit. Printing it means a vacuous pass is visible.">
+    <mxCell id="cmdnote" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" value="Seven, not five: the count includes the container projects :services:ingestion and :services:audit. Printing it means a vacuous pass is visible.">
       <mxGeometry x="498" y="572" width="430" height="60" as="geometry"/>
     </mxCell>
 
@@ -82,7 +82,7 @@
       <mxGeometry x="149" y="672" width="42" height="42" as="geometry"/>
     </mxCell>
 
-    <mxCell id="xlabel" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#b85450;" value="the build fails">
+    <mxCell id="xlabel" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#b85450;" value="the build fails">
       <mxGeometry x="202" y="672" width="300" height="42" as="geometry"/>
     </mxCell>
 

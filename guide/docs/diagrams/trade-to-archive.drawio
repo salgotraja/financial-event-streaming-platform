@@ -3,10 +3,10 @@
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="One trade, from publish to archive">
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="One trade, from publish to archive">
       <mxGeometry x="30" y="22" width="900" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Every participant exists in the repository today. At-least-once, idempotent producers, explicit offset commits, no transactions.">
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Every participant exists in the repository today. At-least-once, idempotent producers, explicit offset commits, no transactions.">
       <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 
@@ -29,37 +29,37 @@
     <mxCell id="m1" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="1. send, key = ticker">
       <mxGeometry relative="1" as="geometry"><mxPoint x="118" y="200" as="sourcePoint"/><mxPoint x="310" y="200" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m1b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="headers: traceparent, correlationId">
+    <mxCell id="m1b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="headers: traceparent, correlationId">
       <mxGeometry x="118" y="204" width="290" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="m2" parent="1" edge="1" style="html=1;endArrow=open;dashed=1;strokeColor=#666666;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="2. schema id">
       <mxGeometry relative="1" as="geometry"><mxPoint x="310" y="262" as="sourcePoint"/><mxPoint x="118" y="262" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m2b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="auto.register.schemas=false, so it is looked up, never created">
+    <mxCell id="m2b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="auto.register.schemas=false, so it is looked up, never created">
       <mxGeometry x="118" y="266" width="440" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="m3" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="3. produce">
       <mxGeometry relative="1" as="geometry"><mxPoint x="118" y="330" as="sourcePoint"/><mxPoint x="502" y="330" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m3b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="acks=all, enable.idempotence=true, lz4, 64KB batches">
+    <mxCell id="m3b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="acks=all, enable.idempotence=true, lz4, 64KB batches">
       <mxGeometry x="118" y="334" width="440" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="m4" parent="1" edge="1" style="html=1;endArrow=open;dashed=1;strokeColor=#666666;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="4. ack">
       <mxGeometry relative="1" as="geometry"><mxPoint x="502" y="398" as="sourcePoint"/><mxPoint x="118" y="398" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m4b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="only once min.insync.replicas=2 replicas hold the record">
+    <mxCell id="m4b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="only once min.insync.replicas=2 replicas hold the record">
       <mxGeometry x="118" y="402" width="440" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="m5" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="5. poll">
       <mxGeometry relative="1" as="geometry"><mxPoint x="502" y="466" as="sourcePoint"/><mxPoint x="694" y="466" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m5b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the value arrives as byte[], never as a deserialised object">
+    <mxCell id="m5b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the value arrives as byte[], never as a deserialised object">
       <mxGeometry x="502" y="470" width="460" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="m6" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="6. resolve the writer schema">
       <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="534" as="sourcePoint"/><mxPoint x="310" y="534" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m6b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="its name becomes eventType; decoding never produces the archived bytes">
+    <mxCell id="m6b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="its name becomes eventType; decoding never produces the archived bytes">
       <mxGeometry x="310" y="538" width="500" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="m7" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=middle;align=left;spacingLeft=8;" value="7. deduplicate on topic-partition-offset">
@@ -72,13 +72,13 @@
     <mxCell id="m8" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="8. write">
       <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="676" as="sourcePoint"/><mxPoint x="886" y="676" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m8b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the bytes exactly as delivered">
+    <mxCell id="m8b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the bytes exactly as delivered">
       <mxGeometry x="606" y="680" width="368" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="m9" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="9. acknowledge">
       <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="744" as="sourcePoint"/><mxPoint x="502" y="744" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m9b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the offset is committed here, never by a timer">
+    <mxCell id="m9b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the offset is committed here, never by a timer">
       <mxGeometry x="414" y="748" width="368" height="20" as="geometry"/>
     </mxCell>
 
@@ -88,13 +88,13 @@
     <mxCell id="m10" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#b85450;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;fontColor=#b85450;" value="10. quarantine to trades.raw.dlq">
       <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="858" as="sourcePoint"/><mxPoint x="886" y="858" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m10b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=12;fontColor=#b85450;" value="same key, original bytes, real attempt count">
+    <mxCell id="m10b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=12;fontColor=#b85450;" value="same key, original bytes, real attempt count">
       <mxGeometry x="606" y="862" width="368" height="20" as="geometry"/>
     </mxCell>
     <mxCell id="m11" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#b85450;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;fontColor=#b85450;" value="11. offset advances anyway">
       <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="916" as="sourcePoint"/><mxPoint x="502" y="916" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m11b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=12;fontColor=#b85450;" value="the next record on the partition archives normally">
+    <mxCell id="m11b" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=12;fontColor=#b85450;" value="the next record on the partition archives normally">
       <mxGeometry x="414" y="920" width="368" height="20" as="geometry"/>
     </mxCell>
 

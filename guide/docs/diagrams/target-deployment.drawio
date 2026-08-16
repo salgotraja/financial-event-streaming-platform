@@ -1,0 +1,81 @@
+<mxGraphModel dx="1000" dy="1200" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="980" pageHeight="1210" math="0" shadow="0" adaptiveColors="auto">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="Target deployment, the ECS Fargate profile">
+      <mxGeometry x="30" y="22" width="920" height="34" as="geometry"/>
+    </mxCell>
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#b85450;fontStyle=1;" value="Intent, not delivered. Nothing on this page is deployed today; the services run from Gradle against the local Compose stack.">
+      <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="vpc" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#6c8ebf;dashed=1;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;fontColor=#3b5a7a;" value="VPC &#183; private subnets, no public ingress to data-plane components">
+      <mxGeometry x="30" y="96" width="920" height="700" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="msk" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Amazon MSK&lt;/b&gt; &#183; managed Kafka&lt;br&gt;&lt;br&gt;TLS in transit, encrypted at rest.&lt;br&gt;IAM authentication and authorization, scoped per topic, per consumer group, per service identity.&lt;br&gt;Brokers are not internet-facing.">
+      <mxGeometry x="52" y="140" width="440" height="150" as="geometry"/>
+    </mxCell>
+    <mxCell id="sr" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Schema Registry&lt;/b&gt;&lt;br&gt;&lt;br&gt;FULL compatibility, matching the merge-time gate.&lt;br&gt;auto.register.schemas=false, so registration is a provisioning step rather than a deploy side effect.">
+      <mxGeometry x="510" y="140" width="418" height="150" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="tasks" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;verticalAlign=top;align=left;spacingLeft=14;spacingTop=10;fontSize=15;fontStyle=1;" value="ECS Fargate &#183; one service per task definition, each with its own task role">
+      <mxGeometry x="52" y="316" width="876" height="264" as="geometry"/>
+    </mxCell>
+    <mxCell id="t1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;Plane 1 &#183; ingestion&lt;/b&gt;&lt;br&gt;4 producers, migration normalizer&lt;br&gt;MSK write only, no read grant">
+      <mxGeometry x="72" y="352" width="410" height="94" as="geometry"/>
+    </mxCell>
+    <mxCell id="t2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;Plane 2 &#183; deterministic streaming&lt;/b&gt;&lt;br&gt;cache projector, enrichment, risk, positions&lt;br&gt;the 50k/sec and sub-200ms budget lives here">
+      <mxGeometry x="498" y="352" width="410" height="94" as="geometry"/>
+    </mxCell>
+    <mxCell id="t3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;Plane 3 &#183; audit and control&lt;/b&gt;&lt;br&gt;archive writer, reconciliation&lt;br&gt;PutObject and Sign only, never Delete">
+      <mxGeometry x="72" y="462" width="410" height="94" as="geometry"/>
+    </mxCell>
+    <mxCell id="t4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;Plane 4 &#183; candidate and case&lt;/b&gt;&lt;br&gt;screening, cases, rule governance, admin plane&lt;br&gt;writes anomaly.candidates, never reads it">
+      <mxGeometry x="498" y="462" width="410" height="94" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="stores" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;verticalAlign=top;align=left;spacingLeft=14;spacingTop=10;fontSize=15;fontStyle=1;" value="Stores &#183; no two services share a schema">
+      <mxGeometry x="52" y="604" width="876" height="170" as="geometry"/>
+    </mxCell>
+    <mxCell id="s1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;ElastiCache Redis&lt;/b&gt;&lt;br&gt;market state, projected from ticks&lt;br&gt;never read through to a producer">
+      <mxGeometry x="72" y="640" width="272" height="112" as="geometry"/>
+    </mxCell>
+    <mxCell id="s2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;RDS PostgreSQL&lt;/b&gt;&lt;br&gt;risk state, positions, cases, decisions&lt;br&gt;authoritative for anything reviewed">
+      <mxGeometry x="356" y="640" width="272" height="112" as="geometry"/>
+    </mxCell>
+    <mxCell id="s3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;S3 + KMS&lt;/b&gt;&lt;br&gt;Parquet archive, Object Lock, versioning&lt;br&gt;signed manifests, customer-managed key">
+      <mxGeometry x="640" y="640" width="288" height="112" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="e1" parent="1" source="tasks" target="msk" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#6c8ebf;endArrow=block;strokeWidth=2;fontSize=13;exitX=0.25;exitY=0;exitDx=0;exitDy=0;" value="IAM auth">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="e2" parent="1" source="tasks" target="stores" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9673a6;endArrow=block;strokeWidth=2;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="agent" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b85450;dashed=1;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=15;fontStyle=1;fontColor=#b85450;" value="Plane 5 &#183; agent investigation, outside the availability graph of Planes 1 to 3">
+      <mxGeometry x="30" y="826" width="920" height="150" as="geometry"/>
+    </mxCell>
+    <mxCell id="a1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;Investigation, review, precedent sync&lt;/b&gt;&lt;br&gt;reads anomaly.candidates only&lt;br&gt;typed tool gateway, no ledger credential">
+      <mxGeometry x="52" y="866" width="410" height="90" as="geometry"/>
+    </mxCell>
+    <mxCell id="a2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=13;align=left;spacingLeft=12;verticalAlign=middle;" value="&lt;b&gt;Neo4j precedent graph&lt;/b&gt;&lt;br&gt;derived and rebuildable from reviewed cases&lt;br&gt;PostgreSQL stays authoritative">
+      <mxGeometry x="498" y="866" width="430" height="90" as="geometry"/>
+    </mxCell>
+    <mxCell id="e3" parent="1" source="vpc" target="agent" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#b85450;endArrow=block;strokeWidth=2;dashed=1;fontSize=13;fontColor=#b85450;exitX=0.15;exitY=1;exitDx=0;exitDy=0;entryX=0.15;entryY=0;entryDx=0;entryDy=0;" value="anomaly.candidates, one way">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="humans" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Human access is a separate path&lt;/b&gt;&lt;br&gt;&lt;br&gt;OIDC identity provider &#8594; admin control plane as the policy enforcement point &#8594; externalised OPA policy decision point &#8594; privileged operation.&lt;br&gt;&lt;br&gt;DLQ replay, rule approval, case disposition and audit export all pass through it, and each records actor, role, reason, target, decision and outcome.">
+      <mxGeometry x="30" y="1000" width="920" height="150" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="foot" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" value="EKS is the second profile: the same services under a Helm chart, one Kubernetes service account each via EKS Pod Identity, KEDA scaling consumers from lag, and SPIFFE/SPIRE for attested service-to-service mTLS in the advanced-security variant. It is an ephemeral validation environment with a tagged teardown plan, not the primary path.">
+      <mxGeometry x="30" y="1160" width="920" height="46" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>

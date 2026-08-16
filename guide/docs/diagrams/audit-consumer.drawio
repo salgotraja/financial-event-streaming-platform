@@ -3,17 +3,17 @@
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="Inside the only consumer in the platform">
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="Inside the only consumer in the platform">
       <mxGeometry x="30" y="22" width="920" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Every decision here exists because two things are certain: at-least-once produces duplicates, and one record will fail to decode.">
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Every decision here exists because two things are certain: at-least-once produces duplicates, and one record will fail to decode.">
       <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 
-    <mxCell id="hdrl" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#666666;" value="The path a record takes">
+    <mxCell id="hdrl" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#666666;" value="The path a record takes">
       <mxGeometry x="30" y="90" width="520" height="22" as="geometry"/>
     </mxCell>
-    <mxCell id="hdrr" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#666666;" value="Where it goes, and why it works">
+    <mxCell id="hdrr" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#666666;" value="Where it goes, and why it works">
       <mxGeometry x="570" y="90" width="380" height="22" as="geometry"/>
     </mxCell>
 

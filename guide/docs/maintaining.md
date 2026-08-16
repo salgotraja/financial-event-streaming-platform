@@ -22,17 +22,11 @@ this guide and will stay targets until Phase 8 produces a measurement.
 
 ## What this guide does not cover yet
 
-It currently explains **how the delivered pieces work**. It does not yet explain, at the level above
-the code, **what this platform is for**. Those chapters get written as the system grows into them:
+Two chapters now cover intent rather than delivered code, and are marked as such:
+[What this platform is for](purpose.md) and [Target architecture](architecture.md). They are the only
+places in the guide where the design leads and the code follows.
 
-**Purpose and problem.** What problem the platform exists to solve, who would run it, what a real
-deployment would be doing, and what makes financial event streaming different from event streaming in
-general. Today the closest thing is two paragraphs on the landing page.
-
-**Target architecture and its reasoning.** The whole five-plane design as an intended system rather
-than as a delivery checklist: the trade-offs behind each plane boundary, why the agent plane is
-separated the way it is, what the deployment topology looks like on ECS and on EKS, and how the pieces
-are meant to scale together. [Five planes](planes.md) sketches the shape; it does not yet argue for it.
+What is still missing gets written as the system grows into it:
 
 **A chapter per phase, as each phase lands.** Deterministic streaming, the durable audit sink, CDC
 migration, candidate screening, the agent tool boundary, the precedent graph. Each one becomes a page
@@ -84,7 +78,7 @@ cd guide/docs/diagrams
 drawio -x -f svg -e -b 10 --embed-svg-fonts false -o NAME.svg NAME.drawio
 ```
 
-Three things that are not optional:
+Four things that are not optional:
 
 `--embed-svg-fonts false`. With font embedding on, draw.io writes a raster PNG fallback for every text
 label and the file grows from about 40KB to over 1MB.
@@ -95,6 +89,10 @@ clicking it.
 
 **Angle brackets disappear.** draw.io renders labels as HTML, so `List<Grant>` in a label is parsed as
 a tag. Write "List of Grant".
+
+**A text cell needs `whiteSpace=wrap` in its style.** Without it a long label renders on one line, and
+the export silently widens the whole canvas to fit. A diagram that comes out 2000px wide when you drew
+it 980px wide has one of these in it.
 
 ## Keeping it honest
 

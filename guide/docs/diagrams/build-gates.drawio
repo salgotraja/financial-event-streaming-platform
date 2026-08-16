@@ -3,10 +3,10 @@
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="What ./gradlew build actually runs">
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="What ./gradlew build actually runs">
       <mxGeometry x="30" y="22" width="920" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Four things fail the build rather than warn. Two are rules about the shape of the codebase, and both run as their own CI step.">
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Four things fail the build rather than warn. Two are rules about the shape of the codebase, and both run as their own CI step.">
       <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 
@@ -49,7 +49,7 @@
     <mxCell id="ci4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontFamily=Courier New;align=left;spacingLeft=12;verticalAlign=middle;" value="./gradlew build, then upload test reports with always()">
       <mxGeometry x="52" y="876" width="876" height="42" as="geometry"/>
     </mxCell>
-    <mxCell id="cinote" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" value="Running the two gates ahead of the wider build duplicates a little work and buys a clear signal: a compatibility break or a forbidden dependency becomes a named failed step rather than a line in a test summary.">
+    <mxCell id="cinote" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" value="Running the two gates ahead of the wider build duplicates a little work and buys a clear signal: a compatibility break or a forbidden dependency becomes a named failed step rather than a line in a test summary.">
       <mxGeometry x="30" y="950" width="920" height="60" as="geometry"/>
     </mxCell>
   </root>

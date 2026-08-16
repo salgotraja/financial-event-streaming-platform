@@ -3,10 +3,10 @@
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="One policy file, one parser, two consumers">
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="One policy file, one parser, two consumers">
       <mxGeometry x="30" y="22" width="920" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="What a test proves and what a broker applies come from the same committed file, read by the same code.">
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="What a test proves and what a broker applies come from the same committed file, read by the same code.">
       <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 
@@ -53,7 +53,7 @@
       <mxGeometry x="30" y="720" width="920" height="130" as="geometry"/>
     </mxCell>
 
-    <mxCell id="proofhdr" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" value="Both halves are asserted, in both places">
+    <mxCell id="proofhdr" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=16;fontStyle=1;" value="Both halves are asserted, in both places">
       <mxGeometry x="30" y="876" width="920" height="26" as="geometry"/>
     </mxCell>
     <mxCell id="pr1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;align=left;spacingLeft=14;verticalAlign=top;spacingTop=10;" value="&lt;b&gt;Per producer identity&lt;/b&gt;&lt;br&gt;&lt;br&gt;ALLOW write the topic it owns&lt;br&gt;DENY read the topic it writes&lt;br&gt;DENY write another service's topic">
@@ -66,7 +66,7 @@
       <mxGeometry x="652" y="912" width="298" height="140" as="geometry"/>
     </mxCell>
 
-    <mxCell id="caveat" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" value="What this does not prove: that a deployed service authenticates as its own principal. The services are not containerised yet, so the identity binding is still open. Cloud deployments authorise with MSK IAM; ACLs exist for this local profile.">
+    <mxCell id="caveat" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" value="What this does not prove: that a deployed service authenticates as its own principal. The services are not containerised yet, so the identity binding is still open. Cloud deployments authorise with MSK IAM; ACLs exist for this local profile.">
       <mxGeometry x="30" y="1070" width="920" height="60" as="geometry"/>
     </mxCell>
   </root>

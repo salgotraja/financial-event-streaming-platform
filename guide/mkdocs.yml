@@ -77,6 +77,9 @@ markdown_extensions:
 
 nav:
   - Start here: index.md
+  - Why it exists:
+      - What this platform is for: purpose.md
+      - Target architecture: architecture.md
   - Follow one trade: spine.md
   - The map:
       - Five planes: planes.md
