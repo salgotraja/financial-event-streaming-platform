@@ -1,7 +1,7 @@
 # Build gates and CI
 
-[![What ./gradlew build actually runs](diagrams/build-gates.svg)](diagrams/build-gates.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/build-gates.drawio`.
+![What ./gradlew build actually runs](diagrams/build-gates.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/build-gates.drawio`.
 {: .diagram-hint }
 
 Four things fail `./gradlew build` rather than warn. Two of them are rules about the shape of the

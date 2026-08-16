@@ -4,8 +4,8 @@ The plane model is the single idea that makes the repository layout, the module 
 and the service objectives follow from one another. It is worth ten minutes even if you only ever
 touch one service.
 
-[![Five planes, and what is actually built](diagrams/five-planes.svg)](diagrams/five-planes.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/five-planes.drawio`.
+![Five planes, and what is actually built](diagrams/five-planes.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/five-planes.drawio`.
 {: .diagram-hint }
 
 ## The five
@@ -71,8 +71,8 @@ The plane diagram above shows intent. This one shows only what moves data today:
 writing four topics, one process reading them, one quarantine path, and a registry every one of them
 depends on.
 
-[![Data flow, level 1, the delivered system only](diagrams/dfd-level-1.svg)](diagrams/dfd-level-1.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/dfd-level-1.drawio`.
+![Data flow, level 1, the delivered system only](diagrams/dfd-level-1.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/dfd-level-1.drawio`.
 {: .diagram-hint }
 
 Two things are worth noticing. There is exactly one consumer, so every other arrow into a store is a

@@ -3,8 +3,8 @@
 One `TradeEvent`, from a publisher call to an archived record. Read this page once, slowly. It touches
 almost every delivered module, and the rest of the guide is a set of footnotes to it.
 
-[![One trade, from publish to archive](diagrams/trade-to-archive.svg)](diagrams/trade-to-archive.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/trade-to-archive.drawio`.
+![One trade, from publish to archive](diagrams/trade-to-archive.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/trade-to-archive.drawio`.
 {: .diagram-hint }
 
 ## Hop 0: the contract exists before the code does

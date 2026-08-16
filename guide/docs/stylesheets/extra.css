@@ -1,34 +1,34 @@
-/* The diagrams are wide. Give the content column more room than the Material default,
-   and let a click open one at full size. */
+/* The diagrams are drawn to be legible at the content column width. glightbox handles
+   click-to-zoom, so nothing here needs to fight for space. */
 
 .md-grid {
-  max-width: 1400px;
+  max-width: 1600px;
 }
 
-.diagram {
-  display: block;
-  cursor: zoom-in;
-  overflow-x: auto;
-  margin: 1.2rem 0;
-  border: 1px solid var(--md-default-fg-color--lightest);
-  border-radius: 0.2rem;
-  background: var(--md-default-bg-color);
-}
-
-.diagram img {
+img.diagram {
   display: block;
   width: 100%;
   height: auto;
+  margin: 1.2rem auto 0.4rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.2rem;
+  background: var(--md-default-bg-color);
+  cursor: zoom-in;
 }
 
 .diagram-hint {
   display: block;
-  margin-top: -0.9rem;
+  margin-top: -0.2rem;
   font-size: 0.72rem;
   color: var(--md-default-fg-color--light);
 }
 
-/* Wide reference tables should scroll rather than crush their columns. */
+/* The lightbox paints its own dark ground; keep a diagram readable on it in either theme. */
+.gslide-media img {
+  background: var(--md-default-bg-color);
+}
+
+/* Wide reference tables should stay compact rather than crush their columns. */
 .md-typeset table:not([class]) {
   font-size: 0.72rem;
 }

@@ -1,7 +1,7 @@
 # The local stack
 
-[![The local stack, and the two profiles it runs as](diagrams/local-stack.svg)](diagrams/local-stack.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/local-stack.drawio`.
+![The local stack, and the two profiles it runs as](diagrams/local-stack.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/local-stack.drawio`.
 {: .diagram-hint }
 
 One script, two profiles, and a provisioning sequence Compose alone cannot express.

@@ -1,7 +1,7 @@
 # Modules and the isolation rule
 
-[![Gradle modules and the one dependency rule the build enforces](diagrams/modules.svg)](diagrams/modules.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/modules.drawio`.
+![Gradle modules and the one dependency rule the build enforces](diagrams/modules.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/modules.drawio`.
 {: .diagram-hint }
 
 ## What is in the build

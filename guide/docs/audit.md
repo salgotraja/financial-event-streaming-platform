@@ -1,7 +1,7 @@
 # The audit consumer
 
-[![Inside the only consumer in the platform](diagrams/audit-consumer.svg)](diagrams/audit-consumer.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/audit-consumer.drawio`.
+![Inside the only consumer in the platform](diagrams/audit-consumer.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/audit-consumer.drawio`.
 {: .diagram-hint }
 
 `audit-service` is the platform's first and, today, only consumer. Every design decision on this path

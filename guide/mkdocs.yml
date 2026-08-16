@@ -40,6 +40,15 @@ theme:
         icon: material/weather-sunny
         name: Switch to light mode
 
+plugins:
+  - search
+  - glightbox:
+      touchNavigation: true
+      zoomable: true
+      draggable: true
+      auto_caption: false
+      skip_classes: []
+
 validation:
   links:
     anchors: warn

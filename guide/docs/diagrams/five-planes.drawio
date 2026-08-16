@@ -1,169 +1,136 @@
-<mxGraphModel dx="1400" dy="1000" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="1500" pageHeight="1060" math="0" shadow="0" adaptiveColors="auto">
+<mxGraphModel dx="1000" dy="1400" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="980" pageHeight="1780" math="0" shadow="0" adaptiveColors="auto">
   <root>
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;" value="Five planes, and what is actually built">
-      <mxGeometry x="60" y="20" width="700" height="30" as="geometry"/>
-    </mxCell>
-    <mxCell id="subtitle" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="Green is delivered and tested. Amber is delivered with a stated limit. Grey dashed is specified in docs/ and has no source in the repository." >
-      <mxGeometry x="60" y="52" width="1200" height="20" as="geometry"/>
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="Five planes, and what is actually built">
+      <mxGeometry x="30" y="22" width="900" height="34" as="geometry"/>
     </mxCell>
 
-    <mxCell id="lane-ingestion" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#333333;" value="Plane 1 &#183; Ingestion and migration">
-      <mxGeometry x="60" y="100" width="450" height="300" as="geometry"/>
+    <mxCell id="lg1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" value="Delivered">
+      <mxGeometry x="30" y="66" width="150" height="30" as="geometry"/>
     </mxCell>
-    <mxCell id="svc-trade" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" value="trade-producer&#10;writes trades.raw, keyed on ticker">
-      <mxGeometry x="85" y="134" width="400" height="42" as="geometry"/>
+    <mxCell id="lg2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" value="Delivered, with a stated limit">
+      <mxGeometry x="192" y="66" width="250" height="30" as="geometry"/>
     </mxCell>
-    <mxCell id="svc-mds" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" value="market-data-simulator&#10;writes market-data.ticks, keyed on ticker">
-      <mxGeometry x="85" y="184" width="400" height="42" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-ca" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" value="corporate-action-producer&#10;writes corporate-actions, keyed on ticker">
-      <mxGeometry x="85" y="234" width="400" height="42" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-ref" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" value="reference-data-service&#10;writes reference-data.instruments, keyed on instrumentId">
-      <mxGeometry x="85" y="284" width="400" height="42" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-mig" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="migration-normalizer &#183; Debezium CDC">
-      <mxGeometry x="85" y="334" width="400" height="42" as="geometry"/>
+    <mxCell id="lg3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=13;" value="Specified in docs/, no source in the repository">
+      <mxGeometry x="454" y="66" width="380" height="30" as="geometry"/>
     </mxCell>
 
-    <mxCell id="lane-audit" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#333333;" value="Plane 3 &#183; Audit and control">
-      <mxGeometry x="60" y="440" width="450" height="150" as="geometry"/>
+    <mxCell id="lane1" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;" value="Plane 1 &#183; Ingestion and migration">
+      <mxGeometry x="30" y="126" width="920" height="252" as="geometry"/>
     </mxCell>
-    <mxCell id="svc-audit" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" value="audit-service&#10;reads the 4 evidence topics as bytes&#10;archives to a logging sink, not to S3">
-      <mxGeometry x="85" y="474" width="400" height="46" as="geometry"/>
+    <mxCell id="p-trade" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;align=left;spacingLeft=14;" value="trade-producer &#8594; trades.raw, keyed on ticker">
+      <mxGeometry x="52" y="164" width="876" height="36" as="geometry"/>
     </mxCell>
-    <mxCell id="svc-recon" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="reconciliation-service &#183; signed manifests, Object Lock">
-      <mxGeometry x="85" y="528" width="400" height="42" as="geometry"/>
+    <mxCell id="p-mds" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;align=left;spacingLeft=14;" value="market-data-simulator &#8594; market-data.ticks, keyed on ticker">
+      <mxGeometry x="52" y="206" width="876" height="36" as="geometry"/>
     </mxCell>
-
-    <mxCell id="spine" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=center;spacingTop=10;fontSize=13;fontStyle=1;" value="Apache Kafka 4.1&#10;three brokers, KRaft">
-      <mxGeometry x="560" y="100" width="330" height="490" as="geometry"/>
+    <mxCell id="p-ca" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;align=left;spacingLeft=14;" value="corporate-action-producer &#8594; corporate-actions, keyed on ticker">
+      <mxGeometry x="52" y="248" width="876" height="36" as="geometry"/>
     </mxCell>
-    <mxCell id="spine-durability" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;" value="acks=all&#10;min.insync.replicas=2&#10;enable.idempotence=true&#10;no transactions, at-least-once">
-      <mxGeometry x="585" y="160" width="280" height="76" as="geometry"/>
+    <mxCell id="p-ref" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;align=left;spacingLeft=14;" value="reference-data-service &#8594; reference-data.instruments, keyed on instrumentId">
+      <mxGeometry x="52" y="290" width="876" height="36" as="geometry"/>
     </mxCell>
-    <mxCell id="spine-topics" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;spacingLeft=10;" value="22 topics provisioned&#10;18 domain topics, 4 dead-letter&#10;partition counts are explicit&#10;auto-creation is off">
-      <mxGeometry x="585" y="252" width="280" height="76" as="geometry"/>
-    </mxCell>
-    <mxCell id="spine-registry" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=11;align=left;spacingLeft=10;" value="Confluent Schema Registry&#10;19 subjects registered&#10;compatibility FULL&#10;auto.register.schemas=false">
-      <mxGeometry x="585" y="344" width="280" height="76" as="geometry"/>
-    </mxCell>
-    <mxCell id="spine-security" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=10;" value="strict-security profile&#10;SASL_SSL, StandardAuthorizer&#10;allow.everyone.if.no.acl.found=false&#10;13 ACLs from committed policy">
-      <mxGeometry x="585" y="436" width="280" height="76" as="geometry"/>
-    </mxCell>
-    <mxCell id="spine-obs" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=center;" value="OTel Collector, Prometheus, Loki, Grafana">
-      <mxGeometry x="585" y="528" width="280" height="46" as="geometry"/>
+    <mxCell id="p-mig" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="migration-normalizer &#183; Debezium CDC from a mock legacy source">
+      <mxGeometry x="52" y="332" width="876" height="36" as="geometry"/>
     </mxCell>
 
-    <mxCell id="lane-streaming" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#333333;" value="Plane 2 &#183; Deterministic streaming">
-      <mxGeometry x="940" y="100" width="500" height="250" as="geometry"/>
+    <mxCell id="spine" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;" value="Apache Kafka 4.1 &#183; three brokers, KRaft">
+      <mxGeometry x="30" y="440" width="920" height="240" as="geometry"/>
     </mxCell>
-    <mxCell id="svc-cache" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="market-data-cache-projector &#183; Redis">
-      <mxGeometry x="965" y="134" width="450" height="42" as="geometry"/>
+    <mxCell id="sp1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;align=left;spacingLeft=14;verticalAlign=middle;" value="acks=all, min.insync.replicas=2&lt;br&gt;enable.idempotence=true, no transactions">
+      <mxGeometry x="52" y="478" width="430" height="74" as="geometry"/>
     </mxCell>
-    <mxCell id="svc-enrich" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="trade-enrichment-service">
-      <mxGeometry x="965" y="184" width="450" height="42" as="geometry"/>
+    <mxCell id="sp2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;align=left;spacingLeft=14;verticalAlign=middle;" value="22 topics, explicit partition counts&lt;br&gt;18 domain plus 4 dead-letter">
+      <mxGeometry x="498" y="478" width="430" height="74" as="geometry"/>
     </mxCell>
-    <mxCell id="svc-risk" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="risk-alert-service">
-      <mxGeometry x="965" y="234" width="450" height="42" as="geometry"/>
+    <mxCell id="sp3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;align=left;spacingLeft=14;verticalAlign=middle;" value="Schema Registry, 19 subjects, FULL&lt;br&gt;auto.register.schemas=false">
+      <mxGeometry x="52" y="566" width="430" height="74" as="geometry"/>
     </mxCell>
-    <mxCell id="svc-pos" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="position-exposure-service">
-      <mxGeometry x="965" y="284" width="450" height="42" as="geometry"/>
-    </mxCell>
-
-    <mxCell id="lane-control" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#333333;" value="Plane 4 &#183; Candidate and case">
-      <mxGeometry x="940" y="380" width="500" height="200" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-anom" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="anomaly-candidate-service &#183; deterministic screening">
-      <mxGeometry x="965" y="414" width="450" height="42" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-case" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="alert-case-service, risk-rule-governance-service">
-      <mxGeometry x="965" y="464" width="450" height="42" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-admin" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="admin-control-plane, reconciliation-simulator">
-      <mxGeometry x="965" y="514" width="450" height="42" as="geometry"/>
+    <mxCell id="sp4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;align=left;spacingLeft=14;verticalAlign=middle;" value="strict-security: SASL_SSL, 13 ACLs&lt;br&gt;allow.everyone.if.no.acl.found=false">
+      <mxGeometry x="498" y="566" width="430" height="74" as="geometry"/>
     </mxCell>
 
-    <mxCell id="boundary" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b85450;dashed=1;dashPattern=8 8;strokeWidth=2;verticalAlign=middle;align=center;fontSize=12;fontStyle=1;fontColor=#b85450;" value="Plane isolation boundary &#183; enforced by ./gradlew checkPlaneIsolation">
-      <mxGeometry x="940" y="606" width="500" height="34" as="geometry"/>
-    </mxCell>
-
-    <mxCell id="lane-agent" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=13;fontStyle=1;fontColor=#333333;" value="Plane 5 &#183; Agent investigation &#183; asynchronous and optional">
-      <mxGeometry x="940" y="660" width="500" height="200" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-agent" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="agent-investigation-service &#183; read-only tools">
-      <mxGeometry x="965" y="694" width="450" height="42" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-human" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="human-review-service">
-      <mxGeometry x="965" y="744" width="450" height="42" as="geometry"/>
-    </mxCell>
-    <mxCell id="svc-graph" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=12;" value="precedent-sync-service &#183; Neo4j, derived and rebuildable">
-      <mxGeometry x="965" y="794" width="450" height="42" as="geometry"/>
-    </mxCell>
-
-    <mxCell id="e1" parent="1" source="svc-trade" target="spine" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;fontSize=10;endArrow=block;">
-      <mxGeometry relative="1" as="geometry"/>
-    </mxCell>
-    <mxCell id="e2" parent="1" source="svc-mds" target="spine" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;fontSize=10;endArrow=block;">
-      <mxGeometry relative="1" as="geometry"/>
-    </mxCell>
-    <mxCell id="e3" parent="1" source="svc-ca" target="spine" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;fontSize=10;endArrow=block;">
-      <mxGeometry relative="1" as="geometry"/>
-    </mxCell>
-    <mxCell id="e4" parent="1" source="svc-ref" target="spine" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;fontSize=10;endArrow=block;">
+    <mxCell id="feed" parent="1" source="lane1" target="spine" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#82b366;endArrow=block;strokeWidth=3;">
       <mxGeometry relative="1" as="geometry"/>
     </mxCell>
 
-    <mxCell id="e5" parent="1" source="spine" target="svc-audit" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d6b656;fontSize=10;endArrow=block;exitX=0;exitY=0.85;exitDx=0;exitDy=0;">
-      <mxGeometry relative="1" as="geometry"/>
-    </mxCell>
-    <mxCell id="e6" parent="1" source="svc-recon" target="spine" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;dashed=1;fontSize=10;endArrow=block;">
-      <mxGeometry relative="1" as="geometry"/>
-    </mxCell>
-    <mxCell id="e6l" parent="e6" vertex="1" connectable="0" style="edgeLabel;html=1;fontSize=10;fontColor=#666666;labelBackgroundColor=#ffffff;" value="{topic}.dlq">
-      <mxGeometry x="0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+    <mxCell id="bus" parent="1" edge="1" style="html=1;endArrow=none;strokeColor=#6c8ebf;strokeWidth=3;">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="70" y="680" as="sourcePoint"/><mxPoint x="70" y="1520" as="targetPoint"/></mxGeometry>
     </mxCell>
 
-    <mxCell id="e7" parent="1" source="spine" target="lane-streaming" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;dashed=1;fontSize=10;endArrow=block;exitX=1;exitY=0.2;exitDx=0;exitDy=0;">
-      <mxGeometry relative="1" as="geometry"/>
+    <mxCell id="lane3" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;" value="Plane 3 &#183; Audit and control">
+      <mxGeometry x="130" y="720" width="820" height="140" as="geometry"/>
     </mxCell>
-    <mxCell id="e8" parent="1" source="spine" target="lane-control" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;dashed=1;fontSize=10;endArrow=block;exitX=1;exitY=0.7;exitDx=0;exitDy=0;">
-      <mxGeometry relative="1" as="geometry"/>
+    <mxCell id="a-audit" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;align=left;spacingLeft=14;" value="audit-service &#183; reads 4 evidence topics as bytes, archives to a logging sink">
+      <mxGeometry x="152" y="758" width="776" height="36" as="geometry"/>
     </mxCell>
-    <mxCell id="e9" parent="1" source="spine" target="lane-agent" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#999999;dashed=1;fontSize=10;endArrow=block;exitX=0.5;exitY=1;exitDx=0;exitDy=0;">
-      <mxGeometry relative="1" as="geometry"/>
-    </mxCell>
-    <mxCell id="e9l" parent="e9" vertex="1" connectable="0" style="edgeLabel;html=1;fontSize=10;fontColor=#666666;labelBackgroundColor=#ffffff;" value="anomaly.candidates only">
-      <mxGeometry x="0.75" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+    <mxCell id="a-recon" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="reconciliation-service &#183; signed manifests, S3 Object Lock">
+      <mxGeometry x="152" y="802" width="776" height="36" as="geometry"/>
     </mxCell>
 
-    <mxCell id="note-invariant" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;fontSize=11;" value="The invariant&#10;&#10;Plane 5 is asynchronous and optional. A provider outage, throttling, graph unavailability or budget exhaustion must never block Planes 1 to 3 or add an availability dependency to them. The 50k events/sec target belongs to deterministic streaming and is never a claim about LLM throughput.&#10;&#10;The build enforces the structural half: no ingestion, streaming or audit module may depend on an agent module, on Neo4j, or on an LLM provider.">
-      <mxGeometry x="60" y="640" width="450" height="220" as="geometry"/>
+    <mxCell id="lane2" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;" value="Plane 2 &#183; Deterministic streaming">
+      <mxGeometry x="130" y="900" width="820" height="222" as="geometry"/>
+    </mxCell>
+    <mxCell id="b1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="market-data-cache-projector &#183; Redis">
+      <mxGeometry x="152" y="938" width="776" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="b2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="trade-enrichment-service &#183; no synchronous fallback on a cache miss">
+      <mxGeometry x="152" y="980" width="776" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="b3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="risk-alert-service &#183; governed, versioned rules">
+      <mxGeometry x="152" y="1022" width="776" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="b4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="position-exposure-service &#183; idempotent by tradeId, rebuildable">
+      <mxGeometry x="152" y="1064" width="776" height="36" as="geometry"/>
     </mxCell>
 
-    <mxCell id="legend" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=12;fontStyle=1;" value="Legend">
-      <mxGeometry x="60" y="900" width="1380" height="70" as="geometry"/>
+    <mxCell id="lane4" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;" value="Plane 4 &#183; Candidate and case">
+      <mxGeometry x="130" y="1162" width="820" height="182" as="geometry"/>
     </mxCell>
-    <mxCell id="lg1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;">
-      <mxGeometry x="90" y="928" width="150" height="28" as="geometry"/>
+    <mxCell id="c1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="anomaly-candidate-service &#183; deterministic screening, no LLM on the hot path">
+      <mxGeometry x="152" y="1200" width="776" height="36" as="geometry"/>
     </mxCell>
-    <mxCell id="lg1t" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" value="Delivered and tested">
-      <mxGeometry x="248" y="928" width="180" height="28" as="geometry"/>
+    <mxCell id="c2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="alert-case-service, risk-rule-governance-service">
+      <mxGeometry x="152" y="1242" width="776" height="36" as="geometry"/>
     </mxCell>
-    <mxCell id="lg2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;">
-      <mxGeometry x="440" y="928" width="150" height="28" as="geometry"/>
+    <mxCell id="c3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="admin-control-plane, reconciliation-simulator">
+      <mxGeometry x="152" y="1284" width="776" height="36" as="geometry"/>
     </mxCell>
-    <mxCell id="lg2t" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" value="Delivered with a stated limit">
-      <mxGeometry x="598" y="928" width="220" height="28" as="geometry"/>
+
+    <mxCell id="boundary" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b85450;dashed=1;dashPattern=8 8;strokeWidth=3;verticalAlign=middle;align=center;fontSize=14;fontStyle=1;fontColor=#b85450;" value="Plane isolation boundary &#183; enforced by ./gradlew checkPlaneIsolation">
+      <mxGeometry x="130" y="1366" width="820" height="42" as="geometry"/>
     </mxCell>
-    <mxCell id="lg3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;dashed=1;fontSize=11;">
-      <mxGeometry x="830" y="928" width="150" height="28" as="geometry"/>
+
+    <mxCell id="lane5" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;" value="Plane 5 &#183; Agent investigation &#183; asynchronous, optional, reads anomaly.candidates only">
+      <mxGeometry x="130" y="1430" width="820" height="182" as="geometry"/>
     </mxCell>
-    <mxCell id="lg3t" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" value="Specified in docs/, no source in the repository">
-      <mxGeometry x="988" y="928" width="340" height="28" as="geometry"/>
+    <mxCell id="d1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="agent-investigation-service &#183; read-only tools plus flag-for-review">
+      <mxGeometry x="152" y="1468" width="776" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="d2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="human-review-service">
+      <mxGeometry x="152" y="1510" width="776" height="36" as="geometry"/>
+    </mxCell>
+    <mxCell id="d3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;dashed=1;fontSize=14;align=left;spacingLeft=14;" value="precedent-sync-service &#183; Neo4j, derived and rebuildable">
+      <mxGeometry x="152" y="1552" width="776" height="36" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="t3" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#6c8ebf;strokeWidth=2;">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="70" y="790" as="sourcePoint"/><mxPoint x="130" y="790" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="t2" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#999999;strokeWidth=2;dashed=1;">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="70" y="1010" as="sourcePoint"/><mxPoint x="130" y="1010" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="t4" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#999999;strokeWidth=2;dashed=1;">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="70" y="1250" as="sourcePoint"/><mxPoint x="130" y="1250" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="t5" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#999999;strokeWidth=2;dashed=1;">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="70" y="1514" as="sourcePoint"/><mxPoint x="130" y="1514" as="targetPoint"/></mxGeometry>
+    </mxCell>
+
+    <mxCell id="inv" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=16;verticalAlign=top;spacingTop=12;fontSize=14;" value="&lt;b&gt;The invariant&lt;/b&gt;&lt;br&gt;&lt;br&gt;Plane 5 is asynchronous and optional. A provider outage, throttling, graph unavailability or budget exhaustion must never block Planes 1 to 3, or add an availability dependency to them.&lt;br&gt;&lt;br&gt;The 50k events/sec target belongs to deterministic streaming and is never a claim about LLM throughput.">
+      <mxGeometry x="30" y="1634" width="920" height="130" as="geometry"/>
     </mxCell>
   </root>
 </mxGraphModel>

@@ -1,7 +1,7 @@
 # Workload authorization
 
-[![One policy file, one parser, two consumers](diagrams/acl-single-source.svg)](diagrams/acl-single-source.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/acl-single-source.drawio`.
+![One policy file, one parser, two consumers](diagrams/acl-single-source.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/acl-single-source.drawio`.
 {: .diagram-hint }
 
 This is the part of the platform with the most finished thinking in it, and it is worth reading even

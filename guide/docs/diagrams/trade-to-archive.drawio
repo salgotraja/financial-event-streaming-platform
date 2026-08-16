@@ -1,93 +1,108 @@
-<mxGraphModel dx="1600" dy="1000" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="1700" pageHeight="900" math="0" shadow="0" adaptiveColors="auto">
+<mxGraphModel dx="1000" dy="1200" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="980" pageHeight="1140" math="0" shadow="0" adaptiveColors="auto">
   <root>
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
 
-    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;" value="One trade, from publish to archive">
-      <mxGeometry x="40" y="20" width="900" height="30" as="geometry"/>
+    <mxCell id="title" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="One trade, from publish to archive">
+      <mxGeometry x="30" y="22" width="900" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="Every participant below exists in the repository today. Delivery is at-least-once with idempotent producers and explicit offset commits; there are no Kafka transactions anywhere on this path.">
-      <mxGeometry x="40" y="50" width="1400" height="20" as="geometry"/>
-    </mxCell>
-
-    <mxCell id="ll1" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;size=52;" value="TradeEventPublisher&#10;trade-producer">
-      <mxGeometry x="40" y="100" width="190" height="700" as="geometry"/>
-    </mxCell>
-    <mxCell id="ll2" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;size=52;" value="KafkaTemplate&#10;+ durability profile">
-      <mxGeometry x="270" y="100" width="190" height="700" as="geometry"/>
-    </mxCell>
-    <mxCell id="ll3" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;size=52;" value="Schema Registry&#10;subject trades.raw-value">
-      <mxGeometry x="500" y="100" width="190" height="700" as="geometry"/>
-    </mxCell>
-    <mxCell id="ll4" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;size=52;" value="Kafka trades.raw&#10;12 partitions, 3 brokers">
-      <mxGeometry x="730" y="100" width="190" height="700" as="geometry"/>
-    </mxCell>
-    <mxCell id="ll5" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;size=52;" value="AuditRecordConsumer&#10;group audit-service">
-      <mxGeometry x="960" y="100" width="190" height="700" as="geometry"/>
-    </mxCell>
-    <mxCell id="ll6" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;size=52;" value="AuditArchiveService&#10;+ AuditEventDecoder">
-      <mxGeometry x="1190" y="100" width="190" height="700" as="geometry"/>
-    </mxCell>
-    <mxCell id="ll7" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;size=52;" value="LoggingAuditSink&#10;and trades.raw.dlq">
-      <mxGeometry x="1420" y="100" width="190" height="700" as="geometry"/>
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Every participant exists in the repository today. At-least-once, idempotent producers, explicit offset commits, no transactions.">
+      <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 
-    <mxCell id="m1" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=bottom;align=center;" value="1. send(ProducerRecord), key = ticker, headers traceparent and correlationId">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="135" y="175" as="sourcePoint"/><mxPoint x="365" y="175" as="targetPoint"/></mxGeometry>
+    <mxCell id="ll1" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;size=64;" value="trade-producer&lt;br&gt;publisher and template">
+      <mxGeometry x="30" y="100" width="176" height="800" as="geometry"/>
     </mxCell>
-    <mxCell id="m2" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=bottom;align=center;" value="2. look up TradeEvent">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="365" y="222" as="sourcePoint"/><mxPoint x="595" y="222" as="targetPoint"/></mxGeometry>
+    <mxCell id="ll2" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;size=64;" value="Schema Registry&lt;br&gt;trades.raw-value">
+      <mxGeometry x="222" y="100" width="176" height="800" as="geometry"/>
     </mxCell>
-    <mxCell id="m3" parent="1" edge="1" style="html=1;endArrow=open;dashed=1;strokeColor=#666666;fontSize=11;verticalAlign=bottom;align=center;" value="3. schema id; production runs auto.register.schemas=false">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="595" y="269" as="sourcePoint"/><mxPoint x="365" y="269" as="targetPoint"/></mxGeometry>
+    <mxCell id="ll3" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;size=64;" value="Kafka trades.raw&lt;br&gt;12 partitions, 3 brokers">
+      <mxGeometry x="414" y="100" width="176" height="800" as="geometry"/>
     </mxCell>
-    <mxCell id="m4" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=bottom;align=center;" value="4. produce: acks=all, enable.idempotence=true, lz4, 64KB batches">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="365" y="316" as="sourcePoint"/><mxPoint x="825" y="316" as="targetPoint"/></mxGeometry>
+    <mxCell id="ll4" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;size=64;" value="audit-service&lt;br&gt;consumer and archiver">
+      <mxGeometry x="606" y="100" width="176" height="800" as="geometry"/>
     </mxCell>
-    <mxCell id="m5" parent="1" edge="1" style="html=1;endArrow=open;dashed=1;strokeColor=#666666;fontSize=11;verticalAlign=bottom;align=center;" value="5. ack once min.insync.replicas=2 replicas hold the record">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="825" y="363" as="sourcePoint"/><mxPoint x="365" y="363" as="targetPoint"/></mxGeometry>
+    <mxCell id="ll5" parent="1" vertex="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;collapsible=0;outlineConnect=0;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;size=64;" value="Sink&lt;br&gt;and trades.raw.dlq">
+      <mxGeometry x="798" y="100" width="176" height="800" as="geometry"/>
     </mxCell>
-    <mxCell id="m6" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=bottom;align=center;" value="6. poll: the value arrives as byte[], never as a deserialised object">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="825" y="410" as="sourcePoint"/><mxPoint x="1055" y="410" as="targetPoint"/></mxGeometry>
+
+    <mxCell id="m1" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="1. send, key = ticker">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="118" y="200" as="sourcePoint"/><mxPoint x="310" y="200" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m7" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=bottom;align=center;" value="7. archive(record)">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="1055" y="457" as="sourcePoint"/><mxPoint x="1285" y="457" as="targetPoint"/></mxGeometry>
+    <mxCell id="m1b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="headers: traceparent, correlationId">
+      <mxGeometry x="118" y="204" width="290" height="20" as="geometry"/>
     </mxCell>
-    <mxCell id="m8" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=bottom;align=center;" value="8. resolve the writer schema, take its name as eventType">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="1285" y="504" as="sourcePoint"/><mxPoint x="595" y="504" as="targetPoint"/></mxGeometry>
+    <mxCell id="m2" parent="1" edge="1" style="html=1;endArrow=open;dashed=1;strokeColor=#666666;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="2. schema id">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="310" y="262" as="sourcePoint"/><mxPoint x="118" y="262" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m9" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=middle;align=left;spacingLeft=8;rounded=0;" value="9. deduplicate on topic-partition-offset">
+    <mxCell id="m2b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="auto.register.schemas=false, so it is looked up, never created">
+      <mxGeometry x="118" y="266" width="440" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="m3" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="3. produce">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="118" y="330" as="sourcePoint"/><mxPoint x="502" y="330" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="m3b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="acks=all, enable.idempotence=true, lz4, 64KB batches">
+      <mxGeometry x="118" y="334" width="440" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="m4" parent="1" edge="1" style="html=1;endArrow=open;dashed=1;strokeColor=#666666;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="4. ack">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="502" y="398" as="sourcePoint"/><mxPoint x="118" y="398" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="m4b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="only once min.insync.replicas=2 replicas hold the record">
+      <mxGeometry x="118" y="402" width="440" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="m5" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="5. poll">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="502" y="466" as="sourcePoint"/><mxPoint x="694" y="466" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="m5b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the value arrives as byte[], never as a deserialised object">
+      <mxGeometry x="502" y="470" width="460" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="m6" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="6. resolve the writer schema">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="534" as="sourcePoint"/><mxPoint x="310" y="534" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="m6b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="its name becomes eventType; decoding never produces the archived bytes">
+      <mxGeometry x="310" y="538" width="500" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="m7" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=middle;align=left;spacingLeft=8;" value="7. deduplicate on topic-partition-offset">
       <mxGeometry relative="1" as="geometry">
-        <mxPoint x="1285" y="536" as="sourcePoint"/>
-        <mxPoint x="1285" y="572" as="targetPoint"/>
-        <Array as="points"><mxPoint x="1350" y="536"/><mxPoint x="1350" y="572"/></Array>
+        <mxPoint x="694" y="588" as="sourcePoint"/>
+        <mxPoint x="694" y="624" as="targetPoint"/>
+        <Array as="points"><mxPoint x="740" y="588"/><mxPoint x="740" y="624"/></Array>
       </mxGeometry>
     </mxCell>
-    <mxCell id="m10" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=bottom;align=center;" value="10. write(ArchivedRecord) carrying the bytes exactly as delivered">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="1285" y="608" as="sourcePoint"/><mxPoint x="1515" y="608" as="targetPoint"/></mxGeometry>
+    <mxCell id="m8" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="8. write">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="676" as="sourcePoint"/><mxPoint x="886" y="676" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m11" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;fontSize=11;verticalAlign=bottom;align=center;" value="11. acknowledge(): the offset is committed here, never by a timer">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="1055" y="655" as="sourcePoint"/><mxPoint x="825" y="655" as="targetPoint"/></mxGeometry>
+    <mxCell id="m8b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the bytes exactly as delivered">
+      <mxGeometry x="606" y="680" width="368" height="20" as="geometry"/>
     </mxCell>
-
-    <mxCell id="alt" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b85450;dashed=1;verticalAlign=top;align=left;spacingLeft=12;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#b85450;" value="alt &#183; the payload cannot be decoded against the registry (poison record)">
-      <mxGeometry x="40" y="680" width="1620" height="140" as="geometry"/>
+    <mxCell id="m9" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#333333;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;" value="9. acknowledge">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="744" as="sourcePoint"/><mxPoint x="502" y="744" as="targetPoint"/></mxGeometry>
     </mxCell>
-    <mxCell id="m12" parent="1" edge="1" style="html=1;endArrow=open;dashed=1;strokeColor=#b85450;fontSize=11;verticalAlign=bottom;align=center;fontColor=#b85450;" value="12. AuditDecodeException, registered as not retryable">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="1285" y="730" as="sourcePoint"/><mxPoint x="1055" y="730" as="targetPoint"/></mxGeometry>
-    </mxCell>
-    <mxCell id="m13" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#b85450;fontSize=11;verticalAlign=bottom;align=center;fontColor=#b85450;" value="13. DeadLetterPublisher sends DeadLetterEvent to trades.raw.dlq, same key, original bytes">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="1055" y="772" as="sourcePoint"/><mxPoint x="1515" y="772" as="targetPoint"/></mxGeometry>
-    </mxCell>
-    <mxCell id="m14" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#b85450;fontSize=11;verticalAlign=bottom;align=center;fontColor=#b85450;" value="14. offset advances; the next record on the partition archives normally">
-      <mxGeometry relative="1" as="geometry"><mxPoint x="1055" y="812" as="sourcePoint"/><mxPoint x="825" y="812" as="targetPoint"/></mxGeometry>
+    <mxCell id="m9b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=12;fontColor=#666666;" value="the offset is committed here, never by a timer">
+      <mxGeometry x="414" y="748" width="368" height="20" as="geometry"/>
     </mxCell>
 
-    <mxCell id="note1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=12;verticalAlign=top;spacingTop=8;fontSize=11;" value="Why bytes, not a deserialised event&#10;&#10;The archive's product is the payload that was published. Decoding on the way in and re-encoding on the way out would store a re-encoding, and an integrity check would then verify the re-encoding rather than the evidence. Reading bytes also puts a schema failure inside the listener, where it is one quarantined record, instead of in the deserialiser, where it stalls the partition.">
-      <mxGeometry x="40" y="840" width="790" height="130" as="geometry"/>
+    <mxCell id="alt" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#b85450;dashed=1;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=14;spacingTop=8;fontSize=14;fontStyle=1;fontColor=#b85450;" value="alt &#183; the payload cannot be decoded (poison record)">
+      <mxGeometry x="30" y="790" width="944" height="150" as="geometry"/>
     </mxCell>
-    <mxCell id="note2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=12;verticalAlign=top;spacingTop=8;fontSize=11;" value="What step 10 is not&#10;&#10;LoggingAuditSink logs the record and discards it. S3 Parquet, the sidecar manifest, the KMS signature and Object Lock retention are Phase 3 work. No evidence-integrity claim rests on this path yet, and deduplication is in-process and bounded, so it covers redelivery within a run and not a restart.">
-      <mxGeometry x="870" y="840" width="790" height="130" as="geometry"/>
+    <mxCell id="m10" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#b85450;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;fontColor=#b85450;" value="10. quarantine to trades.raw.dlq">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="858" as="sourcePoint"/><mxPoint x="886" y="858" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="m10b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;fontSize=12;fontColor=#b85450;" value="same key, original bytes, real attempt count">
+      <mxGeometry x="606" y="862" width="368" height="20" as="geometry"/>
+    </mxCell>
+    <mxCell id="m11" parent="1" edge="1" style="html=1;endArrow=block;strokeColor=#b85450;strokeWidth=2;fontSize=13;verticalAlign=bottom;align=center;fontColor=#b85450;" value="11. offset advances anyway">
+      <mxGeometry relative="1" as="geometry"><mxPoint x="694" y="916" as="sourcePoint"/><mxPoint x="502" y="916" as="targetPoint"/></mxGeometry>
+    </mxCell>
+    <mxCell id="m11b" parent="1" vertex="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=12;fontColor=#b85450;" value="the next record on the partition archives normally">
+      <mxGeometry x="414" y="920" width="368" height="20" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="note1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;fontSize=14;" value="&lt;b&gt;Why bytes, not a deserialised event&lt;/b&gt;&lt;br&gt;&lt;br&gt;The archive's product is the payload that was published. A re-encoding would make an integrity check verify the re-encoding rather than the evidence.">
+      <mxGeometry x="30" y="960" width="460" height="140" as="geometry"/>
+    </mxCell>
+    <mxCell id="note2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;fontSize=14;" value="&lt;b&gt;What step 8 is not&lt;/b&gt;&lt;br&gt;&lt;br&gt;LoggingAuditSink logs the record and discards it. S3 Parquet, the signed manifest and Object Lock are Phase 3, so no evidence claim rests on this path yet.">
+      <mxGeometry x="514" y="960" width="460" height="140" as="geometry"/>
     </mxCell>
   </root>
 </mxGraphModel>

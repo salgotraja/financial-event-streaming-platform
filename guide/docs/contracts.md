@@ -1,7 +1,7 @@
 # Event contracts
 
-[![From a .avsc file to a registry subject a producer can use](diagrams/schema-pipeline.svg)](diagrams/schema-pipeline.svg){: .diagram title="Open the full-size diagram" }
-Click the diagram to open it full size. Source: `guide/docs/diagrams/schema-pipeline.drawio`.
+![From a .avsc file to a registry subject a producer can use](diagrams/schema-pipeline.svg){ .diagram }
+Click to zoom. Source: `guide/docs/diagrams/schema-pipeline.drawio`.
 {: .diagram-hint }
 
 Sixteen Avro schemas in `contracts/src/main/avro/`, namespace `dev.engnotes.fes.events`, generating 31
