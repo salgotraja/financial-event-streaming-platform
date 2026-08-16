@@ -43,5 +43,12 @@ out/
 .claude/scheduled_tasks.lock
 .claude/settings.local.json
 .claude/budget.txt
+
+### Untracked by policy: docs, agent configuration, and Markdown except the root README
 /docs/
+/.claude/
+/.agents/
+/.codex/
 /scripts/sync-agent-config.sh
+*.md
+!/README.md

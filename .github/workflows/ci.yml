@@ -41,10 +41,6 @@ jobs:
       - name: Build and test
         run: ./gradlew build
 
-      # .claude is the single source for agent configuration; .agents and .codex are generated.
-      - name: Agent configuration in sync
-        run: ./scripts/sync-agent-config.sh --check
-
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
