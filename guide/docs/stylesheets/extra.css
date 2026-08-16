@@ -1,25 +1,186 @@
-/* The diagrams are drawn to be legible at the content column width. glightbox handles
-   click-to-zoom, so nothing here needs to fight for space. */
+/* Typography and layout.
+ *
+ * The content column is wide enough to show a diagram at roughly 1:1, but a 1000px line of prose is
+ * about 100 characters, which is too wide to read. So the column stays wide and the prose blocks
+ * inside it are given a measure of their own. Diagrams, tables and code keep the full width.
+ */
+
+:root {
+  --fes-measure: 76ch;
+}
+
+/* Palette. A deep slate header and a plain blue link read as documentation rather than as a product
+   site, and keep the diagrams' own colours the brightest thing on the page. */
+:root,
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #102a43;
+  --md-primary-fg-color--light: #21456b;
+  --md-primary-fg-color--dark: #0a1c2e;
+  --md-accent-fg-color: #073c70;
+  --md-typeset-a-color: #0f5ea8;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0d2438;
+  --md-primary-fg-color--light: #21456b;
+  --md-primary-fg-color--dark: #081726;
+  --md-accent-fg-color: #8fc7f5;
+  --md-typeset-a-color: #7dc4ff;
+}
+
+.md-typeset a {
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.14em;
+}
 
 .md-grid {
   max-width: 1600px;
 }
 
+.md-typeset {
+  font-size: 0.74rem;
+  line-height: 1.7;
+}
+
+/* Measure. Applied to top-level prose only, so nested content inside admonitions and list items is
+   not constrained twice. */
+.md-typeset > p,
+.md-typeset > ul,
+.md-typeset > ol,
+.md-typeset > blockquote,
+.md-typeset > dl {
+  max-width: var(--fes-measure);
+}
+
+/* Headings: a little tighter and with more air above than the Material default, so sections read as
+   sections rather than as an even grey run. */
+.md-typeset h1 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset h2 {
+  margin-top: 2.4em;
+  padding-top: 0.6em;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.md-typeset h3 {
+  margin-top: 1.8em;
+  font-weight: 650;
+  letter-spacing: -0.008em;
+}
+
+.md-typeset h1 + h2,
+.md-typeset h2:first-of-type {
+  margin-top: 1.2em;
+}
+
+/* Inline code: quieter than the Material default, closer to running text in weight. */
+.md-typeset code {
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.86em;
+  background: var(--md-code-bg-color);
+}
+
+.md-typeset a > code {
+  color: inherit;
+}
+
+[data-md-color-scheme="default"] .md-typeset code {
+  color: #163a60;
+  background: #edf2f7;
+}
+
+/* Code inside a heading should read as part of the heading, not as a box pasted into it. */
+.md-typeset h1 code,
+.md-typeset h2 code,
+.md-typeset h3 code,
+.md-typeset h4 code {
+  font-size: 0.8em;
+  padding: 0.05em 0.25em;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Code blocks: full width, a touch smaller, and roomier inside. */
+.md-typeset pre > code {
+  font-size: 0.74rem;
+  line-height: 1.6;
+  padding: 0.9rem 1rem;
+}
+
+.md-typeset .highlight {
+  max-width: none;
+}
+
+/* Tables: the reference tables are dense, so keep them compact but readable, and let a wide one
+   scroll rather than crushing its columns. */
+.md-typeset table:not([class]) {
+  display: table;
+  width: 100%;
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.md-typeset table:not([class]) th {
+  font-weight: 650;
+  background: var(--md-default-fg-color--lightest);
+}
+
+.md-typeset table:not([class]) td,
+.md-typeset table:not([class]) th {
+  padding: 0.5em 0.8em;
+}
+
+/* Long identifiers in a dense table have to wrap somewhere; keep them small enough that most do not. */
+.md-typeset table:not([class]) code {
+  font-size: 0.88em;
+  padding: 0.05em 0.25em;
+}
+
+.md-typeset__scrollwrap {
+  margin: 1em 0;
+}
+
+/* Admonitions: flatter, so a note reads as an aside rather than as a control. */
+.md-typeset .admonition,
+.md-typeset details {
+  max-width: var(--fes-measure);
+  border-width: 0 0 0 3px;
+  border-radius: 4px;
+  box-shadow: none;
+  font-size: 0.78rem;
+}
+
+/* A paragraph holding a diagram is not prose and must not be held to the prose measure. */
+.md-typeset > p:has(> img.diagram),
+.md-typeset > p:has(> a > img.diagram) {
+  max-width: none;
+}
+
+/* Diagrams break the measure on purpose: they are drawn for the full column. */
 img.diagram {
   display: block;
   width: 100%;
+  max-width: none;
   height: auto;
-  margin: 1.2rem auto 0.4rem;
+  margin: 1.4rem auto 0.5rem;
   border: 1px solid var(--md-default-fg-color--lightest);
-  border-radius: 0.2rem;
+  border-radius: 6px;
   background: var(--md-default-bg-color);
   cursor: zoom-in;
 }
 
 .diagram-hint {
   display: block;
-  margin-top: -0.2rem;
-  font-size: 0.72rem;
+  margin: 0 0 1.6rem;
+  font-size: 0.66rem;
   color: var(--md-default-fg-color--light);
 }
 
@@ -28,7 +189,15 @@ img.diagram {
   background: var(--md-default-bg-color);
 }
 
-/* Wide reference tables should stay compact rather than crush their columns. */
-.md-typeset table:not([class]) {
-  font-size: 0.72rem;
+/* Navigation: smaller and calmer, so the eye goes to the content first. */
+.md-nav {
+  font-size: 0.68rem;
+}
+
+.md-nav__title {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light);
 }

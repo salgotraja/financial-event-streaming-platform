@@ -11,6 +11,9 @@ site_dir: ../build/guide
 
 theme:
   name: material
+  font:
+    text: Inter
+    code: JetBrains Mono
   icon:
     logo: material/transit-connection-variant
   features:
