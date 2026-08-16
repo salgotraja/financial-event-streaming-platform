@@ -84,8 +84,9 @@ tasks.register('checkPlaneIsolation') {
                     "Plane isolation violated (ADR-026, ADR-028):\n  " + found.join('\n  '))
         }
 
-        // Stated explicitly so a vacuous pass is never mistaken for a verified one. Until the first
-        // ingestion, streaming or audit module lands this check has nothing to inspect.
+        // Stated explicitly so a vacuous pass is never mistaken for a verified one. The count
+        // includes the intermediate container projects (:services:ingestion, :services:audit), so it
+        // runs ahead of the number of actual services.
         logger.lifecycle("Plane isolation: ${modulesChecked.get()} deterministic-plane module(s) checked")
     }
 }
