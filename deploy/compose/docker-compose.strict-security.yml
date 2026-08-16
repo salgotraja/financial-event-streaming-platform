@@ -1,0 +1,77 @@
+# The strict-security profile (NFR-05.5): authenticated Kafka access and TLS, so service-identity
+# failures can be tested without AWS. Applied as an overlay on docker-compose.yml.
+#
+# Cloud authorization is MSK IAM; ACLs exist for exactly this profile (ADR-009). The ACLs applied
+# here are rendered from each service's committed kafka-acls.yml by ./gradlew renderKafkaAcls, the
+# same files the authorization tests apply, so the stack and the tests cannot drift.
+#
+# What is authenticated and encrypted: every client connection and all inter-broker traffic, over
+# SASL_SSL with SASL/PLAIN. The controller quorum listener is included. Nothing here is reachable
+# from outside the compose network except the published SASL_SSL ports.
+#
+# Credentials come from deploy/compose/.env, written by scripts/generate-dev-security-material.sh
+# and never committed. Certificates are a local development CA, likewise generated and never
+# committed.
+
+x-kafka-security: &kafka-security
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SASL_SSL,INTERNAL:SASL_SSL,EXTERNAL:SASL_SSL
+  KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+  KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+  KAFKA_SASL_MECHANISM_CONTROLLER_PROTOCOL: PLAIN
+  KAFKA_LISTENER_NAME_INTERNAL_PLAIN_SASL_JAAS_CONFIG: ${FES_BROKER_JAAS}
+  KAFKA_LISTENER_NAME_EXTERNAL_PLAIN_SASL_JAAS_CONFIG: ${FES_BROKER_JAAS}
+  KAFKA_LISTENER_NAME_CONTROLLER_PLAIN_SASL_JAAS_CONFIG: ${FES_BROKER_JAAS}
+  KAFKA_SSL_KEYSTORE_TYPE: PEM
+  KAFKA_SSL_KEYSTORE_LOCATION: /etc/kafka/secrets/broker.keystore.pem
+  KAFKA_SSL_TRUSTSTORE_TYPE: PEM
+  KAFKA_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/ca.pem
+  # Clients authenticate with SASL, not with certificates, so no client certificate is required.
+  # Hostname verification stays on: the broker certificate carries every name a client may use.
+  KAFKA_SSL_CLIENT_AUTH: none
+  # The setting the whole profile rests on. With it true, an identity with no ACL would be allowed
+  # everything and every denial test would pass vacuously.
+  KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
+  KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+  KAFKA_SUPER_USERS: User:admin
+
+x-kafka-healthcheck: &kafka-healthcheck
+  test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:19092 --command-config /etc/kafka/secrets/client-admin.properties >/dev/null 2>&1"]
+  interval: 5s
+  timeout: 10s
+  retries: 40
+  start_period: 20s
+
+services:
+  kafka1:
+    environment: *kafka-security
+    volumes: ["./tls:/etc/kafka/secrets:ro", "kafka1-data:/var/lib/kafka/data"]
+    healthcheck: *kafka-healthcheck
+
+  kafka2:
+    environment: *kafka-security
+    volumes: ["./tls:/etc/kafka/secrets:ro", "kafka2-data:/var/lib/kafka/data"]
+    healthcheck: *kafka-healthcheck
+
+  kafka3:
+    environment: *kafka-security
+    volumes: ["./tls:/etc/kafka/secrets:ro", "kafka3-data:/var/lib/kafka/data"]
+    healthcheck: *kafka-healthcheck
+
+  schema-registry:
+    volumes: ["./tls:/etc/kafka/secrets:ro"]
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: SASL_SSL://kafka1:19092,SASL_SSL://kafka2:19092,SASL_SSL://kafka3:19092
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SASL_SSL
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: PLAIN
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: ${FES_ADMIN_JAAS}
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_TRUSTSTORE_TYPE: PEM
+      SCHEMA_REGISTRY_KAFKASTORE_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/ca.pem
+
+  kafka-ui:
+    volumes: ["./tls:/etc/kafka/secrets:ro"]
+    environment:
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: SASL_SSL
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM: PLAIN
+      KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG: ${FES_ADMIN_JAAS}
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_TYPE: PEM
+      KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /etc/kafka/secrets/ca.pem

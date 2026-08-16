@@ -91,6 +91,32 @@ tasks.register('checkPlaneIsolation') {
     }
 }
 
+// The strict-security stack provisions ACLs from the same per-service policy files the authorization
+// tests apply, read by the same parser. Two readers of one policy would be two chances to drift.
+tasks.register('renderKafkaAcls', JavaExec) {
+    group = 'verification'
+    description = 'Renders every service kafka-acls.yml into arguments for the local stack.'
+
+    def policyFiles = fileTree(rootDir) {
+        include 'services/*/*/src/main/resources/security/kafka-acls.yml'
+    }.files.sort()
+    def output = layout.buildDirectory.file('kafka-acls.args').get().asFile
+
+    dependsOn ':platform-common:testFixturesClasses'
+    classpath = project(':platform-common').sourceSets.testFixtures.runtimeClasspath
+    mainClass = 'dev.engnotes.fes.testing.KafkaAclScriptRenderer'
+    args = [output.absolutePath] + policyFiles.collect { it.absolutePath }
+
+    inputs.files(policyFiles)
+    outputs.file(output)
+
+    doFirst {
+        if (policyFiles.isEmpty()) {
+            throw new GradleException('No service kafka-acls.yml found. Every service commits one.')
+        }
+    }
+}
+
 tasks.register('check') {
     dependsOn 'checkPlaneIsolation'
     dependsOn subprojects.collect { "${it.path}:check" }

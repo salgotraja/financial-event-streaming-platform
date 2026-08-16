@@ -33,22 +33,39 @@ public record KafkaAclPolicy(String principal, List<Grant> allowed) {
         return load(DEFAULT_LOCATION);
     }
 
-    @SuppressWarnings("unchecked")
     public static KafkaAclPolicy load(String location) {
         try (InputStream source = KafkaAclPolicy.class.getResourceAsStream(location)) {
             if (source == null) {
                 throw new IllegalStateException("No Kafka ACL policy at " + location
                         + ". Every service commits one; see docs/security/identity-trust-matrix.md");
             }
-            Map<String, Object> document = new Yaml().load(source);
-            List<Map<String, Object>> grants =
-                    (List<Map<String, Object>>) document.getOrDefault("allowed", List.of());
-            return new KafkaAclPolicy(
-                    (String) document.get("principal"),
-                    grants.stream().map(KafkaAclPolicy::toGrant).toList());
+            return parse(source);
         } catch (java.io.IOException e) {
             throw new IllegalStateException("Could not read the Kafka ACL policy at " + location, e);
         }
+    }
+
+    /**
+     * Loads a policy by path rather than from the classpath, so the local stack's ACL provisioning
+     * reads every service's file with the same parser the tests use. Two parsers would be two
+     * chances for the applied permissions and the proven ones to diverge.
+     */
+    public static KafkaAclPolicy loadFile(java.nio.file.Path path) {
+        try (InputStream source = java.nio.file.Files.newInputStream(path)) {
+            return parse(source);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("Could not read the Kafka ACL policy at " + path, e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static KafkaAclPolicy parse(InputStream source) {
+        Map<String, Object> document = new Yaml().load(source);
+        List<Map<String, Object>> grants =
+                (List<Map<String, Object>>) document.getOrDefault("allowed", List.of());
+        return new KafkaAclPolicy(
+                (String) document.get("principal"),
+                grants.stream().map(KafkaAclPolicy::toGrant).toList());
     }
 
     @SuppressWarnings("unchecked")

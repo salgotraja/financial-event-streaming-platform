@@ -3,13 +3,17 @@
 #
 # Compose alone cannot bring this up correctly: topics need explicit partition counts, schema
 # subjects need registering because auto.register.schemas is off, and the strict-security profile
-# needs certificates and ACLs applied in order. This script owns that sequence.
+# needs certificates, credentials and ACLs applied in order. This script owns that sequence.
 #
 # Usage:
 #   scripts/local-stack.sh up [dev|strict-security]   bring the stack up and provision it
 #   scripts/local-stack.sh down                       stop it, keeping volumes
 #   scripts/local-stack.sh destroy                    stop it and delete the volumes
 #   scripts/local-stack.sh status                     what is running, and what is provisioned
+#
+# The two profiles are not interchangeable at runtime: they differ in listener security protocol, so
+# switching profiles needs destroy first. dev is plaintext and is never evidence of production
+# security; strict-security is where anything about identity gets tested.
 #
 # Requires docker, docker compose and python3. Python is used only to build JSON for the Schema
 # Registry API, where hand-rolled quoting would be a bug waiting to happen.
@@ -20,23 +24,49 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_DIR="$REPO_ROOT/deploy/compose"
 AVRO_DIR="$REPO_ROOT/contracts/src/main/avro"
 REGISTRY_URL="http://localhost:8081"
+ACL_ARGS_FILE="$REPO_ROOT/build/kafka-acls.args"
 
-# One broker is enough to reach the cluster; provisioning talks to all three through it.
 BOOTSTRAP_INTERNAL="kafka1:19092"
+ADMIN_CONFIG="/etc/kafka/secrets/client-admin.properties"
+
+# Set by resolve_profile. The running stack's profile is recorded so down/status do not need it.
+PROFILE=""
+PROFILE_MARKER="$COMPOSE_DIR/.active-profile"
 
 log()  { printf '\033[1m==>\033[0m %s\n' "$*"; }
-warn() { printf '\033[33mwarning:\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
 compose() {
-  docker compose -f "$COMPOSE_DIR/docker-compose.yml" "$@"
+  local files=(-f "$COMPOSE_DIR/docker-compose.yml")
+  [ "$PROFILE" = "strict-security" ] && files+=(-f "$COMPOSE_DIR/docker-compose.strict-security.yml")
+  docker compose "${files[@]}" "$@"
+}
+
+# Every Kafka CLI call needs client configuration under strict-security and none under dev.
+kafka_cli() {
+  local script="$1"; shift
+  local extra=()
+  [ "$PROFILE" = "strict-security" ] && extra=(--command-config "$ADMIN_CONFIG")
+  compose exec -T kafka1 "/opt/kafka/bin/$script" --bootstrap-server "$BOOTSTRAP_INTERNAL" \
+    "${extra[@]}" "$@" </dev/null
 }
 
 require_tools() {
-  for tool in docker python3; do
+  for tool in docker python3 curl; do
     command -v "$tool" >/dev/null || die "$tool is required and was not found on PATH"
   done
   docker compose version >/dev/null 2>&1 || die "docker compose v2 or later is required"
+}
+
+resolve_profile() {
+  PROFILE="${1:-}"
+  if [ -z "$PROFILE" ]; then
+    PROFILE="$(cat "$PROFILE_MARKER" 2>/dev/null || echo dev)"
+  fi
+  case "$PROFILE" in
+    dev|strict-security) ;;
+    *) die "unknown profile '$PROFILE'. Use dev or strict-security" ;;
+  esac
 }
 
 wait_for_healthy() {
@@ -61,6 +91,15 @@ for line in raw.splitlines():
   die "$service did not become healthy; see: docker compose logs $service"
 }
 
+ensure_security_material() {
+  if [ ! -f "$COMPOSE_DIR/tls/ca.pem" ] || [ ! -f "$COMPOSE_DIR/.env" ]; then
+    log "generating TLS and credential material"
+    "$REPO_ROOT/scripts/generate-dev-security-material.sh"
+  else
+    log "reusing existing TLS and credential material"
+  fi
+}
+
 create_topics() {
   log "creating topics from deploy/compose/topics.tsv"
   local created=0 existing=0
@@ -68,19 +107,16 @@ create_topics() {
     [ -z "${name:-}" ] && continue
     case "$name" in \#*) continue ;; esac
 
-    local args=(--bootstrap-server "$BOOTSTRAP_INTERNAL" --create --if-not-exists
-                --topic "$name" --partitions "$partitions" --replication-factor 3)
+    local args=(--create --if-not-exists --topic "$name" --partitions "$partitions" --replication-factor 3)
     if [ -n "${config:-}" ] && [ "$config" != "-" ]; then
-      local setting
+      local settings setting
       IFS=',' read -ra settings <<< "$config"
       for setting in "${settings[@]}"; do
         args+=(--config "$setting")
       done
     fi
 
-    # </dev/null matters: docker compose exec reads stdin, and without it the first invocation
-    # consumes the rest of topics.tsv and the loop silently creates one topic.
-    if compose exec -T kafka1 /opt/kafka/bin/kafka-topics.sh "${args[@]}" </dev/null 2>/dev/null | grep -q Created; then
+    if kafka_cli kafka-topics.sh "${args[@]}" 2>/dev/null | grep -q Created; then
       created=$((created + 1))
     else
       existing=$((existing + 1))
@@ -135,16 +171,74 @@ print(json.dumps({
   log "schema subjects: $registered registered or already current"
 }
 
-cmd_up() {
-  local profile="${1:-dev}"
-  case "$profile" in
-    dev) ;;
-    strict-security) die "the strict-security profile is not wired up yet; see docs/task-status.md" ;;
-    *) die "unknown profile '$profile'. Use dev or strict-security" ;;
-  esac
+apply_acls() {
+  log "rendering ACLs from each service's committed kafka-acls.yml"
+  (cd "$REPO_ROOT" && ./gradlew --quiet renderKafkaAcls) \
+    || die "could not render ACLs; run ./gradlew renderKafkaAcls to see why"
+  [ -f "$ACL_ARGS_FILE" ] || die "$ACL_ARGS_FILE was not produced"
 
+  local applied=0
+  while read -r line; do
+    [ -z "$line" ] && continue
+    case "$line" in \#*) continue ;; esac
+    # shellcheck disable=SC2086 # the rendered line is a deliberate argument list
+    kafka_cli kafka-acls.sh --add $line >/dev/null
+    applied=$((applied + 1))
+  done < "$ACL_ARGS_FILE"
+  log "ACLs applied: $applied"
+}
+
+# The profile's whole claim is that an identity can do only what its policy allows. Asserting it here
+# means a broken stack fails at provisioning time rather than looking healthy and denying nothing.
+#
+# Both halves are checked. A denial on its own does not distinguish an enforced policy from a client
+# that cannot connect at all, which would deny everything and prove nothing.
+probe_write() {
+  compose exec -T kafka1 sh -c "echo probe | /opt/kafka/bin/kafka-console-producer.sh \
+    --bootstrap-server $BOOTSTRAP_INTERNAL \
+    --producer.config /etc/kafka/secrets/client-$1.properties \
+    --topic $2" 2>&1 || true
+}
+
+verify_least_privilege() {
+  log "verifying that least privilege is actually enforced"
+
+  local allowed
+  allowed="$(probe_write trade-producer trades.raw)"
+  case "$allowed" in
+    *Exception*|*"Not authorized"*|*ERROR*)
+      die "trade-producer could not write its own topic, so the denial below would prove nothing. Output: $allowed" ;;
+    *)
+      log "verified: trade-producer can write trades.raw" ;;
+  esac
+  # A record has to actually be sent. An empty stdin makes the console producer exit successfully
+  # without ever contacting the topic, which looks like a pass and proves nothing.
+  local output
+  output="$(probe_write trade-producer market-data.ticks)"
+
+  case "$output" in
+    *TopicAuthorizationException*|*"Not authorized"*)
+      log "verified: trade-producer is denied write access to market-data.ticks" ;;
+    *)
+      die "trade-producer was NOT denied write access to another service's topic. The profile is not enforcing. Output: $output" ;;
+  esac
+}
+
+cmd_up() {
+  resolve_profile "${1:-dev}"
   require_tools
-  log "starting the $profile stack"
+
+  if [ "$PROFILE" = "strict-security" ]; then
+    ensure_security_material
+  fi
+
+  local previous
+  previous="$(cat "$PROFILE_MARKER" 2>/dev/null || echo "")"
+  if [ -n "$previous" ] && [ "$previous" != "$PROFILE" ]; then
+    die "the $previous stack is provisioned; the profiles differ in listener security protocol. Run: scripts/local-stack.sh destroy"
+  fi
+
+  log "starting the $PROFILE stack"
   compose up -d
 
   wait_for_healthy kafka1
@@ -155,30 +249,57 @@ cmd_up() {
   create_topics
   register_subjects
 
-  cat <<'BANNER'
+  if [ "$PROFILE" = "strict-security" ]; then
+    apply_acls
+    verify_least_privilege
+  fi
 
-Local stack is up (profile: dev).
+  echo "$PROFILE" > "$PROFILE_MARKER"
+  print_banner
+}
+
+print_banner() {
+  cat <<BANNER
+
+Local stack is up (profile: $PROFILE).
 
   Kafka            localhost:29092, localhost:29093, localhost:29094
   Schema Registry  http://localhost:8081
   Kafka UI         http://localhost:8080
+BANNER
+
+  if [ "$PROFILE" = "strict-security" ]; then
+    cat <<'BANNER'
+
+Kafka requires SASL_SSL with SASL/PLAIN. Per-identity client configuration is in
+deploy/compose/tls/client-<identity>.properties, and the broker trusts deploy/compose/tls/ca.pem.
+Each identity can do only what its service's kafka-acls.yml allows, and that was verified above.
+BANNER
+  else
+    cat <<'BANNER'
 
 This profile is plaintext and unauthenticated. It is a convenience for iteration and is never
 evidence of production security; use the strict-security profile for anything about identity.
 BANNER
+  fi
 }
 
 cmd_down() {
-  log "stopping the stack, keeping volumes"
+  resolve_profile ""
+  log "stopping the $PROFILE stack, keeping volumes"
   compose down
 }
 
 cmd_destroy() {
-  log "stopping the stack and deleting its volumes"
+  resolve_profile ""
+  log "stopping the $PROFILE stack and deleting its volumes"
   compose down --volumes
+  rm -f "$PROFILE_MARKER"
 }
 
 cmd_status() {
+  resolve_profile ""
+  echo "profile: $PROFILE"
   compose ps
   echo
   if curl -sf "$REGISTRY_URL/subjects" >/dev/null 2>&1; then
