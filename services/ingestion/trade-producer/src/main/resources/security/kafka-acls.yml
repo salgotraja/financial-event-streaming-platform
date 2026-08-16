@@ -1,0 +1,18 @@
+# Least-privilege Kafka policy for the trade-producer workload identity.
+#
+# Cloud deployments authorise with MSK IAM; ACLs are reserved for the local strict-security profile
+# (ADR-009, NFR-05.4). This file is the single statement of what this identity may do: the
+# authorization tests apply it, and the strict-security stack provisions from it.
+#
+# Everything absent here is denied. The broker runs allow.everyone.if.no.acl.found=false, so this is
+# an allow-list and not a set of hints. DESCRIBE is implied by WRITE and is not listed.
+#
+# Denials this identity must prove, per NFR-05.19, are asserted in TradeProducerAuthorizationTest:
+# it may not read trades.raw, and it may not write another service's topic.
+
+principal: trade-producer
+
+allowed:
+  - resourceType: TOPIC
+    name: trades.raw
+    operations: [WRITE]

@@ -1,0 +1,16 @@
+# Least-privilege Kafka policy for the reference-data-service workload identity.
+# See trade-producer's policy for the rules that govern this file. Everything absent is denied.
+#
+# The write-only grant is why the publisher's version guard is in-process: this identity cannot read
+# reference-data.instruments back, so it cannot recover the current version after a restart. That
+# limit is a consequence of this policy, not an oversight.
+#
+# Denials proved in ReferenceDataServiceAuthorizationTest: it may not read
+# reference-data.instruments, and it may not write another service's topic.
+
+principal: reference-data-service
+
+allowed:
+  - resourceType: TOPIC
+    name: reference-data.instruments
+    operations: [WRITE]

@@ -1,0 +1,47 @@
+# Least-privilege Kafka policy for the audit-service workload identity.
+# See trade-producer's policy for the rules that govern this file. Everything absent is denied.
+#
+# The archival consumer is the inverse of a producer: it reads the evidence topics and writes only
+# quarantine. specification-v1.2 puts it plainly, "no arbitrary topic writes", so the only WRITE
+# grants are the .dlq topics that per-record quarantine needs (ADR-027).
+#
+# The GROUP grant is scoped to the one consumer group whose name equals the service name. Group
+# scoping is what stops this identity joining another workload's group and consuming its offsets.
+#
+# The other 13 evidence topics in FR-05.1 are absent because nothing writes them yet. Each is added
+# here as its producer ships, which keeps the policy a statement of current access rather than of
+# intent.
+#
+# Denials proved in AuditServiceAuthorizationTest: it may not write a financial topic, and it may not
+# join a consumer group other than audit-service.
+
+principal: audit-service
+
+allowed:
+  - resourceType: TOPIC
+    name: trades.raw
+    operations: [READ]
+  - resourceType: TOPIC
+    name: market-data.ticks
+    operations: [READ]
+  - resourceType: TOPIC
+    name: corporate-actions
+    operations: [READ]
+  - resourceType: TOPIC
+    name: reference-data.instruments
+    operations: [READ]
+  - resourceType: TOPIC
+    name: trades.raw.dlq
+    operations: [WRITE]
+  - resourceType: TOPIC
+    name: market-data.ticks.dlq
+    operations: [WRITE]
+  - resourceType: TOPIC
+    name: corporate-actions.dlq
+    operations: [WRITE]
+  - resourceType: TOPIC
+    name: reference-data.instruments.dlq
+    operations: [WRITE]
+  - resourceType: GROUP
+    name: audit-service
+    operations: [READ]

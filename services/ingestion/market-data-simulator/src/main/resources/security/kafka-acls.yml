@@ -1,0 +1,12 @@
+# Least-privilege Kafka policy for the market-data-simulator workload identity.
+# See trade-producer's policy for the rules that govern this file. Everything absent is denied.
+#
+# Denials proved in MarketDataSimulatorAuthorizationTest: it may not read market-data.ticks, and it
+# may not write another service's topic.
+
+principal: market-data-simulator
+
+allowed:
+  - resourceType: TOPIC
+    name: market-data.ticks
+    operations: [WRITE]
