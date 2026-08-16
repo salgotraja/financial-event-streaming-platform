@@ -5,18 +5,18 @@
       "Edit(.env*)"
     ],
     "ask": [
-      "Bash(cdk deploy*)",
-      "Bash(git push*)"
+      "Bash(git push*)",
+      "Bash(docker compose down -v*)"
     ],
     "allow": [
-      "Bash(./mvnw*)",
-      "Bash(cdk synth*)",
-      "Bash(cdk diff*)",
-      "Bash(git commit*)",
+      "Bash(./gradlew*)",
       "Bash(git add*)",
-      "Bash(git status*)",
+      "Bash(git commit*)",
       "Bash(git diff*)",
-      "Bash(sdk env*)"
+      "Bash(git log*)",
+      "Bash(git status*)",
+      "Bash(docker compose ps*)",
+      "Bash(docker compose logs*)"
     ]
   }
 }

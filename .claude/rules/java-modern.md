@@ -1,11 +1,13 @@
 ---
-description: Java 25/26 modern idioms. Enforce records, sealed types, pattern matching, stream gatherers, virtual threads, scoped values. Applies to all Java source files.
+description: Java 25 modern idioms. Enforce records, sealed types, pattern matching, stream gatherers, virtual threads, scoped values. Applies to all Java source files.
 paths: "**/*.java"
 ---
 
 ## Version Baseline
-Java 25 (LTS) is the target. All features below are finalized unless marked [PREVIEW].
-Structured Concurrency and Primitive Patterns are [PREVIEW] — require --enable-preview.
+Java 25 (LTS) is the target, pinned via the Gradle toolchain so the language level does not drift
+with the installed JDK. All features below are finalized unless marked [PREVIEW].
+Structured Concurrency and Primitive Patterns are [PREVIEW] and require --enable-preview, which this
+build does not enable. Do not use them.
 
 ---
 
@@ -44,9 +46,12 @@ Use records for: DTOs, request/response types, events, commands, queries, value 
 config snapshots. Never revert a record to a POJO for any reason.
 
 Exception — do NOT use records for:
-- JPA @Entity classes (Hibernate needs no-arg constructor + mutable state)
 - Spring beans (@Service, @Repository, @Component, @Controller)
 - Classes that must extend another class
+- Avro-generated event classes (the Avro plugin generates these; hand-written duplicates drift)
+
+This project uses Spring Data JDBC, not JPA, so persistence aggregates may be records where the
+mapping allows it. The usual "Hibernate needs a no-arg constructor" exception does not apply here.
 
 ---
 
