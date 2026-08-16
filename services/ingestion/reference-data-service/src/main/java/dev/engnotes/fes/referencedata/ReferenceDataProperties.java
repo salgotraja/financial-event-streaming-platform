@@ -33,6 +33,8 @@ public record ReferenceDataProperties(
      */
     public record Seed(boolean enabled, List<Instrument> instruments) {
 
+        // Synthetic reference data on real NSE tickers. The ISINs and share counts are plausible
+        // rather than sourced, and no figure here may be cited as a market observation.
         private static final List<Instrument> DEFAULT_INSTRUMENTS = List.of(
                 new Instrument("INS-RELIANCE", "RELIANCE", "NSE", "INE002A01018", "EQUITY", "INR",
                         "ENERGY", 6_766_000_000L),

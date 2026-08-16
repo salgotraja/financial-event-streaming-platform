@@ -18,8 +18,13 @@ import org.springframework.boot.ApplicationRunner;
  * advances.
  *
  * <p>Off unless enabled. A restart would otherwise re-announce the entire master, which on a
- * compacted topic is harmless to the final state but noisy for every consumer rebuilding a cache,
- * and the seed would collide with the version guard the moment an instrument had been updated.
+ * compacted topic is harmless to the final state but noisy for every consumer rebuilding a cache.
+ *
+ * <p>A seed that collides with the version guard is logged and skipped rather than thrown. Once an
+ * instrument has been updated to a later version, re-seeding it at version 1 is exactly the stale
+ * write the guard exists to stop, and the correct response is to leave the newer record in place.
+ * Throwing here would instead fail application startup, taking the service down over reference data
+ * that is already correct on the topic.
  */
 public class InstrumentMasterSeeder implements ApplicationRunner {
 
@@ -42,8 +47,19 @@ public class InstrumentMasterSeeder implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         var instruments = properties.seed().instruments();
-        instruments.forEach(instrument -> publisher.publish(toEvent(instrument)));
-        log.info("Seeded {} instruments to {}", instruments.size(), properties.topic());
+        long seeded = instruments.stream().filter(this::seed).count();
+        log.info("Seeded {} of {} instruments to {}",
+                seeded, instruments.size(), properties.topic());
+    }
+
+    private boolean seed(Instrument instrument) {
+        try {
+            publisher.publish(toEvent(instrument));
+            return true;
+        } catch (IllegalArgumentException e) {
+            log.warn("Skipped seeding instrument {}: {}", instrument.instrumentId(), e.getMessage());
+            return false;
+        }
     }
 
     private InstrumentReferenceEvent toEvent(Instrument instrument) {

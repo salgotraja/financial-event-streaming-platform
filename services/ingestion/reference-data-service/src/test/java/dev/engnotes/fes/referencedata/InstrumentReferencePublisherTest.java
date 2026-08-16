@@ -71,13 +71,14 @@ class InstrumentReferencePublisherTest {
     }
 
     @Test
-    @DisplayName("should never publish a null value that would tombstone the instrument")
-    void should_never_publish_a_null_value_that_would_tombstone_the_instrument() {
-        stubSend();
-
-        publisher.publish(Instruments.instrument("INS-INFY", "INFY", 1L));
-
-        assertThat(captured().value()).isNotNull();
+    @DisplayName("should reject a null instrument rather than tombstoning the key")
+    void should_reject_a_null_instrument_rather_than_tombstoning_the_key() {
+        // On a compacted topic a null value deletes the instrument from every later rebuild, and
+        // this service has no delete path, so a null is always a bug.
+        assertThatThrownBy(() -> publisher.publish(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("tombstone");
+        verify(kafkaTemplate, never()).send(any(ProducerRecord.class));
     }
 
     @Test
