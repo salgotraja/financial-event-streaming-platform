@@ -77,13 +77,17 @@ class TickGenerationDriverTest {
 
     @Test
     @DisplayName("should ignore a second start")
-    void should_ignore_a_second_start() {
+    void should_ignore_a_second_start() throws Exception {
         stubPublish();
         TickGenerationDriver driver = driver(1_000);
 
         driver.start();
         try {
             driver.start();
+            // Waiting for a tick rather than asserting on the flag alone: a driver that stopped
+            // generating would still report running, and stopping before the first publish made
+            // this test fail intermittently on the unused stub.
+            awaitEmitted(driver, 1);
             assertThat(driver.isRunning()).isTrue();
         } finally {
             driver.stop();
