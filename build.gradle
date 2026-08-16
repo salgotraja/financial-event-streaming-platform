@@ -44,40 +44,49 @@ subprojects {
 ext.deterministicPlanePrefixes = [':services:ingestion', ':services:streaming', ':services:audit']
 ext.agentOnlyDependencyMarkers = ['org.neo4j', 'com.anthropic', 'dev.langchain4j', 'io.github.ollama4j']
 
+// Violations are collected at configuration time into plain serializable data. The task body must
+// not touch Project, or the configuration cache cannot store it.
+ext.planeIsolationOffenders = [] as List<String>
+ext.planeIsolationModulesChecked = 0
+
+subprojects { sub ->
+    sub.afterEvaluate {
+        if (!rootProject.deterministicPlanePrefixes.any { sub.path.startsWith(it) }) {
+            return
+        }
+        rootProject.ext.planeIsolationModulesChecked += 1
+
+        sub.configurations.each { config ->
+            config.dependencies.each { dep ->
+                if (dep instanceof ProjectDependency && dep.path.startsWith(':services:agent')) {
+                    rootProject.ext.planeIsolationOffenders << "${sub.path} -> ${dep.path} (agent plane)".toString()
+                } else if (dep.group != null
+                        && rootProject.agentOnlyDependencyMarkers.any { dep.group.startsWith(it) }) {
+                    rootProject.ext.planeIsolationOffenders <<
+                            "${sub.path} -> ${dep.group}:${dep.name} (agent-plane dependency)".toString()
+                }
+            }
+        }
+    }
+}
+
 tasks.register('checkPlaneIsolation') {
     group = 'verification'
     description = 'Fails if a deterministic-plane module depends on the agent plane, Neo4j or an LLM provider.'
 
-    def offenders = []
-    def deterministic = subprojects.findAll { sub ->
-        deterministicPlanePrefixes.any { sub.path.startsWith(it) }
-    }
-    def markers = agentOnlyDependencyMarkers
+    def offenders = providers.provider { rootProject.planeIsolationOffenders.unique() }
+    def modulesChecked = providers.provider { rootProject.planeIsolationModulesChecked }
 
     doLast {
-        deterministic.each { sub ->
-            sub.configurations
-                    .findAll { it.canBeResolved }
-                    .each { config ->
-                        config.allDependencies.each { dep ->
-                            if (dep instanceof ProjectDependency && dep.path.startsWith(':services:agent')) {
-                                offenders << "${sub.path} -> ${dep.path} (agent plane)"
-                            }
-                            if (dep.group != null && markers.any { dep.group.startsWith(it) }) {
-                                offenders << "${sub.path} -> ${dep.group}:${dep.name} (agent-plane dependency)"
-                            }
-                        }
-                    }
-        }
-
-        if (!offenders.isEmpty()) {
+        def found = offenders.get()
+        if (!found.isEmpty()) {
             throw new GradleException(
-                    "Plane isolation violated (ADR-026, ADR-028):\n  " + offenders.unique().join('\n  '))
+                    "Plane isolation violated (ADR-026, ADR-028):\n  " + found.join('\n  '))
         }
 
         // Stated explicitly so a vacuous pass is never mistaken for a verified one. Until the first
         // ingestion, streaming or audit module lands this check has nothing to inspect.
-        logger.lifecycle("Plane isolation: ${deterministic.size()} deterministic-plane module(s) checked")
+        logger.lifecycle("Plane isolation: ${modulesChecked.get()} deterministic-plane module(s) checked")
     }
 }
 
