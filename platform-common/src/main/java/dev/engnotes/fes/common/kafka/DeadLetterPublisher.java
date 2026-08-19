@@ -5,7 +5,6 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 
 import dev.engnotes.fes.events.DeadLetterEvent;

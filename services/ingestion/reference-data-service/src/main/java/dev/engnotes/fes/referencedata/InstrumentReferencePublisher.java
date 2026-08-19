@@ -3,8 +3,8 @@ package dev.engnotes.fes.referencedata;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import dev.engnotes.fes.events.InstrumentReferenceEvent;
 import io.micrometer.tracing.Tracer;

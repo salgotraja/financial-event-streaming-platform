@@ -1,0 +1,27 @@
+# Single declaration point for every version this build pins by hand.
+#
+# Only dependencies the Spring Boot BOM does not manage appear here. Anything the BOM already
+# governs (Kafka, Testcontainers, JUnit, AssertJ, SnakeYAML) stays unversioned in the module files,
+# so the BOM remains the one source of truth for that half and this file for the other.
+
+[versions]
+springBoot = "4.1.0"
+springDependencyManagement = "1.1.7"
+avro = "1.12.1"
+avroPlugin = "1.9.1"
+confluent = "7.9.1"
+spotless = "8.9.0"
+
+# The JaCoCo agent has to understand the class file version the toolchain emits. Gradle's bundled
+# default trails the JDK, so Java 25 bytecode needs this pinned ahead of it.
+jacoco = "0.8.15"
+
+[libraries]
+avro = { module = "org.apache.avro:avro", version.ref = "avro" }
+confluent-kafka-avro-serializer = { module = "io.confluent:kafka-avro-serializer", version.ref = "confluent" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "springDependencyManagement" }
+avro = { id = "com.github.davidmc24.gradle.plugin.avro", version.ref = "avroPlugin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

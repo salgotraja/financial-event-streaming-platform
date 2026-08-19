@@ -96,6 +96,7 @@ order.
 | --- | --- | --- |
 | No deterministic-plane module depends on the agent plane | `build.gradle` | `./gradlew checkPlaneIsolation`, verified to fail on both a project edge and a Neo4j dependency |
 | Every service commits a renderable ACL policy | `KafkaAclScriptRenderer` | `./gradlew renderKafkaAcls`, wired into `check` |
+| Source formatting is enforced rather than reviewed | `build.gradle` | `./gradlew spotlessCheck`, wired into `check` |
 
 ## What has no proof yet
 

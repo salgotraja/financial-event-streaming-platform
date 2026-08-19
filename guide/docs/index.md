@@ -82,11 +82,16 @@ containers, so the first run pulls images and takes a few minutes.
 
 ```bash
 ./gradlew build                    # compile, test, and run every gate
-./gradlew test                     # tests only
+./gradlew test                     # unit tests only, no Docker needed
+./gradlew integrationTest          # the Testcontainers-backed tests
+./gradlew spotlessApply            # fix formatting the build would reject
 ./gradlew checkPlaneIsolation      # the plane dependency rule on its own
 ./gradlew :contracts:test          # the schema compatibility gate on its own
 scripts/local-stack.sh up dev      # the local stack, plaintext profile
 ```
+
+`test` and `integrationTest` split one `src/test` source set by class name, so `./gradlew test` alone
+runs without Docker. See [Build gates and CI](gates.md#gate-5-the-tests).
 
 Gradle, not Maven. There is no `mvnw` in this repository.
 

@@ -174,3 +174,31 @@ at least one tick first, or it asserts against a driver that had not produced an
 `market-data-simulator` has a configurable `rate-per-second`. Nothing in the repository evidences the
 FR-01.4 ceiling or NFR-01.1, because no sustained-throughput run has been done. A configured number in
 a YAML file is not a result.
+
+## Turning on the configuration cache found a task reaching across projects
+
+`renderKafkaAcls` used to sit in the root build and take its classpath from
+`project(':platform-common').sourceSets.testFixtures.runtimeClasspath`. That works until the
+configuration cache is enabled, and then it fails at cache-write time:
+
+```text
+Resolution of the configuration ':platform-common:testFixturesRuntimeClasspath' was attempted
+without an exclusive lock. This is unsafe and not allowed.
+```
+
+Reading another project's source set resolves that project's configuration without the lock Gradle
+holds for it. The task now lives in `platform-common/build.gradle`, where the classpath is its own, and
+writes to the root build directory where `scripts/local-stack.sh` reads it. Running
+`./gradlew renderKafkaAcls` from the root still works, because an unqualified task name matches in
+every project that defines it.
+
+## Spotless's default unused-import engine cannot read this toolchain
+
+`removeUnusedImports()` defaults to the google-java-format engine, which reaches into `jdk.compiler`
+internals that are not open here. The first module to run it throws `ExceptionInInitializerError`, and
+every module after it reports the misleading
+`NoClassDefFoundError: com/google/googlejavaformat/java/RemoveUnusedImports` against every file it was
+asked to check.
+
+`removeUnusedImports('cleanthat-javaparser-unnecessaryimport')` parses the source directly and needs no
+compiler internals.

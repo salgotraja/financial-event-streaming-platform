@@ -1,6 +1,10 @@
 plugins {
-    id 'org.springframework.boot' version '4.1.0' apply false
-    id 'io.spring.dependency-management' version '1.1.7' apply false
+    alias(libs.plugins.spring.boot) apply false
+    alias(libs.plugins.spring.dependency.management) apply false
+
+    // Applied per subproject rather than here. Spotless brings LifecycleBasePlugin with it, which
+    // registers its own check and build tasks; the root already registers both by hand below.
+    alias(libs.plugins.spotless) apply false
 }
 
 // Root is an aggregator. Deployable units are the service modules; each owns its own image,
@@ -11,9 +15,26 @@ allprojects {
     version = '0.0.1-SNAPSHOT'
 }
 
+// Integration tests share the src/test source set with unit tests and are identified by class name.
+// Three names qualify, and the last two are here because a name is not a reliable signal on its own:
+// *AuthorizationTest extends the SecureKafkaStack fixture, and *StackTest tests a container fixture
+// directly. Both start a broker. The split is only worth having if `test` genuinely needs no Docker,
+// so a class that starts a container belongs on this list whatever it is called.
+ext.integrationTestPatterns = ['*IntegrationTest', '*AuthorizationTest', '*StackTest']
+
+// Generated Avro code is compiled, never authored. It is neither formatted nor counted as coverage.
+ext.generatedClassPattern = 'dev/engnotes/fes/events/**'
+
+// Read here in the root script scope, where the catalog accessor is unambiguous.
+def jacocoToolVersion = libs.versions.jacoco.get()
+def integrationTestPatterns = ext.integrationTestPatterns
+def generatedClassPattern = ext.generatedClassPattern
+
 subprojects {
     apply plugin: 'java'
+    apply plugin: 'jacoco'
     apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'com.diffplug.spotless'
 
     java {
         toolchain {
@@ -32,8 +53,96 @@ subprojects {
         }
     }
 
-    tasks.named('test') {
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        // -parameters keeps constructor parameter names in the class file, which Spring and Jackson
+        // both bind by. Without it a record or a constructor-injected bean binds by position.
+        options.compilerArgs << '-parameters'
+        // Warnings are reported, not fatal. A -Werror gate is a separate decision from surfacing the
+        // warnings in the first place, and generated Avro sources are compiled through here too.
+        options.compilerArgs << '-Xlint:all'
+    }
+
+    // Formatting is deliberately narrow: imports, whitespace and annotation placement. A full
+    // reflow would rewrite hand-wrapped explanatory comment blocks that carry meaning.
+    spotless {
+        java {
+            // Explicit target. The default covers every source set, which in contracts includes the
+            // generated Avro output directory.
+            target fileTree(projectDir) { include 'src/**/*.java' }
+
+            // The order the source tree already uses: JDK first, everything else alphabetical,
+            // static imports last. Spotless's default puts statics first, which would rewrite the
+            // import block of every file in the repository for no benefit.
+            importOrder('java|javax', '', '\\#')
+            // The JavaParser engine, not the google-java-format default. That default reaches into
+            // jdk.compiler internals that are not open on this toolchain, and fails with a
+            // NoClassDefFoundError rather than a lint result.
+            removeUnusedImports('cleanthat-javaparser-unnecessaryimport')
+            forbidWildcardImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+            formatAnnotations()
+        }
+    }
+
+    jacoco {
+        toolVersion = jacocoToolVersion
+    }
+
+    // Unit tests: everything that is not named as an integration test. Runs without Docker.
+    tasks.named('test', Test) {
         useJUnitPlatform()
+        filter {
+            integrationTestPatterns.each { excludeTestsMatching it }
+        }
+        jacoco {
+            destinationFile = layout.buildDirectory.file('jacoco/test.exec').get().asFile
+        }
+    }
+
+    // Integration tests: the Testcontainers-backed classes, in their own task with their own agent
+    // output, so unit and integration coverage can be read apart as well as merged.
+    def integrationTest = tasks.register('integrationTest', Test) {
+        group = 'verification'
+        description = 'Runs the Testcontainers-backed tests. Requires a running Docker daemon.'
+
+        useJUnitPlatform()
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        shouldRunAfter tasks.named('test')
+
+        filter {
+            // Not every module has an integration test. contracts, for one, is pure schema.
+            failOnNoMatchingTests = false
+            integrationTestPatterns.each { includeTestsMatching it }
+        }
+        jacoco {
+            destinationFile = layout.buildDirectory.file('jacoco/integrationTest.exec').get().asFile
+        }
+    }
+
+    tasks.named('jacocoTestReport', JacocoReport) {
+        dependsOn tasks.named('test'), integrationTest
+
+        // Both agents' output, merged. A line covered only by an integration test still counts.
+        executionData fileTree(layout.buildDirectory.dir('jacoco')).include('*.exec')
+        classDirectories.setFrom(
+                sourceSets.main.output.classesDirs.asFileTree.matching {
+                    exclude generatedClassPattern
+                })
+
+        reports {
+            xml.required = true
+            html.required = true
+        }
+    }
+
+    // No coverage threshold is set. The report is published first; a ratchet is a separate decision
+    // taken against measured numbers rather than guessed ones.
+    tasks.named('check') {
+        dependsOn integrationTest
+        dependsOn tasks.named('jacocoTestReport')
     }
 }
 
@@ -91,37 +200,12 @@ tasks.register('checkPlaneIsolation') {
     }
 }
 
-// The strict-security stack provisions ACLs from the same per-service policy files the authorization
-// tests apply, read by the same parser. Two readers of one policy would be two chances to drift.
-tasks.register('renderKafkaAcls', JavaExec) {
-    group = 'verification'
-    description = 'Renders every service kafka-acls.yml into arguments for the local stack.'
-
-    def policyFiles = fileTree(rootDir) {
-        include 'services/*/*/src/main/resources/security/kafka-acls.yml'
-    }.files.sort()
-    def output = layout.buildDirectory.file('kafka-acls.args').get().asFile
-
-    dependsOn ':platform-common:testFixturesClasses'
-    classpath = project(':platform-common').sourceSets.testFixtures.runtimeClasspath
-    mainClass = 'dev.engnotes.fes.testing.KafkaAclScriptRenderer'
-    args = [output.absolutePath] + policyFiles.collect { it.absolutePath }
-
-    inputs.files(policyFiles)
-    outputs.file(output)
-
-    doFirst {
-        if (policyFiles.isEmpty()) {
-            throw new GradleException('No service kafka-acls.yml found. Every service commits one.')
-        }
-    }
-}
-
 tasks.register('check') {
     dependsOn 'checkPlaneIsolation'
     // Renders on every build so a malformed or unrenderable policy fails here, rather than when
-    // someone brings up the strict-security stack days later.
-    dependsOn 'renderKafkaAcls'
+    // someone brings up the strict-security stack days later. The task lives in platform-common,
+    // which owns the parser it runs.
+    dependsOn ':platform-common:renderKafkaAcls'
     dependsOn subprojects.collect { "${it.path}:check" }
 }
 

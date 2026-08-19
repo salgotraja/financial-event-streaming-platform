@@ -21,7 +21,7 @@ dependencies {
     implementation project(':platform-common')
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    implementation 'io.confluent:kafka-avro-serializer:7.9.1'
+    implementation libs.confluent.kafka.avro.serializer
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'

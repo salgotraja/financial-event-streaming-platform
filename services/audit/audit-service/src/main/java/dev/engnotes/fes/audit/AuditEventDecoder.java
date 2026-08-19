@@ -1,9 +1,8 @@
 package dev.engnotes.fes.audit;
 
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import org.apache.avro.generic.GenericContainer;
 import org.springframework.stereotype.Component;
-
-import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 
 /**
  * Derives the event type of a payload without taking a compile-time dependency on it.

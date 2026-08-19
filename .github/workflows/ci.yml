@@ -46,5 +46,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results
-          path: '**/build/reports/tests/test'
+          # Both task reports. Unit tests and the Testcontainers-backed integration tests run as
+          # separate tasks and write separate directories under reports/tests.
+          path: '**/build/reports/tests'
           if-no-files-found: ignore

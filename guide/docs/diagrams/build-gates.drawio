@@ -1,4 +1,4 @@
-<mxGraphModel dx="1000" dy="1000" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="980" pageHeight="1040" math="0" shadow="0" adaptiveColors="auto">
+<mxGraphModel dx="1000" dy="1000" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="980" pageHeight="1290" math="0" shadow="0" adaptiveColors="auto">
   <root>
     <mxCell id="0"/>
     <mxCell id="1" parent="0"/>
@@ -6,14 +6,14 @@
     <mxCell id="title" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=24;fontStyle=1;" value="What ./gradlew build actually runs">
       <mxGeometry x="30" y="22" width="920" height="34" as="geometry"/>
     </mxCell>
-    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Four things fail the build rather than warn. Two are rules about the shape of the codebase, and both run as their own CI step.">
+    <mxCell id="sub" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#666666;" value="Five things fail the build rather than warn. Two are rules about the shape of the codebase, and both run as their own CI step.">
       <mxGeometry x="30" y="56" width="920" height="22" as="geometry"/>
     </mxCell>
 
     <mxCell id="root" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=14;fontFamily=Courier New;verticalAlign=middle;" value="./gradlew build &#8594; check">
       <mxGeometry x="30" y="96" width="290" height="50" as="geometry"/>
     </mxCell>
-    <mxCell id="absent" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;fontSize=13;align=left;spacingLeft=14;verticalAlign=middle;" value="&lt;b&gt;Deliberately absent&lt;/b&gt; &#183; no formatter and no linter. check maps to the tests plus checkPlaneIsolation plus renderKafkaAcls, and nothing else.">
+    <mxCell id="absent" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#666666;fontSize=13;align=left;spacingLeft=14;verticalAlign=middle;" value="&lt;b&gt;Deliberately absent&lt;/b&gt; &#183; no coverage floor, no -Werror, no static analysis beyond the compiler&#39;s own lint. Each is a threshold, and a guessed threshold fails the build for a reason nobody chose.">
       <mxGeometry x="350" y="96" width="600" height="50" as="geometry"/>
     </mxCell>
 
@@ -23,11 +23,16 @@
     <mxCell id="g2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Gate 2 &#183; plane isolation&lt;/b&gt;&lt;br&gt;checkPlaneIsolation&lt;br&gt;&lt;br&gt;No ingestion, streaming or audit module may depend on a :services:agent project, or on a group starting with org.neo4j, com.anthropic, dev.langchain4j or io.github.ollama4j.&lt;br&gt;&lt;br&gt;Prints the module count, so a vacuous pass is visible.">
       <mxGeometry x="500" y="186" width="450" height="220" as="geometry"/>
     </mxCell>
-    <mxCell id="g3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Gate 3 &#183; the ACL policies render&lt;/b&gt;&lt;br&gt;renderKafkaAcls&lt;br&gt;&lt;br&gt;Reads every service's kafka-acls.yml with the same parser the tests use and writes build/kafka-acls.args.&lt;br&gt;&lt;br&gt;Runs on every build, so a malformed policy fails here rather than days later when someone brings the stack up. Fails outright if no policy is found.">
+    <mxCell id="g3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Gate 3 &#183; formatting&lt;/b&gt;&lt;br&gt;spotlessCheck&lt;br&gt;&lt;br&gt;Import order, unused imports, no wildcard imports, trailing whitespace, a final newline, annotation placement. No reflow.&lt;br&gt;&lt;br&gt;The full ruleset touched 39 files; this one touched 4. Hand-wrapped comment blocks survive it. Generated Avro sources are excluded.">
       <mxGeometry x="30" y="426" width="450" height="220" as="geometry"/>
     </mxCell>
-    <mxCell id="g4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Gate 4 &#183; the tests&lt;/b&gt;&lt;br&gt;every module's check task&lt;br&gt;&lt;br&gt;143 tests across 27 classes at the last full run.&lt;br&gt;&lt;br&gt;Unit: pure logic, no Spring context.&lt;br&gt;Integration: a real broker on apache/kafka-native plus a real Schema Registry.&lt;br&gt;Authorization: a real broker on apache/kafka with SASL and the StandardAuthorizer.&lt;br&gt;&lt;br&gt;A running Docker daemon is required.">
+
+    <mxCell id="g4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Gate 4 &#183; the ACL policies render&lt;/b&gt;&lt;br&gt;renderKafkaAcls&lt;br&gt;&lt;br&gt;Reads every service&#39;s kafka-acls.yml with the same parser the tests use and writes build/kafka-acls.args.&lt;br&gt;&lt;br&gt;Runs on every build, so a malformed policy fails here rather than days later when someone brings the stack up. Fails outright if no policy is found.">
       <mxGeometry x="500" y="426" width="450" height="220" as="geometry"/>
+    </mxCell>
+
+    <mxCell id="g5" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;align=left;spacingLeft=14;verticalAlign=top;spacingTop=12;" value="&lt;b&gt;Gate 5 &#183; the tests&lt;/b&gt;&lt;br&gt;every module&#39;s check task, as two Gradle tasks&lt;br&gt;&lt;br&gt;146 tests at the last full run: 100 under test, 46 under integrationTest.&lt;br&gt;&lt;br&gt;test: pure logic, no Spring context, no Docker. integrationTest: every *IntegrationTest, *AuthorizationTest and *StackTest class, on a real broker and a real Schema Registry.&lt;br&gt;&lt;br&gt;Each task runs its own JaCoCo agent; jacocoTestReport merges both execution files. No coverage floor is set.">
+      <mxGeometry x="30" y="666" width="920" height="200" as="geometry"/>
     </mxCell>
 
     <mxCell id="e1" parent="1" source="root" target="g1" edge="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#333333;endArrow=block;strokeWidth=2;">
@@ -35,22 +40,22 @@
     </mxCell>
 
     <mxCell id="ci" parent="1" vertex="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#cccccc;verticalAlign=top;align=left;spacingLeft=16;spacingTop=10;fontSize=16;fontStyle=1;" value="On every pull request &#183; .github/workflows/ci.yml">
-      <mxGeometry x="30" y="686" width="920" height="250" as="geometry"/>
+      <mxGeometry x="30" y="926" width="920" height="250" as="geometry"/>
     </mxCell>
     <mxCell id="ci1" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;fontSize=13;fontFamily=Courier New;align=left;spacingLeft=12;verticalAlign=middle;" value="Java 25 corretto, gradle/actions/setup-gradle">
-      <mxGeometry x="52" y="726" width="876" height="42" as="geometry"/>
+      <mxGeometry x="52" y="966" width="876" height="42" as="geometry"/>
     </mxCell>
     <mxCell id="ci2" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontFamily=Courier New;align=left;spacingLeft=12;verticalAlign=middle;" value="./gradlew :contracts:test --tests '*SchemaCompatibilityTest'">
-      <mxGeometry x="52" y="776" width="876" height="42" as="geometry"/>
+      <mxGeometry x="52" y="1016" width="876" height="42" as="geometry"/>
     </mxCell>
     <mxCell id="ci3" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;fontFamily=Courier New;align=left;spacingLeft=12;verticalAlign=middle;" value="./gradlew checkPlaneIsolation">
-      <mxGeometry x="52" y="826" width="876" height="42" as="geometry"/>
+      <mxGeometry x="52" y="1066" width="876" height="42" as="geometry"/>
     </mxCell>
     <mxCell id="ci4" parent="1" vertex="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontFamily=Courier New;align=left;spacingLeft=12;verticalAlign=middle;" value="./gradlew build, then upload test reports with always()">
-      <mxGeometry x="52" y="876" width="876" height="42" as="geometry"/>
+      <mxGeometry x="52" y="1116" width="876" height="42" as="geometry"/>
     </mxCell>
     <mxCell id="cinote" parent="1" vertex="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=13;fontColor=#666666;" value="Running the two gates ahead of the wider build duplicates a little work and buys a clear signal: a compatibility break or a forbidden dependency becomes a named failed step rather than a line in a test summary.">
-      <mxGeometry x="30" y="950" width="920" height="60" as="geometry"/>
+      <mxGeometry x="30" y="1190" width="920" height="60" as="geometry"/>
     </mxCell>
   </root>
 </mxGraphModel>

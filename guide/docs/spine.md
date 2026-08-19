@@ -233,9 +233,11 @@ The whole path is exercised by two integration tests. `TradeEventPublisherIntegr
 1 to 4; `AuditRecordConsumerIntegrationTest` covers hops 5 to 7 and the poison path.
 
 ```bash
-./gradlew :services:ingestion:trade-producer:test
-./gradlew :services:audit:audit-service:test
+./gradlew :services:ingestion:trade-producer:integrationTest
+./gradlew :services:audit:audit-service:integrationTest
 ```
+
+Both are `*IntegrationTest` classes, which belong to the `integrationTest` task rather than to `test`.
 
 Both need a running Docker daemon. They share `KafkaAvroStack` from `platform-common` test fixtures,
 which starts one real broker and one real Schema Registry per JVM and never stops them: Ryuk reaps
