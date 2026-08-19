@@ -175,6 +175,17 @@ at least one tick first, or it asserts against a driver that had not produced an
 FR-01.4 ceiling or NFR-01.1, because no sustained-throughput run has been done. A configured number in
 a YAML file is not a result.
 
+## The current LocalStack image will not start without a licence
+
+`localstack/localstack` moved to a unified image in March 2026. From that tag onward the container
+requires `LOCALSTACK_AUTH_TOKEN` and exits with code 55 when it does not find one, which surfaces
+through Testcontainers as `Wait strategy failed. Container exited with code 55`, with nothing about
+licensing in the Java stack trace.
+
+`4.14.0` is the last community tag. Both the compose stack and `LocalStackFixture` pin it, and the
+reason is written beside each pin so a routine version bump does not quietly make the test suite
+require a paid account.
+
 ## Turning on the configuration cache found a task reaching across projects
 
 `renderKafkaAcls` used to sit in the root build and take its classpath from

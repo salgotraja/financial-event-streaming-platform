@@ -40,6 +40,10 @@ dependencies {
     testFixturesApi 'org.testcontainers:testcontainers-postgresql'
     testFixturesApi 'org.testcontainers:testcontainers-grafana'
 
+    // AWS emulation for the audit evidence path. No AWS SDK is on any classpath yet: the fixture
+    // exposes an endpoint and nothing calls it, matching the compose stack (ADR-012, Phase 3).
+    testFixturesApi 'org.testcontainers:testcontainers-localstack'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

@@ -110,6 +110,39 @@ services:
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
       DYNAMIC_CONFIG_ENABLED: "true"
 
+  # AWS emulation for the audit evidence path. S3 and KMS are the two services that path needs: an
+  # object store under Object Lock, and a customer-managed key the manifest is signed with (ADR-012).
+  #
+  # Nothing in the source tree calls either one yet. The audit service writes through an AuditSink
+  # port whose only implementation logs, and the S3 writer, the sidecar manifest and the KMS
+  # signature are Phase 3. This container is the local endpoint that work will be written against,
+  # and until then it is provisioned infrastructure with no client.
+  #
+  # 4.14.0 and not a later tag on purpose. From the March 2026 unified image onward, the container
+  # requires LOCALSTACK_AUTH_TOKEN and exits with code 55 without one. 4.14.0 is the last tag that
+  # runs unlicensed, so it is what a clone of this repository can actually start.
+  localstack:
+    image: localstack/localstack:4.14.0
+    container_name: fes-localstack
+    hostname: localstack
+    ports: ["4566:4566"]
+    environment:
+      SERVICES: s3,kms
+      # us-east-1 avoids the CreateBucket LocationConstraint special case, which is a detail of the
+      # S3 API rather than a deployment decision. The cloud region is chosen elsewhere.
+      AWS_DEFAULT_REGION: us-east-1
+      # Emulated, so the values are arbitrary and are not secrets. Workload identity replaces static
+      # keys entirely in the cloud profile (ADR-010).
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    volumes: ["localstack-data:/var/lib/localstack"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"available\"'"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
   # Observability (FR-09.1). Services push OTLP to the collector, which exposes metrics for
   # Prometheus and forwards logs to Loki. This works whether a service runs in this stack or from an
   # IDE, because the service pushes rather than being scraped.
@@ -172,3 +205,4 @@ volumes:
   prometheus-data:
   loki-data:
   grafana-data:
+  localstack-data:

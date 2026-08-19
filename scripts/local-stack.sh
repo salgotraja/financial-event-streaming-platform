@@ -262,6 +262,7 @@ cmd_up() {
   wait_for_healthy kafka2
   wait_for_healthy kafka3
   wait_for_healthy schema-registry
+  wait_for_healthy localstack
 
   create_topics
   register_subjects
@@ -287,6 +288,7 @@ Local stack is up (profile: $PROFILE).
   Prometheus       http://localhost:9090
   Loki             http://localhost:3100
   OTLP endpoint    localhost:4317 (grpc), localhost:4318 (http)
+  LocalStack       http://localhost:4566 (s3, kms; no service calls it yet)
 BANNER
 
   if [ "$PROFILE" = "strict-security" ]; then

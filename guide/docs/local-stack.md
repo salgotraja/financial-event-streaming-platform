@@ -25,6 +25,7 @@ Schema Registry API, where hand-rolled quoting would be a bug waiting to happen.
 | `fes-kafka3` | `apache/kafka:4.1.0` | 29094 |
 | `fes-schema-registry` | `confluentinc/cp-schema-registry:7.9.1` | 8081 |
 | `fes-kafka-ui` | `provectuslabs/kafka-ui:v0.7.2` | 8080 |
+| `fes-localstack` | `localstack/localstack:4.14.0` | 4566 |
 | `fes-otel-collector` | `otel/opentelemetry-collector-contrib:0.158.0` | 4317 grpc, 4318 http |
 | `fes-prometheus` | `prom/prometheus:v3.13.2` | 9090 |
 | `fes-loki` | `grafana/loki:3.7.6` | 3100 |
@@ -59,7 +60,7 @@ is the kind of difference that only shows up as a throughput ceiling much later.
 2. Refuse to start if a different profile is already provisioned. The profiles differ in listener
    security protocol, so switching needs `destroy` first.
 3. `docker compose up -d`.
-4. Wait for all three brokers and the registry to report healthy.
+4. Wait for all three brokers, the registry and LocalStack to report healthy.
 5. Create topics from `deploy/compose/topics.tsv`, with explicit partition counts and per-topic config.
 6. Register subjects from `deploy/compose/subjects.tsv`, resolving schema references to a concrete
    subject and version.
@@ -111,6 +112,26 @@ and read by the same parser. Per-identity client configuration is written to
 
 Bringing it up asserts both halves of least privilege before printing the banner. See
 [Workload authorization](authorization.md#enforcement-is-verified-at-provisioning-time-too).
+
+## LocalStack, ahead of its first caller
+
+`fes-localstack` runs S3 and KMS on `localhost:4566`. Those are the two AWS services the audit
+evidence path needs: an object store the archives are written to under Object Lock, and a
+customer-managed key the sidecar manifest is signed with (ADR-012).
+
+Nothing calls it. The audit service writes through an `AuditSink` port whose only implementation logs,
+and the S3 writer, the manifest and the signature are Phase 3 work. This is provisioned infrastructure
+with no client, and it is in the stack now so that the first person to write the durable sink has a
+local endpoint rather than a container to bring up at the same time.
+
+The same emulator backs `LocalStackFixture` in `platform-common` test fixtures, so a test and a service
+reach AWS through the same thing. The fixture deliberately pulls in no AWS SDK: it hands out an
+endpoint, a region and the emulated credentials, and the first module that actually calls S3 brings its
+own client rather than putting one on every service's test classpath today.
+
+The tag is pinned at `4.14.0` rather than something newer. From the March 2026 unified image onward the
+container demands `LOCALSTACK_AUTH_TOKEN` and exits with code 55 without one, so a later tag would make
+the local stack, and the test that exercises it, run only for a licence holder.
 
 ## Observability
 
