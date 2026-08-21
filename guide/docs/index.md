@@ -40,6 +40,8 @@ trade execution and no regulatory reporting.
 | Four ingestion producers | Built |
 | Audit archival consumer | Built, writing to a logging stand-in rather than to S3 |
 | Per-service Kafka policy, authenticated broker, negative authorization tests | Built |
+| Service identity binding, each service proven to authenticate as its own principal | Built, against a local broker with ACLs, not against MSK IAM |
+| Service container images, one per module, from buildpacks | Built |
 | Local stack, both profiles, with observability | Built |
 | Deterministic streaming, CDC migration, control plane, agent plane | Not started |
 | Throughput and latency evidence | Not measured |
@@ -91,7 +93,7 @@ scripts/local-stack.sh up dev      # the local stack, plaintext profile
 ```
 
 `test` and `integrationTest` split one `src/test` source set by class name, so `./gradlew test` alone
-runs without Docker. See [Build gates and CI](gates.md#gate-5-the-tests).
+runs without Docker. See [Build gates and CI](gates.md#gate-6-the-tests).
 
 Gradle, not Maven. There is no `mvnw` in this repository.
 

@@ -28,10 +28,12 @@ from event history (ADR-017).
 ## Phase 3, security enforcement
 
 The authorization half of this phase is done and described in
-[Workload authorization](authorization.md). What remains:
+[Workload authorization](authorization.md), and the binding between a running service and its Kafka
+principal is done and described in [Service identity](identity.md). What remains:
 
-- Per-workload identity in a deployed environment, so that a running service authenticates as its own
-  principal rather than a test proving the policy in isolation.
+- The same binding in a deployed environment. It is proven in CI, against a local broker with ACLs,
+  by running each service's own image. MSK IAM is the cloud authorization path (ADR-009) and nothing
+  exercises it yet, and the strict-security compose stack still does not run the services themselves.
 - The durable audit sink: S3 Parquet, signed manifests, Object Lock, and verification. The audit role
   may `s3:PutObject` and `kms:Sign` and may not delete, overwrite, bypass retention, administer the
   bucket policy or verify (ADR-012).

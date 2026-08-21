@@ -73,6 +73,20 @@ order.
 | The archive cannot manufacture the evidence it archives | `audit-service` policy | `should_deny_writing_a_financial_topic` |
 | One workload cannot advance another's offsets | `audit-service` policy | `should_deny_joining_a_consumer_group_other_than_its_own` |
 
+## Service identity
+
+| Behaviour | Implementation | Proof |
+| --- | --- | --- |
+| A running service authenticates as its own principal, not the administrator's | `KafkaSecurityConfiguration` | `should_be_denied_while_ungranted_then_work_once_its_own_principal_is_granted`, once per service |
+| A service cannot name its own SASL identity | `KafkaSecurityConfiguration` | `should_override_a_jaas_config_a_service_tried_to_set_for_itself` |
+| No service module mentions a JAAS config at all | the five service modules | `should_not_let_a_module_name_a_sasl_username_of_its_own` |
+| The module name, the application name and the policy principal agree | `SecureKafkaStack` | `should_name_one_module_one_application_name_and_one_policy_principal_alike` |
+| The derivation reaches consumers, not only producers | `KafkaSecurityConfiguration` | `should_apply_to_consumers_as_well_as_producers` |
+| A plaintext developer stack is not forced to authenticate | `KafkaSecurityConfiguration` | `should_stay_inactive_when_the_secure_profile_is_not_on` |
+| The in-network listener demands credentials | `SecureKafkaStack` | `should_refuse_an_in_network_client_that_presents_no_credentials`, `should_admit_an_in_network_client_that_presents_credentials` |
+| The inter-broker listener, where clients are super users, is unreachable from the network | `SecureKafkaStack` | `should_not_expose_the_inter_broker_listener_to_a_client_on_the_network` |
+| The registry serves subjects it stored through the authenticated broker | `SecureKafkaStack` | `should_serve_a_subject_registered_against_the_authenticated_broker` |
+
 ## Producer-specific behaviour
 
 | Behaviour | Implementation | Proof |

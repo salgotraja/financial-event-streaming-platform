@@ -4,7 +4,7 @@
 Click to zoom. Source: `guide/docs/diagrams/build-gates.drawio`.
 {: .diagram-hint }
 
-Five things fail `./gradlew build` rather than warn. Two of them are rules about the shape of the
+Six things fail `./gradlew build` rather than warn. Two of them are rules about the shape of the
 codebase rather than about its behaviour, and those two run as their own CI steps so a violation is
 named in the job list rather than buried in a test summary.
 
@@ -78,7 +78,24 @@ doFirst {
 }
 ```
 
-## Gate 5: the tests
+## Gate 5: the service images
+
+```bash
+./gradlew bootBuildImage
+```
+
+Every service module builds a container image, `fes/<module>:local`, from the Spring Boot plugin's
+Paketo integration. No Dockerfile. Each module's `integrationTest` depends on its own image task, so
+the identity proof in [Service identity](identity.md) cannot run against a stale or absent build.
+
+A clean build with all five images forced to rebuild takes 38 seconds on the machine this was measured
+on. Treat that as a floor rather than the CI figure: a CI runner pulls the Paketo builder and run
+images fresh, and a development machine usually has them cached.
+
+No property exists to skip the image build. A gate weakened on a predicted cost rather than an
+observed one stops meaning anything.
+
+## Gate 6: the tests
 
 Three categories, all under each module's `check` task, run by two Gradle tasks.
 
@@ -94,8 +111,14 @@ because a name is not a reliable signal on its own: `*AuthorizationTest` extends
 fixture and `SecureKafkaStackTest` tests that fixture directly, and both start a broker.
 
 That matters more than tidiness. The split is only worth having if `test` genuinely needs no Docker,
-which is checked by running it and confirming no container appeared: 100 unit tests, zero containers
-created. 46 tests run under `integrationTest`.
+which is checked by running it and confirming no container appeared: 124 unit tests, zero containers
+created. 55 tests run under `integrationTest`.
+
+`integrationTest` also sets `forkEvery = 1`, one test class per JVM. That is a correctness setting,
+not a speed one. `SecureKafkaStack.apply` only ever creates ACLs and never revokes them, and every
+service module now has two ACL-applying classes: its authorization test and its identity test. In one
+JVM the second would inherit the first's grants and its denial assertion would silently pass. See
+[Service identity](identity.md).
 
 Each task runs its own JaCoCo agent and writes its own execution data, `build/jacoco/test.exec` and
 `build/jacoco/integrationTest.exec`. `jacocoTestReport` merges both, so a line reached only by an
@@ -118,6 +141,11 @@ that actually breaks in production, schema resolution and subject compatibility,
 **Authorization tests.** `SecureKafkaStack`: a real broker on `apache/kafka:4.1.0` with SASL/PLAIN and
 the `StandardAuthorizer`. Two broker images in one run is the cost of authenticated local tests. See
 [Gotchas](gotchas.md#the-native-image-cannot-act-as-a-sasl-server) for why the images differ.
+
+**Identity tests.** The same secure broker, plus a Schema Registry on its network, plus the service's
+own container image. Each `ServiceIdentityStackTest` starts two containers of that image in sequence.
+These are the slowest tests in the build and the only ones that need an image, which is why each
+module's `integrationTest` depends on its own `bootBuildImage`.
 
 A running Docker daemon is required.
 

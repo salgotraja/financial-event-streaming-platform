@@ -167,10 +167,15 @@ the console producer exit successfully without ever contacting the topic, which 
 **Proven.** That each committed policy is enforceable on a real broker that denies by default, and
 that each identity can do only what its file allows.
 
-**Not proven.** That a deployed service authenticates as its own principal. The services are not
-containerised yet, so nothing exercises the binding between a running process and a Kafka identity.
-That is the last step before per-workload Kafka authorization is genuinely built, and it is tracked as
-open rather than counted as done.
+**Also proven, since the services were containerised.** That a running service authenticates as its
+own principal rather than as an administrator. Each module now carries a `ServiceIdentityStackTest`
+that runs the service's own image against the secure broker twice, denied while ungranted and working
+once `User:<service>` alone is granted. [Service identity](identity.md) covers how, and why a test
+that only asserted a successful publish would have proved nothing.
+
+**Not proven.** Anything about MSK IAM, which is the cloud authorization path and is not exercised
+here. The strict-security compose stack also still does not run the services themselves; the binding
+is proven in CI rather than demonstrated live.
 
 Cloud deployments authorise with MSK IAM scoped per topic, per consumer group, per identity (ADR-009).
 ACLs exist for the local strict-security profile. A test here proves the policy, not the deployment.
@@ -185,8 +190,11 @@ a new service that means:
 3. The principal added to `SecureKafkaStack.PRINCIPALS`, so the broker has its credential.
 4. At least one ALLOW and two DENY tests, driven by the committed file.
 
+Plus, since [Service identity](identity.md) landed, a `ServiceIdentityStackTest` proving the running
+service presents that principal.
+
 One constraint on step 4: `SecureKafkaStack` grants are additive and nothing revokes them, and the
-container is static. Gradle forks a test JVM per module, so today each module's single authorization
-class gets a clean broker. Put two such classes in one JVM and the second inherits the first's grants,
-which turns a denial assertion into a pass without failing anything. If a module ever needs two, add a
-revoke step rather than assuming isolation.
+container is static. Every service module now has two ACL-applying classes, its authorization test and
+its identity test, so `integrationTest` sets `forkEvery = 1` and each gets a clean broker. That
+setting is load-bearing rather than a tuning choice: put two such classes in one JVM and the second
+inherits the first's grants, which turns a denial assertion into a pass without failing anything.

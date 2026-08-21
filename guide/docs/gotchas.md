@@ -213,3 +213,46 @@ asked to check.
 
 `removeUnusedImports('cleanthat-javaparser-unnecessaryimport')` parses the source directly and needs no
 compiler internals.
+
+## Testcontainers' `withListener` silently makes a Kafka listener plaintext
+
+Adding an in-network listener to the secure broker looks like a one-liner:
+`KafkaContainer.withListener("kafka:19092")`. It is not. That method names the listener `TC-0` and
+writes `TC-0:PLAINTEXT` into the security protocol map unconditionally, at container start, after any
+value you set yourself.
+
+On this fixture that would have been silently catastrophic. `ANONYMOUS` is a super user, so a service
+container reaching a plaintext listener authenticates as nobody, passes every ACL, and every denial
+assertion in the repository keeps passing while proving nothing. `SecureKafkaStack` configures
+`KAFKA_LISTENERS`, the protocol map and the advertised listeners by hand instead, and overrides
+`containerIsStarting` rather than calling `super`, because the superclass writes a starter script that
+drops the in-network advertised entry.
+
+The same reasoning applies to the listeners that were already there. `BROKER` and `CONTROLLER` are
+plaintext by necessity, and were harmless while the broker sat on no shared network. The moment it
+joined one, they became a way in, so both are bound to `127.0.0.1` and a test asserts a client on the
+network cannot reach them.
+
+## A Testcontainers log consumer can lag the wait strategy that just matched
+
+`Wait.forLogMessage` attaches its own consumer on a separate Docker follow-stream from the one
+`withLogConsumer` feeds. When `start()` returns, the accumulated `ToStringConsumer` string is not
+guaranteed to contain the line the wait just matched, let alone anything after it.
+
+That turned a mandated negative assertion into one that could pass on an empty string. The identity
+contract now reads `getLogs()`, a synchronous non-follow fetch, while the container is still up, and
+keeps the consumer only for the failure path where the container has already closed. It also asserts
+positively that each captured log contains the marker it waited for, so a regression to a lagging
+capture fails rather than going quiet again.
+
+## A Gradle test task does not know about files the test reads from other modules
+
+`ServiceIdentityNamesTest` lives in `platform-common` and reads every service module's
+`application.yml` and `kafka-acls.yml` to check the three names agree. Gradle's up-to-date check
+tracks the module's own classpath and resources, not arbitrary runtime file reads, so breaking the
+name chain in a service and running `./gradlew build` reported `:platform-common:test` as UP-TO-DATE
+and caught nothing.
+
+`platform-common/build.gradle` now declares those files as task inputs. Worth remembering for any
+check that reads across module boundaries: the test being correct is not the same as the build running
+it.

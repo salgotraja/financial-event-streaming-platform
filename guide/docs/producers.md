@@ -1,7 +1,9 @@
 # The four producers
 
 Four ingestion services, one topic each. They share a shape: a Spring Boot application, a properties
-record, a publisher component, and nothing else. All durability settings come from `platform-common`,
+record, a publisher component, and a driver that is off by default. Each driver is gated on the whole
+`@Configuration` class rather than on individual beans, so there is one place per service that decides
+whether it generates traffic; with the gate off the module is a publisher and nothing else. All durability settings come from `platform-common`,
 so each service's `application.yml` configures only its serializers, its registry URL and its topic.
 
 Every one of them writes trace context onto the record headers as well as into the payload, because
@@ -12,6 +14,13 @@ NFR-04.1 requires end-to-end tracing across services that may never deserialise 
 Covered in detail in [Follow one trade](spine.md). The short version: publishes `TradeEvent` to
 `trades.raw` keyed on ticker, copies `traceparent`, `tracestate` and `correlationId` onto headers, and
 surfaces a delivery failure to the caller rather than swallowing it.
+
+It also carries a synthetic trade generator, `TradeGenerationDriver`, off unless
+`fes.trade-producer.generation.enabled` is `true`. It has the same shape as the market-data rate
+driver below: a `SmartLifecycle` on a virtual thread, waking on a fixed interval and emitting the
+whole batch due for it. The price is a uniform draw around a fixed reference rather than a model,
+deliberately: FR-01.4 specifies a price model for ticks and nothing specifies one for trade prices, so
+inventing one would be a claim about market behaviour this platform does not make.
 
 ## market-data-simulator
 
@@ -82,6 +91,13 @@ Ticker rather than `corporateActionId`, because corporate actions for one instru
 rather than independent facts: a split is superseded by its correction, and a dividend by a revised
 amount. A downstream consumer reading this stream as scheduled-event context must see the latest state
 of a ticker rather than whichever revision landed on the partition it read first.
+
+It carries a startup announcement, `CorporateActionSeeder`, off unless
+`fes.corporate-action-producer.seed.enabled` is `true`. Corporate actions are events in the world
+rather than a rate, so this is an `ApplicationRunner` publishing once, the shape
+`InstrumentMasterSeeder` uses, not a paced driver. A seeded action the validator rejects is logged and
+skipped rather than thrown: failing startup over seed data would take the service down when the right
+answer is to announce what is well formed and say which was not.
 
 This is the one producer that validates before publishing, and the reason is the schema's shape.
 `attributes` is an open `map<string,string>`, so Avro happily accepts a `STOCK_SPLIT` carrying no
