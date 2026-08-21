@@ -87,7 +87,14 @@ public class TradeGenerationDriver implements SmartLifecycle {
             running = false;
             LockSupport.unpark(worker);
             worker.join(Duration.ofSeconds(5));
-            log.info("Trade generation stopped after {} trades", emitted.get());
+            if (worker.isAlive()) {
+                // publish() can still be blocked in max.block.ms when the join times out, so the
+                // worker has not actually stopped. Say so rather than logging a clean shutdown.
+                log.warn("Trade generation did not stop within 5s after {} trades, "
+                        + "worker still running", emitted.get());
+            } else {
+                log.info("Trade generation stopped after {} trades", emitted.get());
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } finally {
