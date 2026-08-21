@@ -144,6 +144,25 @@ subprojects {
         dependsOn integrationTest
         dependsOn tasks.named('jacocoTestReport')
     }
+
+    // One test class per JVM. SecureKafkaStack.apply only ever creates ACLs and never revokes them,
+    // so a second ACL-applying class in one JVM inherits the first's grants and a denial assertion
+    // becomes a silent pass. Every service module now has two such classes: its *AuthorizationTest
+    // and its ServiceIdentityStackTest (ADR-031).
+    tasks.named('integrationTest', Test) {
+        forkEvery = 1
+    }
+
+    // Service images. The identity proof runs the service's own image, so a test must never be able
+    // to run against a stale or absent one.
+    plugins.withId('org.springframework.boot') {
+        tasks.named('bootBuildImage') {
+            imageName = "fes/${project.name}:local"
+        }
+        tasks.named('integrationTest') {
+            dependsOn tasks.named('bootBuildImage')
+        }
+    }
 }
 
 // Plane isolation, the platform's central invariant (ADR-026, ADR-028).
