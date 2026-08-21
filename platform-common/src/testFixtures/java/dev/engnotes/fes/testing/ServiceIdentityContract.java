@@ -102,6 +102,12 @@ public abstract class ServiceIdentityContract {
      * Anything the broker must hold before the service runs: registered Avro subjects for a
      * producer, a seeded record for a consumer. Runs once, before the denied run, and what it
      * creates is still there for the granted one.
+     *
+     * <p>The two are not interchangeable. {@link SecureKafkaStack#registerSubject} is also the
+     * registry container's only lazy start; {@link SecureKafkaStack#serviceEnvironment} hands the
+     * service a network alias for it, but nothing else brings the container up. A subclass that
+     * only seeds a record without ever registering a subject points its service at an alias with
+     * nothing listening behind it.
      */
     protected void prepareBroker() {
         // Overridden by services that need a subject registered or a record to read.
