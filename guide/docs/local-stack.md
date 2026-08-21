@@ -164,6 +164,7 @@ machine and says nothing about how the platform authenticates.
 PostgreSQL and Redis. They join when the Phase 2 services that use them land, so FR-09.1 is partly met
 rather than met.
 
-The services themselves. They run from Gradle or an IDE against the stack. Containerising them is what
-will finally bind a running process to a Kafka identity, and it is the last open item in the security
-slice.
+The services themselves, in this stack. They still run from Gradle or an IDE against it. Each service
+now builds an image, and [service identity](identity.md) proves the binding to a Kafka principal by
+running that image against a separate strict-security broker fixture in `integrationTest`; this
+compose stack does not run the services themselves.

@@ -12,8 +12,9 @@ every ACL is defeated at once, because the administrator is a super user the bro
 ## The identity is derived, never configured
 
 `platform-common/src/main/java/dev/engnotes/fes/common/kafka/KafkaSecurityConfiguration.java`
-builds the SASL login module for every Kafka client a service creates, and the username in it is
-`spring.application.name`:
+builds the SASL login module for the producer and consumer factories Spring Boot autoconfigures, and
+the username in it is `spring.application.name`. A Kafka Streams service will need the equivalent
+applied to its `StreamsBuilderFactoryBean` once one exists:
 
 ```java
 @Configuration(proxyBeanMethods = false)
@@ -69,7 +70,7 @@ inputs. Without that, Gradle reports `:platform-common:test` as up to date when 
 
 Each service module carries a `ServiceIdentityStackTest` extending
 `platform-common/src/testFixtures/java/dev/engnotes/fes/testing/ServiceIdentityContract.java`. A
-subclass supplies four values and nothing else:
+subclass implements three values, and overrides two more only where the service needs them:
 
 ```java
 class TradeProducerServiceIdentityStackTest extends ServiceIdentityContract {

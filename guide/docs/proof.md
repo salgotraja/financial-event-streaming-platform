@@ -80,7 +80,7 @@ order.
 | A running service authenticates as its own principal, not the administrator's | `KafkaSecurityConfiguration` | `should_be_denied_while_ungranted_then_work_once_its_own_principal_is_granted`, once per service |
 | A service cannot name its own SASL identity | `KafkaSecurityConfiguration` | `should_override_a_jaas_config_a_service_tried_to_set_for_itself` |
 | No service module mentions a JAAS config at all | the five service modules | `should_not_let_a_module_name_a_sasl_username_of_its_own` |
-| The module name, the application name and the policy principal agree | `SecureKafkaStack` | `should_name_one_module_one_application_name_and_one_policy_principal_alike` |
+| The module name, the application name and the policy principal agree | `ServiceIdentityNamesTest` reading `settings.gradle`, `application.yml` and `kafka-acls.yml` | `should_name_one_module_one_application_name_and_one_policy_principal_alike` |
 | The derivation reaches consumers, not only producers | `KafkaSecurityConfiguration` | `should_apply_to_consumers_as_well_as_producers` |
 | A plaintext developer stack is not forced to authenticate | `KafkaSecurityConfiguration` | `should_stay_inactive_when_the_secure_profile_is_not_on` |
 | The in-network listener demands credentials | `SecureKafkaStack` | `should_refuse_an_in_network_client_that_presents_no_credentials`, `should_admit_an_in_network_client_that_presents_credentials` |
@@ -103,6 +103,13 @@ order.
 | Producer identity is stamped, never accepted from the caller | `InstrumentReferencePublisher` | `should_overwrite_the_caller_supplied_producer_identity_with_the_configured_one` |
 | A reference version that does not advance is rejected | `InstrumentReferencePublisher` | `should_reject_a_reference_version_that_does_not_advance`, `should_track_versions_per_instrument_rather_than_globally` |
 | Trace context comes from the active span when the schema has no field for it | `InstrumentReferencePublisher` | `should_deliver_w3c_trace_context_from_the_active_span_rather_than_the_payload` |
+| Synthetic trade generation is a mode, not boot behaviour | `TradeGenerationConfiguration` | `should_not_wire_the_driver_when_generation_is_not_configured` |
+| Trades are emitted in the whole batch due for each wake, not one at a time | `TradeGenerationDriver` | `should_publish_the_batch_due_for_each_wake` |
+| The batch size follows from the rate and the wake interval | `TradeGenerationDriver` | `should_derive_the_batch_size_from_the_rate_and_the_wake_interval` |
+| A generated trade satisfies the schema's required fields | `TradeGenerator` | `should_generate_a_trade_that_satisfies_the_schemas_required_fields` |
+| Corporate action seeding is a mode, not boot behaviour | `CorporateActionSeedConfiguration` | `should_not_wire_the_seeder_when_the_seed_is_not_configured` |
+| Every configured action is published at startup | `CorporateActionSeeder` | `should_publish_every_configured_action_at_startup` |
+| An action the validator rejects is skipped rather than failing startup | `CorporateActionSeeder` | `should_skip_an_action_the_validator_rejects_rather_than_failing_startup` |
 
 ## Structure
 
