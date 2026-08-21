@@ -1,7 +1,9 @@
 package dev.engnotes.fes.tradeproducer;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -40,7 +42,8 @@ class TradeEventPublisherTest {
 
     @BeforeEach
     void setUp() {
-        publisher = new TradeEventPublisher(kafkaTemplate, new TradeProducerProperties("trades.raw"));
+        publisher = new TradeEventPublisher(kafkaTemplate, new TradeProducerProperties("trades.raw",
+                new TradeProducerProperties.Generation(false, 100, Duration.ofMillis(50), List.of("AAPL"))));
     }
 
     @Test
