@@ -228,6 +228,31 @@ public final class SecureKafkaStack {
         return "http://%s:%d".formatted(SCHEMA_REGISTRY_ALIAS, SCHEMA_REGISTRY_PORT);
     }
 
+    /** Every shipped service identity, for tests that must cover all of them rather than one. */
+    public static List<String> principals() {
+        return PRINCIPALS;
+    }
+
+    /**
+     * The environment a service container needs to authenticate as one identity.
+     *
+     * <p>A whole environment rather than a secret, so no test ever handles a credential and no
+     * test can accidentally hand a service someone else's. The username is absent on purpose: the
+     * service derives it from its own application name, and a test that could set it would be
+     * testing its own wiring.
+     */
+    public static Map<String, String> serviceEnvironment(String principal) {
+        if (!PRINCIPALS.contains(principal)) {
+            throw new IllegalArgumentException("Unknown principal " + principal
+                    + ". Add it to SecureKafkaStack.PRINCIPALS when the service ships.");
+        }
+        return Map.of(
+                "SPRING_PROFILES_ACTIVE", "secure-kafka",
+                "SPRING_KAFKA_BOOTSTRAP_SERVERS", inNetworkBootstrapServers(),
+                "SCHEMA_REGISTRY_URL", inNetworkSchemaRegistryUrl(),
+                "FES_KAFKA_SASL_SECRET", secretFor(principal));
+    }
+
     /**
      * Registers a schema under a subject, the way a deployment would.
      *
