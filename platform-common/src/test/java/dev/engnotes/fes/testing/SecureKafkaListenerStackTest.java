@@ -60,6 +60,36 @@ class SecureKafkaListenerStackTest {
         }
     }
 
+    @Test
+    @DisplayName("should not expose the inter-broker listener to a client on the network")
+    void should_not_expose_the_inter_broker_listener_to_a_client_on_the_network() throws Exception {
+        try (GenericContainer<?> cli = cliContainer()) {
+            cli.start();
+            String alias = SecureKafkaStack.inNetworkBootstrapServers().split(":")[0];
+            cli.copyFileToContainer(
+                    org.testcontainers.images.builder.Transferable.of("request.timeout.ms=5000\n"),
+                    "/tmp/short-timeout.properties");
+
+            for (String port : java.util.List.of("9093", "9094")) {
+                Container.ExecResult result = cli.execInContainer("/opt/kafka/bin/kafka-broker-api-versions.sh",
+                        "--bootstrap-server", alias + ":" + port,
+                        "--command-config", "/tmp/short-timeout.properties");
+
+                assertThat(result.getExitCode())
+                        .as("the inter-broker listener on port %s must be unreachable from a sibling "
+                                + "container, not merely deny an unauthenticated client", port)
+                        .isNotZero();
+                assertThat(result.getStderr())
+                        .as("must fail to connect (refused or timed out), not be denied after "
+                                + "authenticating: stderr was %s", result.getStderr())
+                        .doesNotContain("SaslAuthenticationException")
+                        .doesNotContain("Authentication failed")
+                        .containsAnyOf("TimeoutException", "Connection refused", "Errno 111",
+                                "Connection to node");
+            }
+        }
+    }
+
     private static GenericContainer<?> cliContainer() {
         return new GenericContainer<>(DockerImageName.parse(CLI_IMAGE))
                 .withNetwork(SecureKafkaStack.network())

@@ -102,9 +102,12 @@ public final class SecureKafkaStack {
                 @Override
                 protected void configure() {
                     super.configure();
+                    // BROKER and CONTROLLER bind to loopback only: a single-node fixture never
+                    // needs either reachable from a sibling container, and 0.0.0.0 here would let
+                    // any container on NETWORK dial in as ANONYMOUS, a super user on this broker.
                     getEnvMap().put("KAFKA_LISTENERS",
-                            "PLAINTEXT://0.0.0.0:9092,BROKER://0.0.0.0:9093,"
-                                    + "CONTROLLER://0.0.0.0:9094,"
+                            "PLAINTEXT://0.0.0.0:9092,BROKER://127.0.0.1:9093,"
+                                    + "CONTROLLER://127.0.0.1:9094,"
                                     + IN_NETWORK_LISTENER + "://0.0.0.0:" + IN_NETWORK_PORT);
                     getEnvMap().put("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP",
                             "BROKER:PLAINTEXT,PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT,"
@@ -118,9 +121,11 @@ public final class SecureKafkaStack {
                  */
                 @Override
                 protected void containerIsStarting(InspectContainerResponse containerInfo) {
+                    // BROKER's advertised entry matches its loopback bind: the broker only ever
+                    // connects to itself over this listener, so no other address is needed.
                     String advertised = String.join(",",
                             "PLAINTEXT://" + getBootstrapServers(),
-                            "BROKER://" + containerInfo.getConfig().getHostName() + ":9093",
+                            "BROKER://127.0.0.1:9093",
                             IN_NETWORK_LISTENER + "://" + KAFKA_ALIAS + ":" + IN_NETWORK_PORT);
                     String command = "#!/bin/bash\n"
                             + "export KAFKA_ADVERTISED_LISTENERS=" + advertised + "\n"
