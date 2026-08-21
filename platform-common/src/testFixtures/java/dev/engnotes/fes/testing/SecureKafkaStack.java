@@ -1,5 +1,10 @@
 package dev.engnotes.fes.testing;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,7 +30,9 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -83,6 +90,10 @@ public final class SecureKafkaStack {
     private static final String KAFKA_ALIAS = "kafka";
     private static final int IN_NETWORK_PORT = 19092;
     private static final String IN_NETWORK_LISTENER = "INTERNAL";
+
+    private static final String SCHEMA_REGISTRY_IMAGE = "confluentinc/cp-schema-registry:7.9.1";
+    private static final String SCHEMA_REGISTRY_ALIAS = "schema-registry";
+    private static final int SCHEMA_REGISTRY_PORT = 8081;
 
     /** The starter script path Testcontainers' KafkaContainer writes. Private upstream. */
     private static final String STARTER_SCRIPT = "/tmp/testcontainers_start.sh";
@@ -173,6 +184,90 @@ public final class SecureKafkaStack {
     /** Bootstrap address for a client on {@link #network()}, not for one on the host. */
     public static String inNetworkBootstrapServers() {
         return KAFKA_ALIAS + ":" + IN_NETWORK_PORT;
+    }
+
+    /**
+     * Started on first use rather than with the broker. Only the four Avro producers need a
+     * registry, and the five authorization tests and audit-service should not pay for one.
+     */
+    private static final class SchemaRegistry {
+
+        private static final GenericContainer<?> CONTAINER =
+                new GenericContainer<>(DockerImageName.parse(SCHEMA_REGISTRY_IMAGE))
+                        .withNetwork(NETWORK)
+                        .withNetworkAliases(SCHEMA_REGISTRY_ALIAS)
+                        .withExposedPorts(SCHEMA_REGISTRY_PORT)
+                        .withEnv("SCHEMA_REGISTRY_HOST_NAME", SCHEMA_REGISTRY_ALIAS)
+                        .withEnv("SCHEMA_REGISTRY_LISTENERS",
+                                "http://0.0.0.0:" + SCHEMA_REGISTRY_PORT)
+                        .withEnv("SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS",
+                                "SASL_PLAINTEXT://" + inNetworkBootstrapServers())
+                        .withEnv("SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL", "SASL_PLAINTEXT")
+                        .withEnv("SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM", "PLAIN")
+                        // The registry runs as the super user because its _schemas topic is
+                        // infrastructure, not a workload's data. No service principal holds
+                        // CREATE, and granting one would widen a policy this repository tests.
+                        .withEnv("SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG",
+                                loginModule(SUPER_USER, secretFor(SUPER_USER)))
+                        .waitingFor(Wait.forHttp("/subjects").forPort(SCHEMA_REGISTRY_PORT));
+
+        static {
+            start();
+            CONTAINER.start();
+        }
+    }
+
+    public static String schemaRegistryUrl() {
+        return "http://%s:%d".formatted(
+                SchemaRegistry.CONTAINER.getHost(),
+                SchemaRegistry.CONTAINER.getMappedPort(SCHEMA_REGISTRY_PORT));
+    }
+
+    /** Registry address for a client on {@link #network()}. */
+    public static String inNetworkSchemaRegistryUrl() {
+        return "http://%s:%d".formatted(SCHEMA_REGISTRY_ALIAS, SCHEMA_REGISTRY_PORT);
+    }
+
+    /**
+     * Registers a schema under a subject, the way a deployment would.
+     *
+     * <p>Done here rather than by letting the container register its own, because every service
+     * ships {@code auto.register.schemas: false} and overriding that in the test would mean the
+     * artifact under test is no longer the artifact that ships.
+     */
+    public static void registerSubject(String subject, String avroSchema) {
+        String body = "{\"schema\": %s}".formatted(quoteJson(avroSchema));
+        try {
+            HttpResponse<String> response = HttpClient.newHttpClient().send(
+                    HttpRequest.newBuilder()
+                            .uri(URI.create(schemaRegistryUrl() + "/subjects/" + subject + "/versions"))
+                            .header("Content-Type", "application/vnd.schemaregistry.v1+json")
+                            .POST(HttpRequest.BodyPublishers.ofString(body))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                throw new IllegalStateException("Could not register " + subject + ": "
+                        + response.statusCode() + " " + response.body());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted registering " + subject, e);
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not register " + subject, e);
+        }
+    }
+
+    private static String quoteJson(String value) {
+        StringBuilder quoted = new StringBuilder("\"");
+        value.chars().forEach(c -> {
+            switch (c) {
+                case '"' -> quoted.append("\\\"");
+                case '\\' -> quoted.append("\\\\");
+                case '\n' -> quoted.append("\\n");
+                default -> quoted.append((char) c);
+            }
+        });
+        return quoted.append('"').toString();
     }
 
     /** A client-properties file authenticating as the super user, for CLI containers. */
