@@ -12,7 +12,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
 /**
- * How a service authenticates to Kafka, applied to every client the service creates (ADR-031).
+ * How a service authenticates to Kafka, applied to the producer and consumer factories Spring Boot
+ * autoconfigures (ADR-031). A Kafka Streams service will need the equivalent applied to its
+ * {@code StreamsBuilderFactoryBean} once one exists; nothing here reaches it yet.
  *
  * <p><strong>The username is derived, never configured.</strong> It is
  * {@code spring.application.name}, and no service module holds a property that names an identity.
