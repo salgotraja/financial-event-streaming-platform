@@ -15,6 +15,12 @@ spring:
 fes:
   trade-producer:
     topic: trades.raw
+    # FR-01.1 load simulation mode. Off by default: this is a mode, not boot behaviour. TradeEvent
+    # carries no field marking a record synthetic, and audit-service archives trades.raw as
+    # evidence, so switching this on in an environment nobody intended puts synthetic trades into
+    # the audit record indistinguishably from real ones.
+    generation:
+      enabled: ${FES_TRADE_PRODUCER_GENERATION_ENABLED:false}
 
 management:
   endpoints:

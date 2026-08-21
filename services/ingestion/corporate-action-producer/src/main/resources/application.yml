@@ -15,6 +15,9 @@ spring:
 fes:
   corporate-action-producer:
     topic: corporate-actions
+    # FR-01.3 startup announcement. Off by default so a restart does not re-announce a fixed set.
+    seed:
+      enabled: ${FES_CORPORATE_ACTION_PRODUCER_SEED_ENABLED:false}
 
 management:
   endpoints:
