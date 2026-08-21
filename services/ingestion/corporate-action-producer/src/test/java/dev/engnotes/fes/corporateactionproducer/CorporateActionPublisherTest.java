@@ -39,8 +39,9 @@ class CorporateActionPublisherTest {
 
     @BeforeEach
     void setUp() {
-        publisher = new CorporateActionPublisher(
-                kafkaTemplate, new CorporateActionProducerProperties("corporate-actions"));
+        publisher = new CorporateActionPublisher(kafkaTemplate,
+                new CorporateActionProducerProperties("corporate-actions",
+                        CorporateActionProducerProperties.Seed.defaults()));
     }
 
     @Test
