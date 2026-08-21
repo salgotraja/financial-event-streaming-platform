@@ -77,3 +77,18 @@ tasks.register('renderKafkaAcls', JavaExec) {
         }
     }
 }
+
+// ServiceIdentityNamesTest reads settings.gradle and every service's application.yml and
+// kafka-acls.yml directly, none of which Gradle would otherwise treat as an input of this task.
+// Without this, a name-chain break introduced in a service module leaves :platform-common:test
+// UP-TO-DATE, so the check silently does not run (ADR-031).
+tasks.named('test', Test) {
+    inputs.file(rootProject.file('settings.gradle'))
+            .withPropertyName('settingsGradle')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    inputs.files(fileTree(rootDir) {
+        include 'services/*/*/src/main/resources/application.yml'
+        include 'services/*/*/src/main/resources/security/kafka-acls.yml'
+    }).withPropertyName('serviceIdentityFiles')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+}
