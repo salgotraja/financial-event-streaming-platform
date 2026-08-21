@@ -124,6 +124,13 @@ public abstract class ServiceIdentityContract {
 
         String deniedOutput = runAndCapture(authorizationErrorMarker(), DENIAL_TIMEOUT);
 
+        // The wait has already matched this. Asserting it again makes the capture's completeness a
+        // tested property rather than an assumption, and the three doesNotContain assertions below
+        // are only as strong as the log they run over.
+        assertThat(deniedOutput)
+                .as("the captured log must hold the line the wait matched, or every absence "
+                        + "asserted over it is vacuous")
+                .contains(authorizationErrorMarker());
         assertThat(deniedOutput)
                 .as("a mis-wired secret fails the handshake and never reaches an authorization "
                         + "check, which would make this whole test pass for the wrong reason")
@@ -138,6 +145,10 @@ public abstract class ServiceIdentityContract {
         String grantedOutput = runAndCapture(successMarker(), SUCCESS_TIMEOUT);
 
         assertThat(grantedOutput)
+                .as("the captured log must hold the line the wait matched, or every absence "
+                        + "asserted over it is vacuous")
+                .contains(successMarker());
+        assertThat(grantedOutput)
                 .as("the only grant applied names User:%s, so work that now succeeds could only "
                         + "have been done by that principal", principal())
                 .doesNotContain(authorizationErrorMarker());
@@ -151,6 +162,8 @@ public abstract class ServiceIdentityContract {
         }
 
         Map<String, String> environment = environment();
+        // Only for the failure path. The wait strategy follows its own log stream, so this consumer
+        // is not synchronised with it and may still be behind when start() returns.
         ToStringConsumer output = new ToStringConsumer();
 
         try (GenericContainer<?> service =
@@ -163,8 +176,13 @@ public abstract class ServiceIdentityContract {
                              .waitingFor(Wait.forLogMessage(".*" + marker + ".*", 1)
                                      .withStartupTimeout(timeout))) {
             service.start();
-            return output.toUtf8String();
+            // A synchronous fetch of the whole log, not the followed stream. Every assertion the
+            // caller makes is an absence, and an absence read from a log that lags the wait would
+            // pass without being true.
+            return service.getLogs();
         } catch (RuntimeException e) {
+            // The container is closed by now, so getLogs() is no longer available and the consumer
+            // is the only record of what happened. Lagging or not, it is what there is to report.
             throw new AssertionError("The service never logged \"" + marker + "\" within "
                     + timeout + ". A timeout here is a failure, not a pass. Output was:\n"
                     + output.toUtf8String(), e);
