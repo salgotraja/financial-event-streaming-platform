@@ -98,82 +98,96 @@ public final class SecureKafkaStack {
     /** The starter script path Testcontainers' KafkaContainer writes. Private upstream. */
     private static final String STARTER_SCRIPT = "/tmp/testcontainers_start.sh";
 
+    // Network.newNetwork() defers the actual docker network create to the first getId() call
+    // (Network$NetworkImpl.getId), so this stays eager without starting Docker.
     private static final Network NETWORK = Network.newNetwork();
-
-    private static final KafkaContainer KAFKA =
-            new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE)) {
-
-                /**
-                 * Configured by hand rather than with {@code withListener}, which names the
-                 * listener {@code TC-0} and maps it to PLAINTEXT unconditionally. An
-                 * unauthenticated in-network listener would let a client authenticate as
-                 * ANONYMOUS, a super user here, and every denial assertion in the repository
-                 * would pass without being true.
-                 */
-                @Override
-                protected void configure() {
-                    super.configure();
-                    // BROKER and CONTROLLER bind to loopback only: a single-node fixture never
-                    // needs either reachable from a sibling container, and 0.0.0.0 here would let
-                    // any container on NETWORK dial in as ANONYMOUS, a super user on this broker.
-                    getEnvMap().put("KAFKA_LISTENERS",
-                            "PLAINTEXT://0.0.0.0:9092,BROKER://127.0.0.1:9093,"
-                                    + "CONTROLLER://127.0.0.1:9094,"
-                                    + IN_NETWORK_LISTENER + "://0.0.0.0:" + IN_NETWORK_PORT);
-                    getEnvMap().put("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP",
-                            "BROKER:PLAINTEXT,PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT,"
-                                    + IN_NETWORK_LISTENER + ":SASL_PLAINTEXT");
-                }
-
-                /**
-                 * Deliberately does not call super. The superclass writes the same starter script
-                 * without the in-network advertised entry, and a listener Kafka does not advertise
-                 * is one an in-network client is redirected away from.
-                 */
-                @Override
-                protected void containerIsStarting(InspectContainerResponse containerInfo) {
-                    // BROKER's advertised entry matches its loopback bind: the broker only ever
-                    // connects to itself over this listener, so no other address is needed.
-                    String advertised = String.join(",",
-                            "PLAINTEXT://" + getBootstrapServers(),
-                            "BROKER://127.0.0.1:9093",
-                            IN_NETWORK_LISTENER + "://" + KAFKA_ALIAS + ":" + IN_NETWORK_PORT);
-                    String command = "#!/bin/bash\n"
-                            + "export KAFKA_ADVERTISED_LISTENERS=" + advertised + "\n"
-                            + "/etc/kafka/docker/run \n";
-                    copyFileToContainer(Transferable.of(command, 0777), STARTER_SCRIPT);
-                }
-            }
-                    .withNetwork(NETWORK)
-                    .withNetworkAliases(KAFKA_ALIAS)
-                    .withEnv("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP",
-                            "BROKER:PLAINTEXT,PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT")
-                    .withEnv("KAFKA_SASL_ENABLED_MECHANISMS", "PLAIN")
-                    .withEnv("KAFKA_LISTENER_NAME_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG", brokerJaas())
-                    .withEnv("KAFKA_LISTENER_NAME_" + IN_NETWORK_LISTENER
-                            + "_PLAIN_SASL_JAAS_CONFIG", brokerJaas())
-                    .withEnv("KAFKA_AUTHORIZER_CLASS_NAME",
-                            "org.apache.kafka.metadata.authorizer.StandardAuthorizer")
-                    // ANONYMOUS covers the inter-broker PLAINTEXT listener only. Client tests always
-                    // connect through an authenticated listener, and the zero-grant test proves an
-                    // unauthorised client is denied rather than merely unable to connect.
-                    .withEnv("KAFKA_SUPER_USERS", "User:" + SUPER_USER + ";User:ANONYMOUS")
-                    .withEnv("KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND", "false");
-
-    static {
-        KAFKA.start();
-    }
 
     private SecureKafkaStack() {
     }
 
     /** Forces class initialisation, and therefore container startup. */
     public static void start() {
-        // Static initialiser does the work.
+        Broker.start();
+    }
+
+    /**
+     * Holds the broker container. Only a class that calls {@link #start()}, or another accessor
+     * on this holder, forces this nested class to initialise and therefore starts Docker.
+     * {@code ServiceIdentityNamesTest} calls {@link SecureKafkaStack#principals()} only, which
+     * never touches this class, so the plain {@code test} task stays container-free.
+     */
+    private static final class Broker {
+
+        private static final KafkaContainer KAFKA =
+                new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE)) {
+
+                    /**
+                     * Configured by hand rather than with {@code withListener}, which names the
+                     * listener {@code TC-0} and maps it to PLAINTEXT unconditionally. An
+                     * unauthenticated in-network listener would let a client authenticate as
+                     * ANONYMOUS, a super user here, and every denial assertion in the repository
+                     * would pass without being true.
+                     */
+                    @Override
+                    protected void configure() {
+                        super.configure();
+                        // BROKER and CONTROLLER bind to loopback only: a single-node fixture never
+                        // needs either reachable from a sibling container, and 0.0.0.0 here would let
+                        // any container on NETWORK dial in as ANONYMOUS, a super user on this broker.
+                        getEnvMap().put("KAFKA_LISTENERS",
+                                "PLAINTEXT://0.0.0.0:9092,BROKER://127.0.0.1:9093,"
+                                        + "CONTROLLER://127.0.0.1:9094,"
+                                        + IN_NETWORK_LISTENER + "://0.0.0.0:" + IN_NETWORK_PORT);
+                        getEnvMap().put("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP",
+                                "BROKER:PLAINTEXT,PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT,"
+                                        + IN_NETWORK_LISTENER + ":SASL_PLAINTEXT");
+                    }
+
+                    /**
+                     * Deliberately does not call super. The superclass writes the same starter script
+                     * without the in-network advertised entry, and a listener Kafka does not advertise
+                     * is one an in-network client is redirected away from.
+                     */
+                    @Override
+                    protected void containerIsStarting(InspectContainerResponse containerInfo) {
+                        // BROKER's advertised entry matches its loopback bind: the broker only ever
+                        // connects to itself over this listener, so no other address is needed.
+                        String advertised = String.join(",",
+                                "PLAINTEXT://" + getBootstrapServers(),
+                                "BROKER://127.0.0.1:9093",
+                                IN_NETWORK_LISTENER + "://" + KAFKA_ALIAS + ":" + IN_NETWORK_PORT);
+                        String command = "#!/bin/bash\n"
+                                + "export KAFKA_ADVERTISED_LISTENERS=" + advertised + "\n"
+                                + "/etc/kafka/docker/run \n";
+                        copyFileToContainer(Transferable.of(command, 0777), STARTER_SCRIPT);
+                    }
+                }
+                        .withNetwork(NETWORK)
+                        .withNetworkAliases(KAFKA_ALIAS)
+                        .withEnv("KAFKA_SASL_ENABLED_MECHANISMS", "PLAIN")
+                        .withEnv("KAFKA_LISTENER_NAME_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG", brokerJaas())
+                        .withEnv("KAFKA_LISTENER_NAME_" + IN_NETWORK_LISTENER
+                                + "_PLAIN_SASL_JAAS_CONFIG", brokerJaas())
+                        .withEnv("KAFKA_AUTHORIZER_CLASS_NAME",
+                                "org.apache.kafka.metadata.authorizer.StandardAuthorizer")
+                        // ANONYMOUS covers the inter-broker PLAINTEXT listener only. Client tests always
+                        // connect through an authenticated listener, and the zero-grant test proves an
+                        // unauthorised client is denied rather than merely unable to connect.
+                        .withEnv("KAFKA_SUPER_USERS", "User:" + SUPER_USER + ";User:ANONYMOUS")
+                        .withEnv("KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND", "false");
+
+        static {
+            KAFKA.start();
+        }
+
+        /** Forces class initialisation, and therefore container startup. */
+        static void start() {
+            // Static initialiser does the work.
+        }
     }
 
     public static String bootstrapServers() {
-        return KAFKA.getBootstrapServers();
+        return Broker.KAFKA.getBootstrapServers();
     }
 
     /** The network the broker is on, so a test can start a service container beside it. */
@@ -212,6 +226,8 @@ public final class SecureKafkaStack {
                         .waitingFor(Wait.forHttp("/subjects").forPort(SCHEMA_REGISTRY_PORT));
 
         static {
+            // Not redundant: forces the broker up first, so the registry's Kafka-backed store has
+            // something to connect to when it starts.
             start();
             CONTAINER.start();
         }
