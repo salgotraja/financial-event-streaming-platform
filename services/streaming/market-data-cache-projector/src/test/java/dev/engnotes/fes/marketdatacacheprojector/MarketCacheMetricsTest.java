@@ -104,9 +104,16 @@ class MarketCacheMetricsTest {
     @Test
     @DisplayName("should count a tick the offset guard rejected")
     void should_count_a_tick_the_offset_guard_rejected() {
-        metrics.record("RELIANCE", 8_000L, new ProjectionResult(ProjectionOutcome.DUPLICATE, false, 4));
+        // APPLIED with windowApplied false: the tick hash accepted the tick but the window's own
+        // offset guard rejected it. A DUPLICATE outcome also increments the stale-writes counter,
+        // which would not show the two counters are tracked apart.
+        metrics.record("RELIANCE", 8_000L, new ProjectionResult(ProjectionOutcome.APPLIED, false, 4));
 
         assertThat(registry.get("market.cache.window.skipped").counter().count()).isEqualTo(1.0);
+        assertThat(registry.get("market.cache.stale.writes").tag("reason", "duplicate")
+                .counter().count()).isEqualTo(0.0);
+        assertThat(registry.get("market.cache.stale.writes").tag("reason", "older")
+                .counter().count()).isEqualTo(0.0);
     }
 
     @Test

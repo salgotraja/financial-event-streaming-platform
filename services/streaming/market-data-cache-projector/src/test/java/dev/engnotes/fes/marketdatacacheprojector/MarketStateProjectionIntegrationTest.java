@@ -16,6 +16,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The two guards, which are deliberately different (ADR-033).
@@ -178,10 +179,56 @@ class MarketStateProjectionIntegrationTest {
     @Test
     @DisplayName("should write both keys in one call so they cannot disagree")
     void should_write_both_keys_in_one_call_so_they_cannot_disagree() {
-        projection.project(tick(BASE_MILLIS, 100.0, 3L), 1L);
+        projection.project(tick(BASE_MILLIS, 100.0, 3L), 42L);
 
-        assertThat(tickState()).isNotEmpty();
-        assertThat(windowState()).isNotEmpty();
+        assertThat(tickState())
+                .as("the tick hash must reflect the tick just projected")
+                .containsEntry("eventTimestamp", Long.toString(BASE_MILLIS));
+        assertThat(windowState())
+                .as("the window must reflect the same call, by the offset it was given")
+                .containsEntry("lastOffset", "42");
+    }
+
+    @Test
+    @DisplayName("should reject a tick carrying a non-finite price and leave redis untouched")
+    void should_reject_a_tick_carrying_a_non_finite_price_and_leave_redis_untouched() {
+        MarketDataTickEvent nanTick = MarketDataTickEvent.newBuilder()
+                .setTicker(TICKER)
+                .setBidPrice(Double.NaN)
+                .setAskPrice(102.0)
+                .setLastTradedPrice(101.5)
+                .setVolume(10L)
+                .setEventTimestamp(Instant.ofEpochMilli(BASE_MILLIS))
+                .setProducedAt(Instant.ofEpochMilli(BASE_MILLIS + 5))
+                .setCorrelationId("corr-nan")
+                .build();
+
+        assertThatThrownBy(() -> projection.project(nanTick, 1L))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(tickState()).isEmpty();
+        assertThat(windowState()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("should reject a tick carrying a negative volume")
+    void should_reject_a_tick_carrying_a_negative_volume() {
+        assertThatThrownBy(() -> projection.project(tick(BASE_MILLIS, 100.0, -1L), 1L))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(tickState()).isEmpty();
+        assertThat(windowState()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("should reject a tick whose event timestamp is more than an hour ahead of the clock")
+    void should_reject_a_tick_whose_event_timestamp_is_more_than_an_hour_ahead_of_the_clock() {
+        long skewedMillis = Instant.now().plusSeconds(4_000).toEpochMilli();
+
+        assertThatThrownBy(() -> projection.project(tick(skewedMillis, 100.0, 3L), 1L))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(windowState()).isEmpty();
     }
 
     private Map<Object, Object> tickState() {

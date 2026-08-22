@@ -199,12 +199,15 @@ class MarketDataTickConsumerIntegrationTest {
         publish(tick("REPLAY", 5_000L, 100.0));
         publish(tick("REPLAY", 15_000L, 110.0));
 
+        // Buckets 0 and 10, from eventTimestamp 5_000 and 15_000 with a 10s bucket. Waiting for both
+        // fields by name, rather than hasSizeGreaterThan(1), stops the snapshot below being captured
+        // after only the first tick has landed.
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
                 assertThat(redis.opsForHash().entries(MarketStateProjection.windowKey("REPLAY")))
-                        .hasSizeGreaterThan(1));
+                        .containsKeys("0:pv", "0:v", "10:pv", "10:v"));
 
-        Map<Object, Object> first = redis.opsForHash()
-                .entries(MarketStateProjection.windowKey("REPLAY"));
+        Map<Object, Object> first = withoutOffset(redis.opsForHash()
+                .entries(MarketStateProjection.windowKey("REPLAY")));
 
         redis.delete(MarketStateProjection.windowKey("REPLAY"));
         redis.delete(MarketStateProjection.tickKey("REPLAY"));
@@ -213,8 +216,16 @@ class MarketDataTickConsumerIntegrationTest {
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
                 assertThat(redis.opsForHash().entries(MarketStateProjection.windowKey("REPLAY")))
-                        .as("buckets keyed by event time reproduce exactly; a wall clock would not")
-                        .containsAllEntriesOf(withoutOffset(first)));
+                        .containsKeys("0:pv", "0:v", "10:pv", "10:v"));
+
+        Map<Object, Object> second = withoutOffset(redis.opsForHash()
+                .entries(MarketStateProjection.windowKey("REPLAY")));
+
+        assertThat(second)
+                .as("replaying the same ticks end to end reproduces identical window state, offset "
+                        + "aside; both runs land in the same wall-clock second, so this proves "
+                        + "reproducibility rather than event-time bucketing against a wall clock")
+                .isEqualTo(first);
     }
 
     private static Map<Object, Object> withoutOffset(Map<Object, Object> window) {

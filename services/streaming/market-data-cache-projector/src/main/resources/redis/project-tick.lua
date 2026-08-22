@@ -8,10 +8,14 @@
 -- offset instead, because two distinct ticks can share a millisecond and the timestamp guard would
 -- drop the second one's volume as though it were a duplicate, when that volume was really traded.
 --
--- The offset guard has two limits. It relies on every tick for a ticker landing on one partition,
+-- The offset guard has three limits. It relies on every tick for a ticker landing on one partition,
 -- which holds because the producer keys on ticker; a change in the topic's partition count breaks
--- the comparability of stored offsets. And a deliberate rebuild must delete the window key first,
--- or every replayed record is skipped as already applied.
+-- the comparability of stored offsets. A deliberate rebuild must delete both the window key and the
+-- tick key, or the tick key rejects every replayed record as older while the window key skips every
+-- replayed record as already applied. And it defends against consumer redelivery only: a
+-- producer-side republish at a new offset, which a DLQ replay would produce, is indistinguishable
+-- from a genuinely distinct tick and double-counts its volume. Exact dedup would need per-record
+-- identity and unbounded state, which this design deliberately avoids.
 --
 -- Buckets are assigned and pruned by the incoming tick's own eventTimestamp, never by a wall clock,
 -- so replaying the topic rebuilds identical state.
@@ -67,7 +71,7 @@ if (not lastOffset) or offset > tonumber(lastOffset) then
     local cutoff = bucket - windowSeconds
     local fields = redis.call('HKEYS', windowKey)
     for i = 1, #fields do
-        local second = string.match(fields[i], '^(%d+):')
+        local second = string.match(fields[i], '^(%-?%d+):')
         if second and tonumber(second) < cutoff then
             redis.call('HDEL', windowKey, fields[i])
         end
