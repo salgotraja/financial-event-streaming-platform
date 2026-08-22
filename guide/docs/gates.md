@@ -169,6 +169,11 @@ Five of those seven are exercised today. Dependency failure joined them with
 [the market cache projector](projector.md), which pauses its listener on an unreachable Redis rather
 than dead-lettering records that were never bad. The other two belong to services that do not exist.
 
+Negative authorization now reaches past Kafka: the projector's Redis ACL has its own test, which
+renders the committed policy template and asserts that a command the workload holds is still refused
+outside its key space. A denial proved with a command the identity never had would have proved
+nothing about the key space at all.
+
 That row has a lesson attached. The handling is only reachable because the module sets an explicit
 Redis command timeout: without one the client blocks on a frozen connection, raises nothing, and the
 outage branch is dead code while the consumer thread stops polling anyway. A test asserting "no dead

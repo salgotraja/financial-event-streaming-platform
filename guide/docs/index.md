@@ -39,7 +39,7 @@ trade execution and no regulatory reporting.
 | Shared consumer offset profile and DLQ publisher | Built |
 | Four ingestion producers | Built |
 | Audit archival consumer | Built, writing to a logging stand-in rather than to S3 |
-| Market cache projector, ticks into Redis | Built, and nothing reads the cache yet because enrichment does not exist |
+| Market cache projector, ticks into Redis with a 5-minute VWAP window | Built, and nothing reads the cache yet because enrichment does not exist |
 | Per-service Kafka policy, authenticated broker, negative authorization tests | Built |
 | Service identity binding, each service proven to authenticate as its own principal | Built, against a local broker with ACLs, not against MSK IAM |
 | Service container images, one per module, from buildpacks | Built |

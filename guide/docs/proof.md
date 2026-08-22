@@ -135,6 +135,11 @@ order.
 | Replaying the same ticks rebuilds identical window state | `MarketDataTickConsumer` | `should_rebuild_identical_window_state_when_the_same_ticks_are_consumed_again` |
 | The window bucket gauge survives garbage collection | `MarketCacheMetrics` | `should_keep_reporting_a_bucket_count_after_the_recording_call_has_returned` |
 | A tick the offset guard rejected is counted apart | `MarketCacheMetrics` | `should_count_a_tick_the_offset_guard_rejected` |
+| A tick carrying a non-finite price is rejected and Redis is left untouched | `MarketStateProjection` | `should_reject_a_tick_carrying_a_non_finite_price_and_leave_redis_untouched` |
+| A negative volume is rejected before the write | `MarketStateProjection` | `should_reject_a_tick_carrying_a_negative_volume` |
+| A wildly future timestamp cannot prune the window | `MarketStateProjection` | `should_reject_a_tick_whose_event_timestamp_is_more_than_an_hour_ahead_of_the_clock` |
+| A telemetry failure does not quarantine a record already projected | `MarketDataTickConsumer` | `should_acknowledge_the_record_when_metrics_recording_throws` |
+| The projector's Redis grant runs the projection script and nothing wider | `users.acl.template` | `should_run_the_projection_script_against_a_market_key_as_the_granted_user`, `should_deny_a_granted_command_outside_the_market_key_space`, `should_refuse_an_unauthenticated_connection` |
 | The projector cannot read the trade stream or write the topic it projects | `security/kafka-acls.yml` | `should_deny_reading_the_trade_stream`, `should_deny_writing_the_topic_it_projects`, `should_deny_joining_a_consumer_group_other_than_its_own` |
 
 ## Structure
