@@ -1,5 +1,7 @@
 package dev.engnotes.fes.marketdatacacheprojector;
 
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
@@ -15,10 +17,10 @@ import org.springframework.data.redis.core.script.RedisScript;
 public class RedisProjectionConfiguration {
 
     @Bean
-    RedisScript<Long> projectTickScript() {
-        DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+    RedisScript<List> projectTickScript() {
+        DefaultRedisScript<List> script = new DefaultRedisScript<>();
         script.setLocation(new ClassPathResource("redis/project-tick.lua"));
-        script.setResultType(Long.class);
+        script.setResultType(List.class);
         return script;
     }
 

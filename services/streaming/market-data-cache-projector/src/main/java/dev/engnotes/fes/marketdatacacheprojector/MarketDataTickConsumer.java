@@ -36,7 +36,7 @@ public class MarketDataTickConsumer {
                         Acknowledgment acknowledgment) {
 
         MarketDataTickEvent tick = record.value();
-        ProjectionOutcome outcome = projection.project(tick);
+        ProjectionOutcome outcome = projection.project(tick, record.offset()).outcome();
         metrics.record(tick.getTicker().toString(), tick.getEventTimestamp().toEpochMilli(), outcome);
 
         // DEBUG rather than INFO: at the platform's target rate an INFO line per record is the

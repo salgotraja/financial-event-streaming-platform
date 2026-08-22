@@ -109,7 +109,7 @@ class MarketDataTickConsumerIntegrationTest {
         publish(tick("PROJECT-OK", 5_000L, 101.5));
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "PROJECT-OK"))
+                assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("PROJECT-OK")))
                         .containsEntry("lastTradedPrice", "101.5"));
     }
 
@@ -126,10 +126,10 @@ class MarketDataTickConsumerIntegrationTest {
         publish(tick("IDEMPOTENT-SENTINEL", 5_000L, 1.0));
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "IDEMPOTENT-SENTINEL"))
+                assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("IDEMPOTENT-SENTINEL")))
                         .containsEntry("lastTradedPrice", "1.0"));
 
-        assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "IDEMPOTENT"))
+        assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("IDEMPOTENT")))
                 .as("the second IDEMPOTENT record must have zero effect, having already been "
                         + "applied once with this timestamp")
                 .containsEntry("lastTradedPrice", "101.5");
@@ -152,7 +152,7 @@ class MarketDataTickConsumerIntegrationTest {
                 .isEqualTo(POISON);
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "AFTER-POISON"))
+                assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("AFTER-POISON")))
                         .as("the offset must advance past the poison record")
                         .containsEntry("lastTradedPrice", "202.5"));
     }
@@ -187,7 +187,7 @@ class MarketDataTickConsumerIntegrationTest {
         }
 
         Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "OUTAGE"))
+                assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("OUTAGE")))
                         .as("the unlimited backoff keeps retrying the uncommitted record, and it is "
                                 + "redelivered successfully once redis answers again")
                         .containsEntry("lastTradedPrice", "303.5"));
