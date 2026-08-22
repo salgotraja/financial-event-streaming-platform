@@ -79,7 +79,11 @@ The tick hash and the window are guarded differently, which looks like an incons
 The tick hash keeps the compare-and-set on `eventTimestamp`. The window is guarded by the Kafka
 offset: increments apply only when the record's offset exceeds the stored `lastOffset`. Ticks are
 keyed on ticker, so every tick for a ticker is on one partition where offsets strictly increase, and a
-redelivered record replays an offset already seen and is skipped exactly.
+record the consumer redelivers, whether from a rebalance or a rewind, replays an offset already seen
+and is skipped exactly. That guarantee covers consumer redelivery only: a producer-side republish at a
+new offset, which a DLQ replay would produce, is indistinguishable from a genuinely distinct tick and
+double-counts its volume. Exact dedup would need per-record identity and unbounded state, which this
+design deliberately avoids.
 
 They cannot be merged. Two distinct ticks can share a millisecond at a high tick rate. The timestamp
 guard calls the second one a duplicate, which is right for a latest-price entry and wrong for a volume
@@ -87,37 +91,39 @@ sum, because that volume was really traded and must count.
 `should_count_both_ticks_when_two_distinct_ticks_share_a_millisecond` is the test that pins this: the
 tick is a `DUPLICATE` and its volume still lands in the window.
 
-The offset guard has two limits worth knowing before you rely on it. A change in the topic's partition
-count breaks the comparability of stored offsets, because offsets are only monotonic within a
-partition. And a deliberate rebuild has to delete the window key first, or every replayed record is
-skipped as already applied.
+The offset guard has three limits worth knowing before you rely on it. A change in the topic's
+partition count breaks the comparability of stored offsets, because offsets are only monotonic within
+a partition. A deliberate rebuild has to delete both the window key and the tick key, or the tick key
+rejects every replayed record as older while the window key skips every replayed record as already
+applied. And, as above, it defends against consumer redelivery only, not a producer-side republish.
 
 **The window expires and the tick hash does not.** A window holding nothing in the last five minutes
-is genuinely empty, so an expiry there says something true. A latest-price entry that expired would
-turn a stalled feed into a cache miss, which reads as a cold cache rather than the fault it is. The
-asymmetry is the point, not an oversight.
+is genuinely empty, so an expiry there says something true, but only for the idle case: a window that
+expired mid-repopulation after the 600s TTL is partial rather than empty, and a reader cannot tell the
+two apart from the hash alone. A latest-price entry that expired would turn a stalled feed into a cache
+miss, which reads as a cold cache rather than the fault it is. The asymmetry is the point, not an
+oversight, but it is not a clean guarantee either.
 
 ## The write only ever moves forward
 
 `src/main/resources/redis/project-tick.lua` is the whole write path:
 
 ```lua
-local stored = redis.call('HGET', KEYS[1], 'eventTimestamp')
-local incoming = tonumber(ARGV[1])
-
+local outcome = 1
+local stored = redis.call('HGET', tickKey, 'eventTimestamp')
 if stored then
     local current = tonumber(stored)
-    if incoming < current then
-        return -1
-    end
-    if incoming == current then
-        return 0
+    if eventTimestamp < current then
+        outcome = -1
+    elseif eventTimestamp == current then
+        outcome = 0
     end
 end
 ```
 
-Strictly newer applies, equal is treated as already applied, older is discarded. `MarketStateProjection`
-maps the three return codes to `ProjectionOutcome.APPLIED`, `DUPLICATE` and `OLDER`.
+Strictly newer applies, equal is treated as already applied, older is discarded. The script returns
+`outcome` as the first element of a three-element table, and `ProjectionOutcome` and `ProjectionResult`
+map it to `APPLIED`, `DUPLICATE` and `OLDER`.
 
 This is the part worth understanding, because a plain `HSET` looks equivalent and is not.
 `MarketDataTickPublisher` keys ticks on the ticker precisely so Kafka orders them within a partition,
@@ -131,8 +137,9 @@ Two details follow from that:
 **The comparison happens inside the script, not in Java.** A client-side read-then-write races a
 second consumer of the same partition during a rebalance, which is the exact window this closes.
 
-**Entries never expire.** A TTL would turn a stalled price feed into a cache miss, and a miss reads as
-a cold cache rather than as the fault it is. Staleness stays visible as age instead.
+**The tick entry never expires.** A TTL would turn a stalled price feed into a cache miss, and a miss
+reads as a cold cache rather than as the fault it is. Staleness stays visible as age instead. This is
+no longer true of the window key, which does carry a TTL; see the asymmetry above.
 
 `should_skip_a_tick_older_than_the_stored_one` and `should_skip_a_tick_whose_timestamp_equals_the_stored_one`
 in `MarketStateProjectionIntegrationTest` are the tests that hold this. Both assert the stored price
