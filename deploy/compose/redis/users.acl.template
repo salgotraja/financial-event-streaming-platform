@@ -9,9 +9,12 @@
 # from configuration, so what that grant permits is reviewed with the code. Every command below is
 # one the projector itself calls; none is added for the healthcheck, which instead reuses +eval.
 #
+# The grant holds +hkeys and not +hgetall: pruning the window needs the field names only, so the
+# narrower grant is correct and the script never reads bucket values it does not use.
+#
 # This file is a template. scripts/generate-dev-security-material.sh renders it into
 # deploy/compose/redis/users.acl, substituting the password below. The rendered file carries the
 # real password and is never committed; only this template is.
 
 user default off
-user market-data-cache-projector on >__FES_REDIS_PROJECTOR_SECRET__ ~market:* resetchannels +eval +evalsha +hget +hset
+user market-data-cache-projector on >__FES_REDIS_PROJECTOR_SECRET__ ~market:* resetchannels +eval +evalsha +hget +hset +hincrbyfloat +hkeys +hdel +expire
