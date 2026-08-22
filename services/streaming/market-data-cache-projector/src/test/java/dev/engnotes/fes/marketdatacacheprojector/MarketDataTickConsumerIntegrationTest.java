@@ -193,6 +193,37 @@ class MarketDataTickConsumerIntegrationTest {
                         .containsEntry("lastTradedPrice", "303.5"));
     }
 
+    @Test
+    @DisplayName("should rebuild identical window state when the same ticks are consumed again")
+    void should_rebuild_identical_window_state_when_the_same_ticks_are_consumed_again() {
+        publish(tick("REPLAY", 5_000L, 100.0));
+        publish(tick("REPLAY", 15_000L, 110.0));
+
+        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(redis.opsForHash().entries(MarketStateProjection.windowKey("REPLAY")))
+                        .hasSizeGreaterThan(1));
+
+        Map<Object, Object> first = redis.opsForHash()
+                .entries(MarketStateProjection.windowKey("REPLAY"));
+
+        redis.delete(MarketStateProjection.windowKey("REPLAY"));
+        redis.delete(MarketStateProjection.tickKey("REPLAY"));
+        publish(tick("REPLAY", 5_000L, 100.0));
+        publish(tick("REPLAY", 15_000L, 110.0));
+
+        Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(redis.opsForHash().entries(MarketStateProjection.windowKey("REPLAY")))
+                        .as("buckets keyed by event time reproduce exactly; a wall clock would not")
+                        .containsAllEntriesOf(withoutOffset(first)));
+    }
+
+    private static Map<Object, Object> withoutOffset(Map<Object, Object> window) {
+        Map<Object, Object> copy = new java.util.HashMap<>(window);
+        // lastOffset advances with each publish and is not part of the projected state.
+        copy.remove("lastOffset");
+        return copy;
+    }
+
     private MessageListenerContainer listenerContainer() {
         return listenerRegistry.getListenerContainers().iterator().next();
     }

@@ -36,13 +36,14 @@ public class MarketDataTickConsumer {
                         Acknowledgment acknowledgment) {
 
         MarketDataTickEvent tick = record.value();
-        ProjectionOutcome outcome = projection.project(tick, record.offset()).outcome();
-        metrics.record(tick.getTicker().toString(), tick.getEventTimestamp().toEpochMilli(), outcome);
+        ProjectionResult result = projection.project(tick, record.offset());
+        metrics.record(tick.getTicker().toString(), tick.getEventTimestamp().toEpochMilli(), result);
 
         // DEBUG rather than INFO: at the platform's target rate an INFO line per record is the
         // dominant cost of the service. The identity stack test raises this logger instead.
-        log.debug("Projected tick ticker={} outcome={} partition={} offset={}",
-                tick.getTicker(), outcome, record.partition(), record.offset());
+        log.debug("Projected tick ticker={} outcome={} windowApplied={} partition={} offset={}",
+                tick.getTicker(), result.outcome(), result.windowApplied(),
+                record.partition(), record.offset());
 
         acknowledgment.acknowledge();
     }

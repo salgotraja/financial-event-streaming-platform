@@ -28,6 +28,10 @@ import org.springframework.stereotype.Component;
  *
  * <p>Per-ticker cardinality is bounded by the simulator's ticker set. An unbounded ticker universe
  * would make the age gauge a cardinality problem and would need a different instrument.
+ *
+ * <p>{@code market.cache.window.buckets} reports how many buckets the rolling window holds per
+ * ticker, so pruning is observable, and {@code market.cache.window.skipped} counts a tick the
+ * window's offset guard rejected.
  */
 @Component
 public class MarketCacheMetrics {
@@ -36,8 +40,10 @@ public class MarketCacheMetrics {
     private final Clock clock;
     private final AtomicLong projectionLagMillis = new AtomicLong();
     private final ConcurrentHashMap<String, AtomicLong> storedEventTimestamps = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicLong> windowBuckets = new ConcurrentHashMap<>();
     private final Counter duplicateWrites;
     private final Counter olderWrites;
+    private final Counter windowSkipped;
 
     public MarketCacheMetrics(MeterRegistry registry, Clock clock) {
         this.registry = registry;
@@ -50,10 +56,13 @@ public class MarketCacheMetrics {
 
         this.duplicateWrites = staleWrites("duplicate");
         this.olderWrites = staleWrites("older");
+        this.windowSkipped = Counter.builder("market.cache.window.skipped")
+                .description("Ticks the window's offset guard rejected as already applied")
+                .register(registry);
     }
 
-    public void record(String ticker, long eventTimestampMillis, ProjectionOutcome outcome) {
-        switch (outcome) {
+    public void record(String ticker, long eventTimestampMillis, ProjectionResult result) {
+        switch (result.outcome()) {
             case APPLIED -> {
                 projectionLagMillis.set(clock.millis() - eventTimestampMillis);
                 storedTimestampFor(ticker).set(eventTimestampMillis);
@@ -64,6 +73,12 @@ public class MarketCacheMetrics {
             // than it is.
             case OLDER -> olderWrites.increment();
         }
+
+        if (result.windowApplied()) {
+            windowBucketsFor(ticker).set(result.windowBuckets());
+        } else {
+            windowSkipped.increment();
+        }
     }
 
     private AtomicLong storedTimestampFor(String ticker) {
@@ -73,6 +88,17 @@ public class MarketCacheMetrics {
                             stored -> (clock.millis() - stored.get()) / 1000.0)
                     .tag("ticker", name)
                     .description("Age of the stored entry, so a stalled feed is visible")
+                    .register(registry);
+            return holder;
+        });
+    }
+
+    private AtomicLong windowBucketsFor(String ticker) {
+        return windowBuckets.computeIfAbsent(ticker, name -> {
+            AtomicLong holder = new AtomicLong();
+            Gauge.builder("market.cache.window.buckets", holder, AtomicLong::get)
+                    .tag("ticker", name)
+                    .description("Buckets the rolling window holds, so pruning is observable")
                     .register(registry);
             return holder;
         });
