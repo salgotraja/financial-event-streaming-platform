@@ -24,11 +24,78 @@ The consumer group is `market-data-cache-projector`. Group name equals service n
 the same reason it does on the audit consumer: the name is what the `GROUP` grant in the service's
 Kafka policy scopes.
 
-One hash per ticker, at `market:tick:{ticker}`, holding `eventTimestamp`, `bidPrice`, `askPrice`,
-`lastTradedPrice`, `volume`, `producedAt` and `correlationId`.
+Two hashes per ticker:
+
+```text
+market:{RELIANCE}:tick      latest state, no TTL
+market:{RELIANCE}:window    about 30 rolling buckets, TTL 600s
+```
+
+The braced segment is a Redis Cluster hash tag. It makes both keys land in the same slot, which is
+what lets one script write both atomically. Without it the script would fail with `CROSSSLOT` on a
+clustered Redis while passing every local test against the standalone one the compose stack runs.
+Nothing in the repository commits to cluster mode, so this is insurance rather than a requirement,
+and it costs nothing if cluster mode is never used (ADR-033).
+
+The tick hash holds `eventTimestamp`, `bidPrice`, `askPrice`, `lastTradedPrice`, `volume`,
+`producedAt` and `correlationId`.
 
 The source-event timestamp is stored beside the value on purpose. A reader applies its own freshness
 policy, and this service never decides what "too old" means for anyone else.
+
+## The rolling window
+
+`EnrichedTradeEvent` needs `vwap5Min`, a volume-weighted average price over the last five minutes,
+and the latest tick alone cannot produce it. The window is where that comes from.
+
+The window hash holds ten-second buckets, two fields each:
+
+```text
+1740000000:pv   sum of lastTradedPrice x volume for ticks in that bucket
+1740000000:v    sum of volume for the same bucket
+lastOffset      the highest Kafka offset already applied
+```
+
+A reader does one `HGETALL`, discards buckets outside its own horizon, and divides the summed `pv` by
+the summed `v`. That read is O(1) in the tick rate: about thirty buckets whatever the traffic. Holding
+raw ticks instead would have put an unbounded scan inside the enrichment path, which sits in the
+sub-200ms risk budget, a target rather than a measurement but still the budget the design answers to.
+
+The horizon belongs to the reader, for the same reason the freshness policy does. Buckets are
+quantised to ten seconds, so a five-minute window is really the buckets covering four minutes fifty to
+five minutes. Accurate enough for a five-minute average, and worth knowing before you read `vwap5Min`
+as accurate to the second.
+
+**Buckets are assigned and pruned by the tick's own `eventTimestamp`, never by a wall clock.** That is
+what makes replaying the topic rebuild identical state, which is what makes this a projection rather
+than a recording of when the projector happened to run.
+`should_place_a_tick_in_the_bucket_its_own_event_timestamp_selects` pins the exact field name derived
+from a fixed past timestamp, so a wall-clock bucket would be a different number and fail it outright.
+
+## Two guards, and why they are not the same guard
+
+The tick hash and the window are guarded differently, which looks like an inconsistency and is not.
+
+The tick hash keeps the compare-and-set on `eventTimestamp`. The window is guarded by the Kafka
+offset: increments apply only when the record's offset exceeds the stored `lastOffset`. Ticks are
+keyed on ticker, so every tick for a ticker is on one partition where offsets strictly increase, and a
+redelivered record replays an offset already seen and is skipped exactly.
+
+They cannot be merged. Two distinct ticks can share a millisecond at a high tick rate. The timestamp
+guard calls the second one a duplicate, which is right for a latest-price entry and wrong for a volume
+sum, because that volume was really traded and must count.
+`should_count_both_ticks_when_two_distinct_ticks_share_a_millisecond` is the test that pins this: the
+tick is a `DUPLICATE` and its volume still lands in the window.
+
+The offset guard has two limits worth knowing before you rely on it. A change in the topic's partition
+count breaks the comparability of stored offsets, because offsets are only monotonic within a
+partition. And a deliberate rebuild has to delete the window key first, or every replayed record is
+skipped as already applied.
+
+**The window expires and the tick hash does not.** A window holding nothing in the last five minutes
+is genuinely empty, so an expiry there says something true. A latest-price entry that expired would
+turn a stalled feed into a cache miss, which reads as a cold cache rather than the fault it is. The
+asymmetry is the point, not an oversight.
 
 ## The write only ever moves forward
 
@@ -153,6 +220,8 @@ the test now exercises the classification, the pause, and the resume.
 | `market_cache_projection_lag_seconds` | Gauge | how far behind the source event the projection is running |
 | `market_cache_entry_age_seconds{ticker}` | Gauge per ticker | age of the stored entry, so a stalled feed is visible |
 | `market_cache_stale_writes_total{reason}` | Counter | ticks the compare-and-set declined, `reason` being `older` or `duplicate` |
+| `market_cache_window_buckets{ticker}` | Gauge per ticker | buckets the window holds, so pruning is observable |
+| `market_cache_window_skipped_total` | Counter | ticks the offset guard rejected, near zero outside redelivery |
 
 Two instrument choices in `MarketCacheMetrics` are worth copying rather than rediscovering.
 
@@ -188,7 +257,7 @@ Redis, in the `strict-security` profile only, from `deploy/compose/redis/users.a
 
 ```text
 user default off
-user market-data-cache-projector on >__FES_REDIS_PROJECTOR_SECRET__ ~market:* resetchannels +eval +evalsha +hget +hset
+user market-data-cache-projector on >__FES_REDIS_PROJECTOR_SECRET__ ~market:* resetchannels +eval +evalsha +hget +hset +hincrbyfloat +hkeys +hdel +expire
 ```
 
 `user default off` is the Redis counterpart of the broker's `allow.everyone.if.no.acl.found=false`.
@@ -206,5 +275,16 @@ enforced inside scripts too: as this user, `HGET other:key somefield` fails with
 command refused by the key space, is what demonstrates the scope rather than a denial that any
 ungranted command would produce.
 
+`+hkeys` rather than `+hgetall` is deliberate: pruning needs the field names only, so the narrower
+grant is the correct one and the script never reads values it does not use.
+
 The dev profile runs Redis unauthenticated on the private compose network, on the same terms as every
 other dev-profile listener. See [The local stack](local-stack.md).
+
+## One number to read with care
+
+The bucket sums are accumulated with `HINCRBYFLOAT`, which works in long double, and the simulator
+draws volume from a Pareto distribution with alpha below two and a deliberately uncapped tail
+(ADR-006). A single tick can therefore carry enormous volume legitimately, and a bucket's `pv` can
+span a wide magnitude range, so the sums are approximate in their last significant digits by
+construction. This is a synthetic model and no number it produces is a market observation.

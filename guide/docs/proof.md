@@ -126,6 +126,15 @@ order.
 | A per-ticker gauge survives garbage collection | `MarketCacheMetrics` | `should_keep_reporting_an_entry_age_after_the_recording_call_has_returned` |
 | A rejected tick does not make the cache look fresher than it is | `MarketCacheMetrics` | `should_not_advance_the_entry_age_from_a_tick_that_was_not_applied` |
 | A duplicate and an out-of-order tick are counted apart | `MarketCacheMetrics` | `should_count_a_duplicate_and_an_older_tick_under_different_reasons` |
+| A tick lands in the bucket its own event timestamp selects, not the current one | `project-tick.lua` | `should_place_a_tick_in_the_bucket_its_own_event_timestamp_selects` |
+| A redelivered offset does not double-count the window | `project-tick.lua` | `should_not_double_count_when_the_same_offset_is_replayed` |
+| Two distinct ticks sharing a millisecond both count toward volume | `project-tick.lua` | `should_count_both_ticks_when_two_distinct_ticks_share_a_millisecond` |
+| A bucket older than the window is pruned | `project-tick.lua` | `should_prune_a_bucket_older_than_the_window_from_the_incoming_tick` |
+| The window expires while the latest-price entry does not | `MarketStateProjection` | `should_give_the_window_a_ttl_so_an_idle_ticker_does_not_linger_forever` |
+| Both keys are written in one call so they cannot disagree | `MarketStateProjection` | `should_write_both_keys_in_one_call_so_they_cannot_disagree` |
+| Replaying the same ticks rebuilds identical window state | `MarketDataTickConsumer` | `should_rebuild_identical_window_state_when_the_same_ticks_are_consumed_again` |
+| The window bucket gauge survives garbage collection | `MarketCacheMetrics` | `should_keep_reporting_a_bucket_count_after_the_recording_call_has_returned` |
+| A tick the offset guard rejected is counted apart | `MarketCacheMetrics` | `should_count_a_tick_the_offset_guard_rejected` |
 | The projector cannot read the trade stream or write the topic it projects | `security/kafka-acls.yml` | `should_deny_reading_the_trade_stream`, `should_deny_writing_the_topic_it_projects`, `should_deny_joining_a_consumer_group_other_than_its_own` |
 
 ## Structure
