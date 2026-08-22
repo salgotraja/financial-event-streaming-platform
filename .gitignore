@@ -60,4 +60,5 @@ out/
 deploy/compose/tls/
 deploy/compose/.env
 deploy/compose/.active-profile
+deploy/compose/redis/users.acl
 .gstack/

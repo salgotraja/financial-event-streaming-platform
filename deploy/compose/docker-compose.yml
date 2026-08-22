@@ -110,6 +110,21 @@ services:
       KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
       DYNAMIC_CONFIG_ENABLED: "true"
 
+  redis:
+    image: redis:8.10.1-alpine
+    # ADR-027: the market cache is projected from market-data.ticks. This is a cache and never a
+    # store of record, so no volume is mounted: losing it costs a replay, not data.
+    #
+    # Unauthenticated, on the private compose network, on the same terms as every other dev-profile
+    # listener. The strict-security overlay is where an absent grant becomes a denial.
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   # AWS emulation for the audit evidence path. S3 and KMS are the two services that path needs: an
   # object store under Object Lock, and a customer-managed key the manifest is signed with (ADR-012).
   #

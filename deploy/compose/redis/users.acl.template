@@ -1,0 +1,18 @@
+# Redis workload identities for the strict-security profile (ADR-032, NFR-05.4).
+#
+# The default user is disabled, so an unauthenticated connection has no access at all. That is the
+# Redis equivalent of allow.everyone.if.no.acl.found=false: without it every denial below would be
+# bypassable by simply not authenticating.
+#
+# The projector is scoped to the market: key space and to the commands it issues. It holds +eval
+# because the compare-and-set is a script; the script is committed in the module rather than loaded
+# from configuration, so what that grant permits is reviewed with the code.
+#
+# This file is a template. scripts/generate-dev-security-material.sh renders it into
+# deploy/compose/redis/users.acl, substituting the password below. The rendered file carries the
+# real password and is never committed; only this template is.
+
+user default off
+# +ping is additional to Task 0's list: PING touches no key space, and the healthcheck needs it to
+# prove the credential matches without granting any data access beyond ~market:*.
+user market-data-cache-projector on >__FES_REDIS_PROJECTOR_SECRET__ ~market:* resetchannels +eval +evalsha +hget +hset +hgetall +ping
