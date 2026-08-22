@@ -18,6 +18,7 @@ include 'services:ingestion:market-data-simulator'
 include 'services:ingestion:corporate-action-producer'
 include 'services:ingestion:reference-data-service'
 include 'services:audit:audit-service'
+include 'services:streaming:market-data-cache-projector'
 ```
 
 Modules land when the work reaches them. Creating an empty module ahead of its phase produces a
@@ -80,12 +81,14 @@ touches `Project`, which is what keeps the task compatible with the Gradle confi
 
 ```console
 $ ./gradlew checkPlaneIsolation
-Plane isolation: 7 deterministic-plane module(s) checked
+Plane isolation: 9 deterministic-plane module(s) checked
 ```
 
 Without that line, a check that inspects nothing looks exactly like a check that found nothing. The
-count is seven rather than five because it includes the intermediate container projects
-`:services:ingestion` and `:services:audit`.
+count runs ahead of the number of services because it includes the intermediate container projects
+`:services:ingestion`, `:services:audit` and `:services:streaming`. Adding the first module under a
+new group moves the count by two, the group and the leaf, which is why it went from seven to nine
+when `market-data-cache-projector` landed.
 
 ## Layering inside a service
 

@@ -88,7 +88,7 @@ Every service module builds a container image, `fes/<module>:local`, from the Sp
 Paketo integration. No Dockerfile. Each module's `integrationTest` depends on its own image task, so
 the identity proof in [Service identity](identity.md) cannot run against a stale or absent build.
 
-A clean build with all five images forced to rebuild takes 38 seconds on the machine this was measured
+A clean build with all six images forced to rebuild takes 38 seconds on the machine this was measured
 on. Treat that as a floor rather than the CI figure: a CI runner pulls the Paketo builder and run
 images fresh, and a development machine usually has them cached.
 
@@ -158,13 +158,20 @@ to be considered complete:
 | --- | --- |
 | Idempotency | The same event processed twice produces a single effect |
 | Poison record | A malformed record is quarantined to `{topic}.dlq`, the offset advances, and the next record on the partition processes normally |
-| Dependency failure | A Redis or PostgreSQL outage opens the circuit at the dependency boundary and does not quarantine otherwise valid records |
+| Dependency failure | A Redis or PostgreSQL outage is handled at the dependency boundary and does not quarantine otherwise valid records |
 | Negative authorization | At least one ALLOW and two DENY per service, driven by the committed policy |
 | Agent tool boundary | Unknown tool denied, undeclared argument rejected, injected instruction text ignored, failed required tool produces `ESCALATE` rather than `NO_FLAG` |
 | Plane isolation | A build-level check |
 | Rebuild | Read models and the precedent graph rebuild from event history and report a reconciliation result |
 
-Four of those seven are exercised today. The other three belong to services that do not exist.
+Five of those seven are exercised today. Dependency failure joined them with
+[the market cache projector](projector.md), which pauses its listener on an unreachable Redis rather
+than dead-lettering records that were never bad. The other two belong to services that do not exist.
+
+That row has a lesson attached. The handling is only reachable because the module sets an explicit
+Redis command timeout: without one the client blocks on a frozen connection, raises nothing, and the
+outage branch is dead code while the consumer thread stops polling anyway. A test asserting "no dead
+letter" passed before the timeout existed, and it passed because nothing had failed.
 
 ## The CI workflow
 

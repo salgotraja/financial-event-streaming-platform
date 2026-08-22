@@ -89,6 +89,7 @@ nav:
       - Event contracts: contracts.md
       - The four producers: producers.md
       - The audit consumer: audit.md
+      - The market cache projector: projector.md
       - Workload authorization: authorization.md
       - Service identity: identity.md
       - Build gates and CI: gates.md

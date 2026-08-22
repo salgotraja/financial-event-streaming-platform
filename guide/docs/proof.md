@@ -111,6 +111,23 @@ order.
 | Every configured action is published at startup | `CorporateActionSeeder` | `should_publish_every_configured_action_at_startup` |
 | An action the validator rejects is skipped rather than failing startup | `CorporateActionSeeder` | `should_skip_an_action_the_validator_rejects_rather_than_failing_startup` |
 
+## The market cache projection
+
+| Behaviour | Implementation | Proof |
+| --- | --- | --- |
+| A newer tick overwrites, an older one never does | `MarketStateProjection` | `should_apply_a_newer_tick_over_an_older_one`, `should_skip_a_tick_older_than_the_stored_one` |
+| Redelivery of the same record has one effect | `MarketStateProjection` | `should_skip_a_tick_whose_timestamp_equals_the_stored_one`, and `should_have_one_effect_when_the_same_tick_is_delivered_twice` against a real broker |
+| An absent entry is written rather than skipped | `MarketStateProjection` | `should_write_the_entry_when_no_state_exists_for_the_ticker` |
+| A tick reaches Redis through the listener | `MarketDataTickConsumer` | `should_project_a_healthy_tick_into_redis` |
+| A malformed record is quarantined with its bytes intact and the partition keeps moving | `ProjectorKafkaConfiguration` | `should_quarantine_a_malformed_record_with_its_original_bytes_and_keep_the_partition_moving` |
+| An unreachable Redis pauses the listener instead of dead-lettering good records | `ProjectorKafkaConfiguration` | `should_not_quarantine_a_valid_tick_when_redis_is_unreachable` |
+| The specified metric series names really appear in a scrape | `MarketCacheMetrics` | `should_publish_the_series_names_the_specification_requires` |
+| Projection lag is measured from the source event | `MarketCacheMetrics` | `should_report_the_lag_between_the_source_event_and_the_write` |
+| A per-ticker gauge survives garbage collection | `MarketCacheMetrics` | `should_keep_reporting_an_entry_age_after_the_recording_call_has_returned` |
+| A rejected tick does not make the cache look fresher than it is | `MarketCacheMetrics` | `should_not_advance_the_entry_age_from_a_tick_that_was_not_applied` |
+| A duplicate and an out-of-order tick are counted apart | `MarketCacheMetrics` | `should_count_a_duplicate_and_an_older_tick_under_different_reasons` |
+| The projector cannot read the trade stream or write the topic it projects | `security/kafka-acls.yml` | `should_deny_reading_the_trade_stream`, `should_deny_writing_the_topic_it_projects`, `should_deny_joining_a_consumer_group_other_than_its_own` |
+
 ## Structure
 
 | Behaviour | Implementation | Proof |
@@ -122,7 +139,7 @@ order.
 
 ## What has no proof yet
 
-Anything that would need a service that does not exist: enrichment latency, risk evaluation, a
-dependency-failure circuit breaker, read-model rebuild, the agent tool boundary, sustained throughput,
-and evidence integrity end to end. Those rows appear in `.claude/rules/testing.md` as required
+Anything that would need a service that does not exist: enrichment latency, risk evaluation,
+read-model rebuild, the agent tool boundary, sustained throughput, and evidence integrity end to end.
+Dependency failure has one proof now, on the projector's Redis connection, and none on PostgreSQL. Those rows appear in `.claude/rules/testing.md` as required
 categories and are waiting on their subjects.

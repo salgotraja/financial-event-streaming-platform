@@ -128,6 +128,25 @@ null group precisely so `group.id` can be left unset.
 makes the denial the one that matters: a producer that could write `trades.enriched` could inject
 trades that skipped enrichment entirely.
 
+## A second consumer, scoped narrower still
+
+`market-data-cache-projector` grants `READ` on `market-data.ticks`, `WRITE` on
+`market-data.ticks.dlq`, and `READ` on the `GROUP` named after itself. Four assertions in
+`MarketDataCacheProjectorAuthorizationTest`, one allowed and three denied:
+
+**ALLOW** read `market-data.ticks` through its own consumer group.
+
+**DENY** read `trades.raw`. The projector has no business in the trade stream, and a grant it does not
+need is a grant an attacker inherits.
+
+**DENY** join another workload's consumer group.
+
+**DENY** write `market-data.ticks`, the topic it projects. A projector that can write the tick stream
+can manufacture the prices it is supposed to be observing.
+
+Its Redis access is scoped the same way and is covered in
+[the market cache projector](projector.md).
+
 ## The consumer contract is the inverse
 
 `audit-service` does not extend the producer contract, because its shape is reversed. Its policy grants

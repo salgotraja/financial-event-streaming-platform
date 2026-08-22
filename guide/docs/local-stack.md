@@ -25,6 +25,7 @@ Schema Registry API, where hand-rolled quoting would be a bug waiting to happen.
 | `fes-kafka3` | `apache/kafka:4.1.0` | 29094 |
 | `fes-schema-registry` | `confluentinc/cp-schema-registry:7.9.1` | 8081 |
 | `fes-kafka-ui` | `provectuslabs/kafka-ui:v0.7.2` | 8080 |
+| `fes-redis` | `redis:8.10.1-alpine` | 6379 |
 | `fes-localstack` | `localstack/localstack:4.14.0` | 4566 |
 | `fes-otel-collector` | `otel/opentelemetry-collector-contrib:0.158.0` | 4317 grpc, 4318 http |
 | `fes-prometheus` | `prom/prometheus:v3.13.2` | 9090 |
@@ -161,8 +162,10 @@ machine and says nothing about how the platform authenticates.
 
 ## What is not in the stack yet
 
-PostgreSQL and Redis. They join when the Phase 2 services that use them land, so FR-09.1 is partly met
-rather than met.
+PostgreSQL. It joins when the Phase 2 services that need it land, so FR-09.1 is partly met rather
+than met. Redis arrived with [the market cache projector](projector.md): unauthenticated in the dev
+profile, and in `strict-security` behind an ACL file with `user default off` and one user per
+workload, scoped to the key space that workload owns.
 
 The services themselves, in this stack. They still run from Gradle or an IDE against it. Each service
 now builds an image, and [service identity](identity.md) proves the binding to a Kafka principal by

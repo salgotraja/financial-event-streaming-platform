@@ -22,6 +22,21 @@ and every denial assertion in the suite passes while proving nothing.
 Both the fixture and the strict-security profile set it to `false`. `SecureKafkaStackTest` exists to
 prove the resulting refusal is an authorization error and not a timeout.
 
+## Without a client timeout, a dependency outage raises nothing at all
+
+A test paused the Redis container and asserted that no valid record reached the dead-letter topic. It
+passed. It would also have passed with the entire outage-handling branch deleted, because with no
+`spring.data.redis.timeout` set, the client does not fail: it blocks on the frozen connection and
+completes when the container is unpaused. Nothing was classified, because nothing was thrown.
+
+The runtime consequence is worse than the test one. A blocked call holds the consumer thread, so
+`poll()` stops, and the broker eventually evicts the consumer from its group, which is the failure the
+pausing back-off handler was chosen to avoid in the first place.
+
+Two habits come out of it. Set an explicit command timeout on any client a consumer calls
+synchronously, sized far below `max.poll.interval.ms`. And when a test asserts that something did not
+happen, delete the mechanism and check the test fails, because an absence proves nothing on its own.
+
 ## A denial that arrives as a timeout looks like a pass
 
 An authorization failure that surfaces as a hang is indistinguishable, in a test, from a broker that

@@ -9,10 +9,8 @@ the compatibility gate.
 
 ## Phase 2, deterministic streaming
 
-Four services. The next work in the queue.
-
-**market-data-cache-projector.** Projects `market-data.ticks` into Redis so enrichment has current
-market state, with freshness metrics. Redis joins the local stack in the same change.
+Three services remain. [The market cache projector](projector.md) is built, and Redis joined the local
+stack with it, so what follows is the rest of the queue.
 
 **trade-enrichment-service.** Consumes `trades.raw`, joins market state and instrument reference data,
 produces `trades.enriched`. One constraint is fixed in advance: on a cache miss it must not fall back
@@ -111,7 +109,7 @@ These qualify claims made elsewhere in this guide:
 - The identity trust matrix has entries for 11 services; 8 more arrive with their phases.
 - There is no runtime validation of Schema Registry subject naming or per-subject compatibility
   configuration.
-- PostgreSQL and Redis are absent from the local stack, so FR-09.1 is partly met.
+- PostgreSQL is absent from the local stack, so FR-09.1 is partly met. Redis is present in both profiles.
 - Every IAM control is specified and none is built. Specified and Built are tracked as separate states
   so the distinction stays visible, and ADR-030 fixes what is in scope at all: workload identity, authorization,
   privileged control, agent identity, evidence and identity observability are in; workforce identity,
