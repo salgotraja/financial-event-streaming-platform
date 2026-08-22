@@ -80,10 +80,20 @@ The tick hash keeps the compare-and-set on `eventTimestamp`. The window is guard
 offset: increments apply only when the record's offset exceeds the stored `lastOffset`. Ticks are
 keyed on ticker, so every tick for a ticker is on one partition where offsets strictly increase, and a
 record the consumer redelivers, whether from a rebalance or a rewind, replays an offset already seen
-and is skipped exactly. That guarantee covers consumer redelivery only: a producer-side republish at a
-new offset, which a DLQ replay would produce, is indistinguishable from a genuinely distinct tick and
-double-counts its volume. Exact dedup would need per-record identity and unbounded state, which this
-design deliberately avoids.
+and is skipped exactly. That guarantee covers consumer redelivery only. A record republished onto the
+topic at a new offset is indistinguishable from a genuinely distinct tick and double-counts its
+volume.
+
+That exposure is narrower than it first sounds. A record can only be in that position if it was
+applied here and then dead-lettered afterwards, and the ordinary dead-letter cases never reach the
+write at all: an undecodable payload fails in the deserialiser, and a tick that fails validation is
+rejected before the script runs, so replaying either one counts it once and correctly. A telemetry
+failure is logged and swallowed rather than propagated, precisely so it cannot quarantine a record
+the projection already accepted, which leaves an acknowledge failure as the remaining path, and that
+means the broker is unreachable, in which case the dead-letter send fails too.
+
+Exact dedup would need per-record identity and unbounded state, which this design deliberately
+avoids (ADR-033).
 
 They cannot be merged. Two distinct ticks can share a millisecond at a high tick rate. The timestamp
 guard calls the second one a duplicate, which is right for a latest-price entry and wrong for a volume
@@ -95,7 +105,7 @@ The offset guard has three limits worth knowing before you rely on it. A change 
 partition count breaks the comparability of stored offsets, because offsets are only monotonic within
 a partition. A deliberate rebuild has to delete both the window key and the tick key, or the tick key
 rejects every replayed record as older while the window key skips every replayed record as already
-applied. And, as above, it defends against consumer redelivery only, not a producer-side republish.
+applied. And, as above, it defends against consumer redelivery only, not a republish at a new offset.
 
 **The window expires and the tick hash does not.** A window holding nothing in the last five minutes
 is genuinely empty, so an expiry there says something true, but only for the idle case: a window that

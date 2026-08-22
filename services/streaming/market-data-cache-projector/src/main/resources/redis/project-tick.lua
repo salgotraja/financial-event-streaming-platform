@@ -12,9 +12,14 @@
 -- which holds because the producer keys on ticker; a change in the topic's partition count breaks
 -- the comparability of stored offsets. A deliberate rebuild must delete both the window key and the
 -- tick key, or the tick key rejects every replayed record as older while the window key skips every
--- replayed record as already applied. And it defends against consumer redelivery only: a
--- producer-side republish at a new offset, which a DLQ replay would produce, is indistinguishable
--- from a genuinely distinct tick and double-counts its volume. Exact dedup would need per-record
+-- replayed record as already applied. And it defends against consumer redelivery only: a record
+-- republished onto the topic at a NEW offset is indistinguishable from a genuinely distinct tick
+-- and double-counts its volume.
+--
+-- That last limit is narrower than it sounds. A record only reaches that position if it was applied
+-- here and dead-lettered afterwards, and the ordinary dead-letter cases never reach this script at
+-- all: an undecodable payload fails in the deserialiser and a failed validation is rejected before
+-- the write, so replaying either counts it once and correctly. Exact dedup would need per-record
 -- identity and unbounded state, which this design deliberately avoids.
 --
 -- Buckets are assigned and pruned by the incoming tick's own eventTimestamp, never by a wall clock,
