@@ -96,7 +96,7 @@ for line in raw.splitlines():
 }
 
 ensure_security_material() {
-  if [ ! -f "$COMPOSE_DIR/tls/ca.pem" ] || [ ! -f "$COMPOSE_DIR/.env" ]; then
+  if [ ! -f "$COMPOSE_DIR/tls/ca.pem" ] || [ ! -f "$COMPOSE_DIR/.env" ] || [ ! -f "$COMPOSE_DIR/redis/users.acl" ]; then
     log "generating TLS and credential material"
     "$REPO_ROOT/scripts/generate-dev-security-material.sh"
   else
@@ -263,6 +263,7 @@ cmd_up() {
   wait_for_healthy kafka3
   wait_for_healthy schema-registry
   wait_for_healthy localstack
+  wait_for_healthy redis
 
   create_topics
   register_subjects

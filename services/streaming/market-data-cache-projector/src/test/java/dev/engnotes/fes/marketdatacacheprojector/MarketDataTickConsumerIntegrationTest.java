@@ -118,10 +118,21 @@ class MarketDataTickConsumerIntegrationTest {
     void should_have_one_effect_when_the_same_tick_is_delivered_twice() {
         publish(tick("IDEMPOTENT", 5_000L, 101.5));
         publish(tick("IDEMPOTENT", 5_000L, 999.0));
+        // The topic is single-partition, so this sentinel is processed strictly after both
+        // IDEMPOTENT records above. Waiting for it in redis before asserting on IDEMPOTENT proves
+        // the duplicate was already handled rather than racing whichever record lands first: the
+        // straightforward "await lastTradedPrice=101.5" form is satisfied the moment the first
+        // record is projected, possibly before the second has even been polled.
+        publish(tick("IDEMPOTENT-SENTINEL", 5_000L, 1.0));
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "IDEMPOTENT"))
-                        .containsEntry("lastTradedPrice", "101.5"));
+                assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "IDEMPOTENT-SENTINEL"))
+                        .containsEntry("lastTradedPrice", "1.0"));
+
+        assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "IDEMPOTENT"))
+                .as("the second IDEMPOTENT record must have zero effect, having already been "
+                        + "applied once with this timestamp")
+                .containsEntry("lastTradedPrice", "101.5");
     }
 
     @Test

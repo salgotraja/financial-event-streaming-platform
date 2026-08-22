@@ -112,6 +112,7 @@ services:
 
   redis:
     image: redis:8.10.1-alpine
+    container_name: fes-redis
     # ADR-027: the market cache is projected from market-data.ticks. This is a cache and never a
     # store of record, so no volume is mounted: losing it costs a replay, not data.
     #

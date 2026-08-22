@@ -8,8 +8,8 @@
 # The GROUP grant is scoped to the one consumer group whose name equals the service name. Group
 # scoping is what stops this identity joining another workload's group and consuming its offsets.
 #
-# Denials proved in MarketDataCacheProjectorAuthorizationTest: it may not read trades.raw, and it
-# may not join a consumer group other than its own.
+# Denials proved in MarketDataCacheProjectorAuthorizationTest: it may not read trades.raw, it may
+# not join a consumer group other than its own, and it may not write the topic it projects.
 
 principal: market-data-cache-projector
 
