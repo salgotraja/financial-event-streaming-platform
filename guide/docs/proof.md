@@ -79,7 +79,7 @@ order.
 | --- | --- | --- |
 | A running service authenticates as its own principal, not the administrator's | `KafkaSecurityConfiguration` | `should_be_denied_while_ungranted_then_work_once_its_own_principal_is_granted`, once per service |
 | A service cannot name its own SASL identity | `KafkaSecurityConfiguration` | `should_override_a_jaas_config_a_service_tried_to_set_for_itself` |
-| No service module mentions a JAAS config at all | the five service modules | `should_not_let_a_module_name_a_sasl_username_of_its_own` |
+| No service module mentions a JAAS config at all | the six service modules | `should_not_let_a_module_name_a_sasl_username_of_its_own` |
 | The module name, the application name and the policy principal agree | `ServiceIdentityNamesTest` reading `settings.gradle`, `application.yml` and `kafka-acls.yml` | `should_name_one_module_one_application_name_and_one_policy_principal_alike` |
 | The derivation reaches consumers, not only producers | `KafkaSecurityConfiguration` | `should_apply_to_consumers_as_well_as_producers` |
 | A plaintext developer stack is not forced to authenticate | `KafkaSecurityConfiguration` | `should_stay_inactive_when_the_secure_profile_is_not_on` |

@@ -115,3 +115,12 @@ These qualify claims made elsewhere in this guide:
   privileged control, agent identity, evidence and identity observability are in; workforce identity,
   identity governance, customer identity and federation breadth are excluded by decision rather than
   by backlog.
+- The market cache projector's Redis identity has no automated test. The Kafka half is proven
+  structurally, by a denied run and a granted run of the service's own container image
+  (`MarketDataCacheProjectorServiceIdentityStackTest`); the Redis half, the `market-data-cache-projector`
+  ACL user in `deploy/compose/redis/users.acl.template`, is proven only by a manual `redis-cli` probe
+  recorded outside this repository. Do not read the Kafka proof as covering both connections.
+- The actuator's `RedisHealthIndicator` issues `INFO`, a command the projector's Redis ACL does not
+  grant. Nothing in the compose stack runs this service under `strict-security` yet, so this has not
+  surfaced, but once it does the service's aggregate `/actuator/health` will report `DOWN` on the
+  Redis indicator until the ACL is widened or the indicator is reconfigured.

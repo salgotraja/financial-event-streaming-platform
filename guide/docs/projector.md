@@ -133,13 +133,18 @@ the classification above never runs and the consumer thread stops polling anyway
 would be unreachable code, and the failure it was written to prevent would happen by a different
 route.
 
-Two seconds sits far above normal latency here, which is sub-millisecond, and far below the 300s
-default `max.poll.interval.ms`.
+Two seconds sits far above normal latency to a local Redis and far below the 300s default
+`max.poll.interval.ms`. Nothing in this repository has measured what that latency actually is; treat
+the two-second figure as a margin chosen against the poll-interval ceiling, not as evidence of a
+target.
 
 `should_not_quarantine_a_valid_tick_when_redis_is_unreachable` pauses the Redis container for longer
 than that timeout, then asserts no dead letter, that the listener container actually reports paused,
 and that the tick lands once Redis answers again. The middle assertion is what stops the test passing
-for the wrong reason: without it, the test passes whether or not any of this machinery exists.
+for the wrong reason: an earlier version of this test lacked a command timeout, so a frozen connection
+never raised anything the error handler could classify, and the test would have passed whether or not
+any of this machinery existed. With the timeout in place and the paused-container assertion in place,
+the test now exercises the classification, the pause, and the resume.
 
 ## Metrics
 
@@ -183,7 +188,7 @@ Redis, in the `strict-security` profile only, from `deploy/compose/redis/users.a
 
 ```text
 user default off
-user market-data-cache-projector on >__FES_REDIS_PROJECTOR_SECRET__ ~market:* resetchannels +eval +evalsha +hget +hset +hgetall
+user market-data-cache-projector on >__FES_REDIS_PROJECTOR_SECRET__ ~market:* resetchannels +eval +evalsha +hget +hset
 ```
 
 `user default off` is the Redis counterpart of the broker's `allow.everyone.if.no.acl.found=false`.

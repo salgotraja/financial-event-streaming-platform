@@ -88,9 +88,10 @@ Every service module builds a container image, `fes/<module>:local`, from the Sp
 Paketo integration. No Dockerfile. Each module's `integrationTest` depends on its own image task, so
 the identity proof in [Service identity](identity.md) cannot run against a stale or absent build.
 
-A clean build with all six images forced to rebuild takes 38 seconds on the machine this was measured
-on. Treat that as a floor rather than the CI figure: a CI runner pulls the Paketo builder and run
-images fresh, and a development machine usually has them cached.
+A clean build with all images forced to rebuild took 38 seconds on the machine this was measured on,
+across the five service images that existed at the time; it has not been re-measured since the market
+cache projector's image landed as a sixth. Treat that as a floor rather than the CI figure: a CI runner
+pulls the Paketo builder and run images fresh, and a development machine usually has them cached.
 
 No property exists to skip the image build. A gate weakened on a predicted cost rather than an
 observed one stops meaning anything.
