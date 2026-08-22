@@ -1,0 +1,25 @@
+# Least-privilege Kafka policy for the market-data-cache-projector workload identity.
+# See trade-producer's policy for the rules that govern this file. Everything absent is denied.
+#
+# A projector reads one topic and writes nothing onto a financial topic. The only WRITE grant is the
+# .dlq topic that per-record quarantine needs (ADR-027). It holds no grant on trades.raw or on any
+# other stream: an identity that could read the trade flow would have access it has no use for.
+#
+# The GROUP grant is scoped to the one consumer group whose name equals the service name. Group
+# scoping is what stops this identity joining another workload's group and consuming its offsets.
+#
+# Denials proved in MarketDataCacheProjectorAuthorizationTest: it may not read trades.raw, and it
+# may not join a consumer group other than its own.
+
+principal: market-data-cache-projector
+
+allowed:
+  - resourceType: TOPIC
+    name: market-data.ticks
+    operations: [READ]
+  - resourceType: TOPIC
+    name: market-data.ticks.dlq
+    operations: [WRITE]
+  - resourceType: GROUP
+    name: market-data-cache-projector
+    operations: [READ]

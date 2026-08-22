@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// ADR-027: Redis market state is projected from market-data.ticks, so trade enrichment never needs
+// a synchronous simulator call on a cache miss. ADR-032: the projection is monotonic in the
+// source-event timestamp, and the projector holds its own Redis identity.
+// Workload identity: market-data-cache-projector. Consumer group: the same name.
+// Kafka permission: read market-data.ticks, write only market-data.ticks.dlq.
+//
+// The first module in the streaming plane, so checkPlaneIsolation inspects that prefix for the
+// first time here.
+
+description = 'Projects the latest market state per ticker from market-data.ticks into Redis'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation libs.confluent.kafka.avro.serializer
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
