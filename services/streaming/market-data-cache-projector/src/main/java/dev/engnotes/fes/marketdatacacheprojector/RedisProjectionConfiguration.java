@@ -21,4 +21,9 @@ public class RedisProjectionConfiguration {
         script.setResultType(Long.class);
         return script;
     }
+
+    @Bean
+    java.time.Clock projectorClock() {
+        return java.time.Clock.systemUTC();
+    }
 }

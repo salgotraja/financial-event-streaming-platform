@@ -30,6 +30,7 @@ dependencies {
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation 'io.micrometer:micrometer-registry-prometheus'
     testImplementation testFixtures(project(':platform-common'))
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
