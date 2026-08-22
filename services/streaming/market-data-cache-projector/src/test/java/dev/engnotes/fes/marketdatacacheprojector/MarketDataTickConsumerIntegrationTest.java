@@ -36,6 +36,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -68,6 +70,9 @@ class MarketDataTickConsumerIntegrationTest {
 
     @Autowired
     private StringRedisTemplate redis;
+
+    @Autowired
+    private KafkaListenerEndpointRegistry listenerRegistry;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -147,24 +152,38 @@ class MarketDataTickConsumerIntegrationTest {
         REDIS.getDockerClient().pauseContainerCmd(REDIS.getContainerId()).exec();
         try {
             publish(tick("OUTAGE", 7_000L, 303.5));
-            // Long enough that a bounded retry sequence would have exhausted and recovered.
-            Thread.sleep(Duration.ofSeconds(15).toMillis());
+
+            // 15s against a 2s redis command timeout is ample for a QueryTimeoutException to fire
+            // and reach isRedisOutage, and for that classification to actually pause the container:
+            // a bounded retry sequence would instead have exhausted within the 5s poisonBackOff
+            // elapsed cap and quarantined the record.
+            Awaitility.await()
+                    .atMost(Duration.ofSeconds(15))
+                    .pollInterval(Duration.ofMillis(200))
+                    .untilAsserted(() -> assertThat(listenerContainer().isContainerPaused())
+                            .as("only ContainerPausingBackOffHandler pauses the container, and the "
+                                    + "error handler reaches it only by classifying a real "
+                                    + "QueryTimeoutException as a redis outage; a container that "
+                                    + "never pauses means that branch never engaged")
+                            .isTrue());
 
             assertThat(readDeadLetterKeys())
                     .as("a connection failure is not a poison record, and a dead letter here would "
                             + "be a lie about a record that was never bad")
                     .doesNotContain("OUTAGE");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException(e);
         } finally {
             REDIS.getDockerClient().unpauseContainerCmd(REDIS.getContainerId()).exec();
         }
 
         Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
                 assertThat(redis.opsForHash().entries(MarketStateProjection.KEY_PREFIX + "OUTAGE"))
-                        .as("the uncommitted offset means the tick replays once redis returns")
+                        .as("the unlimited backoff keeps retrying the uncommitted record, and it is "
+                                + "redelivered successfully once redis answers again")
                         .containsEntry("lastTradedPrice", "303.5"));
+    }
+
+    private MessageListenerContainer listenerContainer() {
+        return listenerRegistry.getListenerContainers().iterator().next();
     }
 
     private static MarketDataTickEvent tick(String ticker, long eventTimestampMillis, double price) {

@@ -1,6 +1,14 @@
 spring:
   application:
     name: market-data-cache-projector
+  data:
+    redis:
+      # An unavailable Redis must surface as an exception the error handler can classify, and it
+      # must do so far inside max.poll.interval.ms. Without these the Lettuce call blocks on the
+      # frozen connection, the consumer thread stops polling, and the broker evicts the consumer:
+      # the exact failure the pausing back-off handler exists to prevent.
+      timeout: 2s
+      connect-timeout: 2s
   kafka:
     properties:
       schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
@@ -25,7 +33,7 @@ spring:
         schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
         auto.register.schemas: false
 
-# Redis connection details are deliberately absent. Boot defaults to localhost:6379, and a
+# Redis connection details are otherwise absent. Boot defaults host/port to localhost:6379, and a
 # deployment overrides SPRING_DATA_REDIS_HOST, _PORT, _USERNAME and _PASSWORD from the environment.
 # Declaring them here with empty defaults would make Lettuce attempt AUTH with an empty username
 # against the dev profile's unauthenticated Redis, which fails for a reason that looks like a

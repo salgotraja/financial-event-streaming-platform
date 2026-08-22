@@ -24,9 +24,13 @@ import org.springframework.util.backoff.FixedBackOff;
 /**
  * The two failure classes ADR-027 separates, wired so that neither can be mistaken for the other.
  *
- * <p><strong>A malformed payload is one quarantined record.</strong> Three attempts, then the
- * recoverer publishes to {@code {topic}.dlq} and the offset advances, so the partition keeps moving.
- * Retrying a decode failure longer does not help: the bytes do not improve.
+ * <p><strong>A malformed payload is one quarantined record, with zero retries.</strong> {@code
+ * DeserializationException} is registered as not retryable, so the recoverer runs on the first
+ * attempt and publishes to {@code {topic}.dlq}, and the offset advances so the partition keeps
+ * moving. Retrying a decode failure does not help: the bytes do not improve. The bounded
+ * {@link #poisonBackOff()} exists for the listener failures that are not a decode failure and not a
+ * Redis outage, so a transient bug elsewhere in the listener still gets a few bounded attempts
+ * before quarantine rather than being retried forever or quarantined on the first failure.
  *
  * <p><strong>A Redis outage pauses the container.</strong> The back-off function returns an
  * unlimited-attempt back-off for a connection failure or a command timeout, so the recoverer is never
