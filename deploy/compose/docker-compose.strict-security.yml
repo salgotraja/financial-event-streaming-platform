@@ -82,7 +82,10 @@ services:
     environment:
       FES_REDIS_PROJECTOR_SECRET: ${FES_REDIS_PROJECTOR_SECRET}
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --user market-data-cache-projector --pass $${FES_REDIS_PROJECTOR_SECRET} --no-auth-warning ping | grep -q PONG"]
+      # EVAL rather than PING: the projector never holds a +ping grant, only the commands it
+      # actually issues, so the healthcheck proves liveness and credential match with the same
+      # +eval grant the compare-and-set script uses.
+      test: ["CMD-SHELL", "redis-cli --user market-data-cache-projector --pass $${FES_REDIS_PROJECTOR_SECRET} --no-auth-warning EVAL 'return 1' 0 | grep -q 1"]
       interval: 5s
       timeout: 3s
       retries: 20
