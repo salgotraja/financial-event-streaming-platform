@@ -39,7 +39,6 @@ fes:
   market-data-cache-projector:
     topic: market-data.ticks
     consumer-instance: ${HOSTNAME:market-data-cache-projector-local}
-    recent-record-window: 100000
 
 management:
   endpoints:
