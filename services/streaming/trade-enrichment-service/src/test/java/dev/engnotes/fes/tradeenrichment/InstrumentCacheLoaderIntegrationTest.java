@@ -159,6 +159,24 @@ class InstrumentCacheLoaderIntegrationTest {
         // is actually observable here rather than a check that would not really prove closure.
     }
 
+    @Test
+    @DisplayName("should fail loading and report not loaded when the onLoaded callback throws")
+    void should_fail_loading_and_report_not_loaded_when_the_onLoaded_callback_throws() {
+        // Task 6's callback binds a metrics gauge and starts a Kafka listener container, which can
+        // throw. If loaded were set before this callback ran, a caller could observe isLoaded() ==
+        // true for a service whose trade listener never actually started.
+        InstrumentCache cache = new InstrumentCache();
+        RuntimeException callbackFailure = new RuntimeException("listener container failed to start");
+        InstrumentCacheLoader loader = new InstrumentCacheLoader(cache, consumerProperties(), TOPIC,
+                Duration.ofSeconds(60), () -> {
+                    throw callbackFailure;
+                });
+
+        assertThatThrownBy(loader::loadInitialSnapshot).isSameAs(callbackFailure);
+
+        assertThat(loader.isLoaded()).isFalse();
+    }
+
     private static InstrumentCacheLoader loader(InstrumentCache cache, Duration timeout) {
         return loader(cache, TOPIC, timeout);
     }

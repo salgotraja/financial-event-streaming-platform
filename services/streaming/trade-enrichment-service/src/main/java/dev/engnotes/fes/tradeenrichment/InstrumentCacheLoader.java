@@ -73,7 +73,11 @@ import org.slf4j.LoggerFactory;
  * The same rule covers setup: if constructing the consumer or capturing its partitions and end
  * offsets fails before the catch-up loop is ever reached, the calling thread is still the only owner
  * there has ever been, so it closes the consumer itself before the exception leaves
- * {@link #loadInitialSnapshot()}.
+ * {@link #loadInitialSnapshot()}. It also covers the {@code onLoaded} callback: that callback runs
+ * before {@link #isLoaded()} is allowed to report true and before a follower is considered, so a
+ * throwing callback still finds the calling thread as sole owner, closes the consumer itself, and
+ * propagates the failure rather than leaving a loader that claims to be ready while the thing meant
+ * to make it ready never started.
  */
 public class InstrumentCacheLoader implements AutoCloseable {
 
@@ -160,10 +164,21 @@ public class InstrumentCacheLoader implements AutoCloseable {
             }
         }
 
+        try {
+            onLoaded.run();
+        } catch (RuntimeException e) {
+            // The callback failing after a successful catch-up is the same hazard as any other
+            // exit before ownership transfers: this thread is still the sole owner, and loaded must
+            // stay false so a caller can never observe isLoaded() == true for a service that never
+            // actually started. No follower either: nothing consumes the cache, so keeping a broker
+            // connection alive just to keep it fresh would be pointless.
+            consumer.close();
+            throw e;
+        }
+
         loaded.set(true);
         log.info("Instrument master loaded from {} partitions={} instruments={}",
                 topic, partitions.size(), cache.size());
-        onLoaded.run();
         startFollowing();
     }
 
