@@ -2,6 +2,7 @@ package dev.engnotes.fes.tradeenrichment;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -126,6 +127,36 @@ class InstrumentCacheLoaderIntegrationTest {
 
         assertThatCode(loader::close).doesNotThrowAnyException();
         assertThatCode(loader::close).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("should close its own consumer when setup fails before the catch-up loop is reached")
+    void should_close_its_own_consumer_when_setup_fails_before_the_catch_up_loop_is_reached() {
+        // partitionsOf() throws for a topic with no partitions, before the catch-up loop and before
+        // any ownership handoff exists. This exercises the setup-failure close path, distinct from
+        // the timeout and WakeupException paths covered above: the calling thread is still the only
+        // owner the consumer has ever had, and must close it itself before the exception leaves.
+        //
+        // allow.auto.create.topics is forced off so this is deterministic regardless of the test
+        // broker's own auto-create default: partitionsFor() must return empty, not silently create
+        // the topic and hand back one partition.
+        InstrumentCache cache = new InstrumentCache();
+        String missingTopic = "tes-ref-missing-" + UUID.randomUUID();
+        Map<String, Object> properties = new HashMap<>(consumerProperties());
+        properties.put("allow.auto.create.topics", false);
+        InstrumentCacheLoader loader =
+                new InstrumentCacheLoader(cache, properties, missingTopic, Duration.ofSeconds(30), () -> {
+                });
+
+        assertThatThrownBy(loader::loadInitialSnapshot)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no partitions");
+
+        assertThat(loader.isLoaded()).isFalse();
+        // This assertion covers the exception type and message, not the consumer's closed state:
+        // KafkaConsumer exposes no public way to observe that from outside without a test seam
+        // (a spy or a wrapped factory) that the loader does not currently have. Asserting only what
+        // is actually observable here rather than a check that would not really prove closure.
     }
 
     private static InstrumentCacheLoader loader(InstrumentCache cache, Duration timeout) {

@@ -70,6 +70,10 @@ import org.slf4j.LoggerFactory;
  * touching the consumer, because a live thread might still be inside {@code poll}. This makes the
  * invariant structural rather than a narrowed timing window: whichever thread is executing
  * {@code consumer.close()} is always the same thread that was the last to call {@code poll()} on it.
+ * The same rule covers setup: if constructing the consumer or capturing its partitions and end
+ * offsets fails before the catch-up loop is ever reached, the calling thread is still the only owner
+ * there has ever been, so it closes the consumer itself before the exception leaves
+ * {@link #loadInitialSnapshot()}.
  */
 public class InstrumentCacheLoader implements AutoCloseable {
 
@@ -121,11 +125,21 @@ public class InstrumentCacheLoader implements AutoCloseable {
      */
     public void loadInitialSnapshot() {
         consumer = new KafkaConsumer<>(consumerProperties);
-        List<TopicPartition> partitions = partitionsOf(consumer);
-        consumer.assign(partitions);
-        consumer.seekToBeginning(partitions);
 
-        Map<TopicPartition, Long> ends = new HashMap<>(consumer.endOffsets(partitions));
+        List<TopicPartition> partitions;
+        Map<TopicPartition, Long> ends;
+        try {
+            partitions = partitionsOf(consumer);
+            consumer.assign(partitions);
+            consumer.seekToBeginning(partitions);
+            ends = new HashMap<>(consumer.endOffsets(partitions));
+        } catch (RuntimeException e) {
+            // Nothing has handed ownership onward yet: this thread is the only one that has ever
+            // touched the consumer, so it is the one that must close it before the exception leaves.
+            consumer.close();
+            throw e;
+        }
+
         long deadline = System.nanoTime() + timeout.toNanos();
 
         while (!caughtUp(ends)) {
