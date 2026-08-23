@@ -3,6 +3,7 @@ package dev.engnotes.fes.marketdatacacheprojector;
 import java.time.Instant;
 import java.util.Map;
 
+import dev.engnotes.fes.common.cache.MarketCacheKeys;
 import dev.engnotes.fes.events.MarketDataTickEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,8 +56,8 @@ class MarketStateProjectionIntegrationTest {
 
     @BeforeEach
     void clearTicker() {
-        redis.delete(MarketStateProjection.tickKey(TICKER));
-        redis.delete(MarketStateProjection.windowKey(TICKER));
+        redis.delete(MarketCacheKeys.tickKey(TICKER));
+        redis.delete(MarketCacheKeys.windowKey(TICKER));
     }
 
     @Test
@@ -170,10 +171,10 @@ class MarketStateProjectionIntegrationTest {
     void should_give_the_window_a_ttl_so_an_idle_ticker_does_not_linger_forever() {
         projection.project(tick(BASE_MILLIS, 100.0, 3L), 1L);
 
-        assertThat(redis.getExpire(MarketStateProjection.windowKey(TICKER)))
+        assertThat(redis.getExpire(MarketCacheKeys.windowKey(TICKER)))
                 .as("the latest-price key deliberately has none; an empty window is honestly empty")
                 .isPositive();
-        assertThat(redis.getExpire(MarketStateProjection.tickKey(TICKER))).isNegative();
+        assertThat(redis.getExpire(MarketCacheKeys.tickKey(TICKER))).isNegative();
     }
 
     @Test
@@ -232,11 +233,11 @@ class MarketStateProjectionIntegrationTest {
     }
 
     private Map<Object, Object> tickState() {
-        return redis.opsForHash().entries(MarketStateProjection.tickKey(TICKER));
+        return redis.opsForHash().entries(MarketCacheKeys.tickKey(TICKER));
     }
 
     private Map<Object, Object> windowState() {
-        return redis.opsForHash().entries(MarketStateProjection.windowKey(TICKER));
+        return redis.opsForHash().entries(MarketCacheKeys.windowKey(TICKER));
     }
 
     private static MarketDataTickEvent tick(long eventTimestampMillis, double lastTradedPrice, long volume) {

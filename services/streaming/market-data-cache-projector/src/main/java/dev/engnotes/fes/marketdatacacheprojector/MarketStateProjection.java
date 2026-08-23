@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 
+import dev.engnotes.fes.common.cache.MarketCacheKeys;
 import dev.engnotes.fes.events.MarketDataTickEvent;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -25,7 +26,8 @@ import org.springframework.stereotype.Component;
  * while passing every local test against a standalone Redis.
  *
  * <p>The key space prefix is a security boundary, not only a naming convention. The projector's
- * Redis grant is scoped to {@code market:*}.
+ * Redis grant is scoped to {@code market:*}. The key format itself lives in platform-common's
+ * {@link MarketCacheKeys}, because {@code trade-enrichment-service} must agree on it.
  *
  * <p>A tick with a non-finite price or a negative volume is rejected before the script runs. The
  * script's tick-hash write and its window write are separate Redis calls inside one script, and Redis
@@ -42,8 +44,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class MarketStateProjection {
 
-    static final int BUCKET_SECONDS = 10;
-    static final int WINDOW_SECONDS = 300;
+    // BUCKET_SECONDS and WINDOW_SECONDS live in platform-common's MarketCacheKeys, because the
+    // reader has to agree with them. These two do not: see that class for why the split falls here.
     static final int WINDOW_TTL_SECONDS = 600;
     static final Duration MAX_FUTURE_SKEW = Duration.ofHours(1);
 
@@ -57,20 +59,12 @@ public class MarketStateProjection {
         this.clock = clock;
     }
 
-    public static String tickKey(String ticker) {
-        return "market:{" + ticker + "}:tick";
-    }
-
-    public static String windowKey(String ticker) {
-        return "market:{" + ticker + "}:window";
-    }
-
     @SuppressWarnings("unchecked")
     public ProjectionResult project(MarketDataTickEvent tick, long offset) {
         validate(tick);
         String ticker = tick.getTicker().toString();
         List<Long> result = redis.execute(projectTick,
-                List.of(tickKey(ticker), windowKey(ticker)),
+                List.of(MarketCacheKeys.tickKey(ticker), MarketCacheKeys.windowKey(ticker)),
                 Long.toString(tick.getEventTimestamp().toEpochMilli()),
                 Double.toString(tick.getBidPrice()),
                 Double.toString(tick.getAskPrice()),
@@ -79,8 +73,8 @@ public class MarketStateProjection {
                 Long.toString(tick.getProducedAt().toEpochMilli()),
                 tick.getCorrelationId().toString(),
                 Long.toString(offset),
-                Integer.toString(BUCKET_SECONDS),
-                Integer.toString(WINDOW_SECONDS),
+                Integer.toString(MarketCacheKeys.BUCKET_SECONDS),
+                Integer.toString(MarketCacheKeys.WINDOW_SECONDS),
                 Integer.toString(WINDOW_TTL_SECONDS));
         return ProjectionResult.of(result);
     }

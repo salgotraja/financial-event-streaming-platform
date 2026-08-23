@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
+import dev.engnotes.fes.common.cache.MarketCacheKeys;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import dev.engnotes.fes.events.MarketDataTickEvent;
 import dev.engnotes.fes.testing.KafkaAvroStack;
@@ -109,7 +110,7 @@ class MarketDataTickConsumerIntegrationTest {
         publish(tick("PROJECT-OK", 5_000L, 101.5));
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("PROJECT-OK")))
+                assertThat(redis.opsForHash().entries(MarketCacheKeys.tickKey("PROJECT-OK")))
                         .containsEntry("lastTradedPrice", "101.5"));
     }
 
@@ -126,10 +127,10 @@ class MarketDataTickConsumerIntegrationTest {
         publish(tick("IDEMPOTENT-SENTINEL", 5_000L, 1.0));
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("IDEMPOTENT-SENTINEL")))
+                assertThat(redis.opsForHash().entries(MarketCacheKeys.tickKey("IDEMPOTENT-SENTINEL")))
                         .containsEntry("lastTradedPrice", "1.0"));
 
-        assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("IDEMPOTENT")))
+        assertThat(redis.opsForHash().entries(MarketCacheKeys.tickKey("IDEMPOTENT")))
                 .as("the second IDEMPOTENT record must have zero effect, having already been "
                         + "applied once with this timestamp")
                 .containsEntry("lastTradedPrice", "101.5");
@@ -152,7 +153,7 @@ class MarketDataTickConsumerIntegrationTest {
                 .isEqualTo(POISON);
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("AFTER-POISON")))
+                assertThat(redis.opsForHash().entries(MarketCacheKeys.tickKey("AFTER-POISON")))
                         .as("the offset must advance past the poison record")
                         .containsEntry("lastTradedPrice", "202.5"));
     }
@@ -187,7 +188,7 @@ class MarketDataTickConsumerIntegrationTest {
         }
 
         Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.tickKey("OUTAGE")))
+                assertThat(redis.opsForHash().entries(MarketCacheKeys.tickKey("OUTAGE")))
                         .as("the unlimited backoff keeps retrying the uncommitted record, and it is "
                                 + "redelivered successfully once redis answers again")
                         .containsEntry("lastTradedPrice", "303.5"));
@@ -203,23 +204,23 @@ class MarketDataTickConsumerIntegrationTest {
         // fields by name, rather than hasSizeGreaterThan(1), stops the snapshot below being captured
         // after only the first tick has landed.
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.windowKey("REPLAY")))
+                assertThat(redis.opsForHash().entries(MarketCacheKeys.windowKey("REPLAY")))
                         .containsKeys("0:pv", "0:v", "10:pv", "10:v"));
 
         Map<Object, Object> first = withoutOffset(redis.opsForHash()
-                .entries(MarketStateProjection.windowKey("REPLAY")));
+                .entries(MarketCacheKeys.windowKey("REPLAY")));
 
-        redis.delete(MarketStateProjection.windowKey("REPLAY"));
-        redis.delete(MarketStateProjection.tickKey("REPLAY"));
+        redis.delete(MarketCacheKeys.windowKey("REPLAY"));
+        redis.delete(MarketCacheKeys.tickKey("REPLAY"));
         publish(tick("REPLAY", 5_000L, 100.0));
         publish(tick("REPLAY", 15_000L, 110.0));
 
         Awaitility.await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
-                assertThat(redis.opsForHash().entries(MarketStateProjection.windowKey("REPLAY")))
+                assertThat(redis.opsForHash().entries(MarketCacheKeys.windowKey("REPLAY")))
                         .containsKeys("0:pv", "0:v", "10:pv", "10:v"));
 
         Map<Object, Object> second = withoutOffset(redis.opsForHash()
-                .entries(MarketStateProjection.windowKey("REPLAY")));
+                .entries(MarketCacheKeys.windowKey("REPLAY")));
 
         assertThat(second)
                 .as("replaying the same ticks end to end reproduces identical window state, offset "

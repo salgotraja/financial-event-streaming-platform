@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import dev.engnotes.fes.common.cache.MarketCacheKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -126,10 +127,10 @@ class MarketCacheRedisAclIntegrationTest {
 
         @SuppressWarnings("unchecked")
         List<Long> result = grantedTemplate.execute(script,
-                List.of(MarketStateProjection.tickKey(TICKER), MarketStateProjection.windowKey(TICKER)),
+                List.of(MarketCacheKeys.tickKey(TICKER), MarketCacheKeys.windowKey(TICKER)),
                 "1000", "100.0", "101.0", "100.5", "10", "1005", "corr-acl", "1",
-                Integer.toString(MarketStateProjection.BUCKET_SECONDS),
-                Integer.toString(MarketStateProjection.WINDOW_SECONDS),
+                Integer.toString(MarketCacheKeys.BUCKET_SECONDS),
+                Integer.toString(MarketCacheKeys.WINDOW_SECONDS),
                 Integer.toString(MarketStateProjection.WINDOW_TTL_SECONDS));
 
         assertThat(result).as("the grant must let the projector's own script run to completion")
@@ -137,7 +138,7 @@ class MarketCacheRedisAclIntegrationTest {
         // HGET, not HGETALL: the shipped grant deliberately holds +hkeys and not +hgetall, so
         // reading the written field back for verification must use a command this user actually
         // holds.
-        assertThat(grantedTemplate.opsForHash().get(MarketStateProjection.tickKey(TICKER), "lastTradedPrice"))
+        assertThat(grantedTemplate.opsForHash().get(MarketCacheKeys.tickKey(TICKER), "lastTradedPrice"))
                 .isEqualTo("100.5");
     }
 
@@ -163,7 +164,7 @@ class MarketCacheRedisAclIntegrationTest {
 
             // Resolved empirically: with user default off, an unauthenticated client is denied
             // before it can run any command, and Redis reports it as NOAUTH.
-            assertThatThrownBy(() -> anonymousTemplate.opsForValue().get(MarketStateProjection.tickKey(TICKER)))
+            assertThatThrownBy(() -> anonymousTemplate.opsForValue().get(MarketCacheKeys.tickKey(TICKER)))
                     .as("user default off must leave an unauthenticated client with no access at all")
                     .hasStackTraceContaining("NOAUTH");
         } finally {
