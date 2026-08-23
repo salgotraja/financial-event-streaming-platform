@@ -65,7 +65,7 @@ class InstrumentCacheLoaderIntegrationTest {
     @Test
     @DisplayName("should not report loaded until every partition has been read to its captured end")
     void should_not_report_loaded_until_every_partition_has_been_read_to_its_captured_end() {
-        // 500 instruments across 6 partitions does not arrive in one poll. A loader that stopped
+        // 2000 instruments across 6 partitions does not arrive in one poll. A loader that stopped
         // after the first non-empty poll would report loaded with a partial map, release the trade
         // listener, and dead-letter every trade for a ticker it had not reached yet. Asserting the
         // LAST seeded ticker, not the first, is what makes this test able to see that.

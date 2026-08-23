@@ -146,22 +146,29 @@ public class InstrumentCacheLoader implements AutoCloseable {
 
         long deadline = System.nanoTime() + timeout.toNanos();
 
-        while (!caughtUp(ends)) {
-            if (System.nanoTime() > deadline) {
-                consumer.close();
-                throw new IllegalStateException(
-                        "Timed out after " + timeout + " reading the instrument master from " + topic
-                                + ". Starting the trade listener now would dead-letter every trade "
-                                + "for an instrument this process has not folded yet.");
+        try {
+            while (!caughtUp(ends)) {
+                if (System.nanoTime() > deadline) {
+                    throw new IllegalStateException(
+                            "Timed out after " + timeout + " reading the instrument master from " + topic
+                                    + ". Starting the trade listener now would dead-letter every trade "
+                                    + "for an instrument this process has not folded yet.");
+                }
+                try {
+                    fold(consumer.poll(POLL));
+                } catch (WakeupException e) {
+                    log.info("Instrument master load for {} interrupted by close() before the catch-up "
+                            + "condition was met; the trade listener was never started", topic);
+                    consumer.close();
+                    return;
+                }
             }
-            try {
-                fold(consumer.poll(POLL));
-            } catch (WakeupException e) {
-                log.info("Instrument master load for {} interrupted by close() before the catch-up "
-                        + "condition was met; the trade listener was never started", topic);
-                consumer.close();
-                return;
-            }
+        } catch (RuntimeException e) {
+            // Covers both the timeout above and caughtUp() itself, which calls consumer.position()
+            // and can throw. Either way this thread is still the sole owner, so it closes the
+            // consumer here before the exception leaves, the same as the setup block above.
+            consumer.close();
+            throw e;
         }
 
         try {
