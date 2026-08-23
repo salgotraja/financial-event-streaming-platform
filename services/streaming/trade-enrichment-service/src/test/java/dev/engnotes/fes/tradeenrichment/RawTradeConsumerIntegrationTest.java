@@ -228,12 +228,14 @@ class RawTradeConsumerIntegrationTest {
         ProducerRecord<String, TradeEvent> record =
                 new ProducerRecord<>(TRADE_TOPIC, HEADERS_TICKER, trade("T-HEADERS-1", HEADERS_TICKER, 5_000L));
         record.headers().add(new RecordHeader("traceparent", "trace-abc".getBytes()));
+        record.headers().add(new RecordHeader("tracestate", "state-abc".getBytes()));
         record.headers().add(new RecordHeader("correlationId", "corr-abc".getBytes()));
         publish(record);
 
         ConsumerRecord<String, EnrichedTradeEvent> enriched = readOneEnriched(HEADERS_TICKER);
         assertThat(enriched.key()).isEqualTo(HEADERS_TICKER);
         assertThat(new String(enriched.headers().lastHeader("traceparent").value())).isEqualTo("trace-abc");
+        assertThat(new String(enriched.headers().lastHeader("tracestate").value())).isEqualTo("state-abc");
         assertThat(new String(enriched.headers().lastHeader("correlationId").value())).isEqualTo("corr-abc");
     }
 
@@ -242,8 +244,15 @@ class RawTradeConsumerIntegrationTest {
     void should_quarantine_a_trade_whose_ticker_has_no_projected_market_state() {
         publish(trade("T-TICK-ABSENT-1", TICK_ABSENT_TICKER, 5_000L));
 
-        assertThat(readOneDeadLetter(TICK_ABSENT_TICKER).value().getFailureReason())
-                .contains("tick_absent");
+        ConsumerRecord<String, DeadLetterEvent> deadLetter = readOneDeadLetter(TICK_ABSENT_TICKER);
+        assertThat(deadLetter.value().getFailureReason()).contains("tick_absent");
+        // tick_absent is recoverable: the tick that never arrives here could arrive on a later
+        // poll, so this must be attempted more than once before quarantine, not dead-lettered on
+        // the first failure the way a not-retryable exception is.
+        assertThat(deadLetter.value().getRetryCount())
+                .as("a recoverable reason must go through the bounded back-off, not straight to the "
+                        + "recoverer on the first attempt")
+                .isGreaterThan(1);
     }
 
     @Test
@@ -264,7 +273,14 @@ class RawTradeConsumerIntegrationTest {
 
         publish(trade("T-FUTURE-1", FUTURE_TICKER, 5_000L));
 
-        assertThat(readOneDeadLetter(FUTURE_TICKER).value().getFailureReason()).contains("future");
+        ConsumerRecord<String, DeadLetterEvent> deadLetter = readOneDeadLetter(FUTURE_TICKER);
+        assertThat(deadLetter.value().getFailureReason()).contains("future");
+        // future cannot improve on retry: the cached tick only postdates the trade further as time
+        // passes, so this must quarantine on the first attempt rather than spending the bounded
+        // back-off on a reason that can never resolve.
+        assertThat(deadLetter.value().getRetryCount())
+                .as("future must not consume the bounded back-off the other four reasons get")
+                .isEqualTo(1);
     }
 
     @Test

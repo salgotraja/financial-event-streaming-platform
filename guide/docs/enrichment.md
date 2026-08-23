@@ -98,14 +98,14 @@ consume to broker acknowledgement. It is a processing-cost measure, not a delive
 
 ## When a trade cannot be enriched
 
-Four failure classes, three of them inherited unchanged from the projector's error handler.
+Four failure classes, two of them inherited unchanged from the projector's error handler.
 
 | Condition | What happens |
 | --- | --- |
 | Undecodable payload | not retryable, straight to `trades.raw.dlq` with the bytes the broker delivered |
 | Redis connection failure or command timeout | container pauses, unlimited attempts, never dead-letters |
 | Trade validation failure | not retryable, `trades.raw.dlq` |
-| Reference data unavailable | not retryable, `trades.raw.dlq` |
+| Reference data unavailable | bounded retry, then `trades.raw.dlq`, except one reason below |
 
 The last class carries a reason, which is both the metric tag and the dead-letter message:
 
@@ -117,15 +117,21 @@ The last class carries a reason, which is both the metric tag and the dead-lette
 | `window_empty` | the rolling window carries no volume in this trade's horizon |
 | `instrument_missing` | the instrument master does not carry this ticker |
 
-None of the three non-outage classes is retried. Retrying a decode failure does not improve the bytes,
-and every reference-data reason is deterministic for a given record and cache state: `stale` and
-`future` are event-time comparisons that cannot change inside a five-second back-off. Leaving them
-retryable would triple the Redis reads and the latency for every bad trade.
+A decode failure and a validation failure are never retried: retrying does not improve the bytes, and a
+validation verdict on the payload does not change either. Reference data unavailable is different.
+`age = trade.eventTimestamp - cachedTick.eventTimestamp`, and the projector is monotonic in event time
+(ADR-032), so the cached tick's timestamp only ever moves forward and `age` can only shrink across a
+retry. `tick_absent`, `window_empty` and `instrument_missing` can resolve as soon as the projector or the
+instrument loader catches up, and `stale` shrinks with every fresher tick, so those four get the same
+bounded back-off a decode failure does not. Only `future`, where the cached tick already postdates the
+trade, cannot improve: the same guarantee that shrinks age for the other four makes it grow more
+negative for this one, so it dead-letters on the first attempt instead of spending the back-off on a
+reason that can never resolve.
 
-**A stalled market-data feed therefore dead-letters the trade flow** for as long as the stall lasts,
-because every trade breaches the freshness bound. That is a deliberate choice, not an oversight. ADR-027
-scopes circuit breakers to calls against a failing dependency, and a Redis read that succeeds and
-returns an old value is not a failing call. The mitigation is that
+**A stalled market-data feed still dead-letters the trade flow eventually**, once the bounded retry is
+exhausted, because every trade keeps breaching the freshness bound. That is a deliberate choice, not an
+oversight. ADR-027 scopes circuit breakers to calls against a failing dependency, and a Redis read that
+succeeds and returns an old value is not a failing call. The mitigation is that
 `enrichment_reference_unavailable_total{reason="stale"}` makes it visible, not a mechanism that
 suppresses it.
 

@@ -37,18 +37,27 @@ import org.springframework.util.backoff.FixedBackOff;
 /**
  * The two failure classes ADR-027 separates, wired so that neither can be mistaken for the other.
  *
- * <p><strong>A malformed payload is one quarantined record, with zero retries.</strong> {@code
- * DeserializationException} is registered as not retryable, so the recoverer runs on the first
- * attempt and publishes to {@code {topic}.dlq}, and the offset advances so the partition keeps
- * moving. Retrying a decode failure does not help: the bytes do not improve. The bounded
- * {@link #poisonBackOff()} exists for the listener failures that are not a decode failure, not a
- * validation verdict, and not a Redis outage: a transient bug elsewhere in the listener still gets a
- * few bounded attempts before quarantine rather than being retried forever or quarantined on the
- * first failure. Registering the three exceptions below as not retryable makes this back-off
- * unreachable for every failure this service currently enumerates; it stays because a future listener
- * bug of that fourth kind deserves bounded retry rather than either extreme, and it remains the
- * back-off the {@link DefaultErrorHandler} is constructed with and the one
- * {@code setBackOffFunction} returns for the non-outage branch.
+ * <p><strong>A malformed payload or a failed validation is one quarantined record, with zero
+ * retries.</strong> {@code DeserializationException} and {@code IllegalArgumentException} are
+ * registered as not retryable, so the recoverer runs on the first attempt and publishes to
+ * {@code {topic}.dlq}, and the offset advances so the partition keeps moving. Retrying either does
+ * not help: the bytes do not decode differently on a second attempt, and a validation verdict on the
+ * payload does not change either.
+ *
+ * <p><strong>A reference-data gap gets the same bounded retry, except the one reason that cannot
+ * improve.</strong> {@code ReferenceDataUnavailableException} is deliberately left out of the
+ * not-retryable set. {@code age = trade.eventTimestamp - cachedTick.eventTimestamp}, and the
+ * projection is monotonic in event time (ADR-032), so the cached tick's timestamp only ever moves
+ * forward: {@code age} can only shrink across a retry. That makes four of its five reasons
+ * recoverable inside the bounded window: {@code tick_absent} and {@code window_empty} resolve as
+ * soon as the projector writes the ticker's first tick or bucket, {@code instrument_missing}
+ * resolves as soon as the loader's follower thread folds the record, and {@code stale} shrinks with
+ * every fresher tick. Only {@code future}, where the cached tick already postdates the trade, cannot
+ * improve: the same monotonic guarantee that shrinks age for the other four makes it grow more
+ * negative for this one. {@code setBackOffFunction} gives {@code future} a zero-attempt back-off and
+ * gives every other {@code ReferenceDataUnavailableException} the same {@link #poisonBackOff()} the
+ * other listener failures get, so a newly listed ticker, or the first trade after a projector
+ * restart, gets a second chance instead of dead-lettering with zero attempts.
  *
  * <p><strong>A Redis outage pauses the container.</strong> The back-off function returns an
  * unlimited-attempt back-off for a connection failure or a command timeout, so the recoverer is never
@@ -118,22 +127,15 @@ public class EnrichmentKafkaConfiguration {
                 poisonBackOff(),
                 pausing);
 
-        errorHandler.setBackOffFunction((record, exception) ->
-                isRedisOutage(exception)
-                        ? new FixedBackOff(OUTAGE_PAUSE_MS, FixedBackOff.UNLIMITED_ATTEMPTS)
-                        : poisonBackOff());
+        errorHandler.setBackOffFunction((record, exception) -> backOffFor(exception));
 
-        // Retrying any of these three does not help, and retrying costs more than it looks.
-        // A DeserializationException's bytes do not improve. A ReferenceDataUnavailableException is
-        // a property of the record set against the projection: tick_absent, instrument_missing and
-        // window_empty are all deterministic for a given record and cache state, and stale and
-        // future are event-time comparisons that cannot change within a 5s back-off. An
-        // IllegalArgumentException is a validation verdict on the payload. Leaving them retryable
-        // would triple the Redis reads and the latency for every bad trade, which at a stalled-feed
-        // rate is the whole partition's throughput.
-        errorHandler.addNotRetryableExceptions(DeserializationException.class,
-                ReferenceDataUnavailableException.class,
-                IllegalArgumentException.class);
+        // Retrying either of these does not help. A DeserializationException's bytes do not
+        // improve on a second attempt. An IllegalArgumentException is a validation verdict on the
+        // payload that will not change either. ReferenceDataUnavailableException is deliberately
+        // absent: four of its five reasons can resolve within the bounded back-off (see the class
+        // javadoc), so it is routed through setBackOffFunction instead, which still gives its one
+        // reason that cannot improve, future, a zero-attempt back-off of its own.
+        errorHandler.addNotRetryableExceptions(DeserializationException.class, IllegalArgumentException.class);
         errorHandler.setRetryListeners(failureTracker);
         // The container commits the recovered record's offset, so one poison payload does not block
         // the partition behind it.
@@ -280,6 +282,24 @@ public class EnrichmentKafkaConfiguration {
             log.warn("Metrics recording failed for quarantined topic={} partition={} offset={}",
                     failed.topic(), failed.partition(), failed.offset(), e);
         }
+    }
+
+    /**
+     * The back-off for one listener failure, in priority order: a Redis outage always pauses the
+     * container regardless of what triggered it, then {@code future} gets zero attempts because it
+     * cannot improve, then everything else falls through to the bounded {@link #poisonBackOff()}.
+     */
+    static BackOff backOffFor(Throwable exception) {
+        if (isRedisOutage(exception)) {
+            return new FixedBackOff(OUTAGE_PAUSE_MS, FixedBackOff.UNLIMITED_ATTEMPTS);
+        }
+        if (reasonOf(exception).filter(reason -> reason == UnavailableReason.FUTURE).isPresent()) {
+            // Age only grows more negative on retry (see the class javadoc), so no bounded wait
+            // recovers this one; the recoverer should see it on the first attempt, same as a
+            // not-retryable exception.
+            return new FixedBackOff(0L, 0L);
+        }
+        return poisonBackOff();
     }
 
     private static Optional<UnavailableReason> reasonOf(Throwable failure) {
