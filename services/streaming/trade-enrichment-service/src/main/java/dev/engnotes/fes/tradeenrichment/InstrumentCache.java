@@ -20,6 +20,10 @@ import dev.engnotes.fes.events.InstrumentReferenceEvent;
  * because of the map: a trade reading a {@code sharesOutstanding} one version behind produces a
  * slightly stale {@code marketCap}, not a wrong one, and the next trade for that ticker picks up the
  * new value. Nothing here accumulates, so a stale read cannot compound.
+ *
+ * <p>A ticker change writes the new ticker into {@code byTicker} before it removes the old one, so a
+ * concurrent reader always finds the instrument under one ticker or the other and never sees it
+ * vanish from both during the swap.
  */
 public class InstrumentCache {
 
@@ -37,11 +41,11 @@ public class InstrumentCache {
         }
 
         String ticker = event.getTicker().toString();
+        byTicker.put(ticker, new Instrument(ticker, event.getSharesOutstanding()));
         String previous = tickerByInstrumentId.put(instrumentId, ticker);
         if (previous != null && !previous.equals(ticker)) {
             byTicker.remove(previous);
         }
-        byTicker.put(ticker, new Instrument(ticker, event.getSharesOutstanding()));
     }
 
     public Optional<Instrument> find(String ticker) {

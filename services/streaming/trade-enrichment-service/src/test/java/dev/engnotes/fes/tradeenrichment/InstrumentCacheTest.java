@@ -50,9 +50,16 @@ class InstrumentCacheTest {
     @Test
     @DisplayName("should ignore a tombstone for a key it never saw")
     void should_ignore_a_tombstone_for_a_key_it_never_saw() {
+        // A tombstone for an instrument id the cache never saw must not disturb what it already
+        // holds. A prior version of this test tombstoned on a fresh cache and asserted size zero,
+        // which passes whether or not the null branch does anything at all: seed a known instrument
+        // first so an indiscriminate removal has something to destroy.
+        cache.apply("INE002A01018", instrument("RELIANCE", 1L));
+
         cache.apply("INE-UNKNOWN", null);
 
-        assertThat(cache.size()).isZero();
+        assertThat(cache.find("RELIANCE")).contains(new Instrument("RELIANCE", 1L));
+        assertThat(cache.size()).isEqualTo(1);
     }
 
     @Test
