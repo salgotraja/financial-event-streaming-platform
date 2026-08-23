@@ -72,7 +72,10 @@ public class TradeEnricher {
             throw unavailable(UnavailableReason.STALE,
                     "the cached tick for " + ticker + " is " + age + "ms old, over the " + maxAge + " limit");
         }
-        if (snapshot.windowVolume() <= 0.0) {
+        // !(x > 0.0) rather than x <= 0.0: they differ precisely on NaN, and a NaN volume must take
+        // this path. `x <= 0.0` is false for NaN, so a corrupt window volume would otherwise slip
+        // past this guard and vwap5Min, a non-optional double, would publish as NaN.
+        if (!(snapshot.windowVolume() > 0.0)) {
             throw unavailable(UnavailableReason.WINDOW_EMPTY,
                     "the rolling window for " + ticker + " carries no volume in this trade's horizon");
         }
@@ -82,11 +85,17 @@ public class TradeEnricher {
                         "the instrument master does not carry " + ticker));
 
         double mid = (snapshot.bidPrice() + snapshot.askPrice()) / 2.0;
-        if (!Double.isFinite(mid) || mid <= 0.0) {
-            // priceDeviation divides by this and is a non-optional double, so an Infinity here would
-            // reach the topic rather than fail here.
+        // A non-finite mid or lastTradedPrice is a corrupt cache value, not a business condition:
+        // the checks above only cover reasons the trade set against the projection, and this is a
+        // defect in what the projector wrote to Redis. Treated as a validation failure rather than
+        // ReferenceDataUnavailableException, consistent with the existing mid-price guard, because
+        // no bounded retry against the same corrupt value can fix it. priceDeviation divides by mid
+        // and marketCap multiplies by lastTradedPrice, and both are non-optional doubles, so an
+        // Infinity or NaN here would otherwise reach the topic rather than fail here.
+        if (!Double.isFinite(mid) || mid <= 0.0 || !Double.isFinite(snapshot.lastTradedPrice())) {
             throw new IllegalArgumentException(
-                    "The cached quote for " + ticker + " yields an unusable mid-price of " + mid);
+                    "The cached quote for " + ticker + " yields an unusable mid-price of " + mid
+                            + " or lastTradedPrice of " + snapshot.lastTradedPrice());
         }
 
         Instant enrichedAt = clock.instant();

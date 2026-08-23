@@ -167,6 +167,30 @@ class TradeEnricherTest {
     }
 
     @Test
+    @DisplayName("should reject a non-finite cached last traded price rather than publishing a NaN market cap")
+    void should_reject_a_non_finite_cached_last_traded_price_rather_than_publishing_a_nan_market_cap() {
+        // Double.parseDouble("NaN") succeeds, so a corrupt lastTradedPrice reaches the snapshot
+        // without a NumberFormatException. Bid/ask are finite so only lastTradedPrice is at fault.
+        given(snapshot(TRADE_AT - 1_000, 99.0, 101.0, Double.NaN, 2000.0, 20.0), 1_000_000L);
+
+        assertThatThrownBy(() -> enricher.enrich(trade(105.0), TRADE_AT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lastTradedPrice");
+    }
+
+    @Test
+    @DisplayName("should reject a NaN window volume as window_empty rather than publishing a NaN vwap")
+    void should_reject_a_nan_window_volume_as_window_empty_rather_than_publishing_a_nan_vwap() {
+        // windowVolume() <= 0.0 is false for NaN, so a corrupt volume would otherwise slip past the
+        // window_empty guard entirely and vwap5Min would publish as NaN.
+        given(snapshot(TRADE_AT - 1_000, 99.0, 101.0, 100.0, 2000.0, Double.NaN), 1_000_000L);
+
+        assertThatThrownBy(() -> enricher.enrich(trade(105.0), TRADE_AT))
+                .isInstanceOf(ReferenceDataUnavailableException.class)
+                .extracting("reason").isEqualTo(UnavailableReason.WINDOW_EMPTY);
+    }
+
+    @Test
     @DisplayName("should reject a trade carrying a non-finite price")
     void should_reject_a_trade_carrying_a_non_finite_price() {
         given(snapshot(TRADE_AT - 1_000, 99.0, 101.0, 100.0, 2000.0, 20.0), 1_000_000L);
