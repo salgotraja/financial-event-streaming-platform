@@ -3,6 +3,31 @@
 Every entry cost someone real time. Each one names where the behaviour lives so you can check it
 rather than take it on trust.
 
+## The native Kafka image can segfault on launch, and one crash fails the whole class
+
+`apache/kafka-native` is a GraalVM build, and on a CI runner it occasionally dies during startup:
+
+```text
+[ SegfaultHandler caught a segfault in thread 0x00007f64757eb8c0 ] siginfo: si_signo: 11
+ContainerLaunchException: Timed out waiting for log output matching
+  '.*Transitioning from RECOVERY to RUNNING.*'
+```
+
+What reaches the build log is neither of those lines. Because the container starts in a static
+initialiser, the failure surfaces as `initializationError` on the test class, wrapped in an
+`ExceptionInInitializerError`, and it reads like a test failure in whichever module happened to draw
+the crash. The one that failed had nothing to do with the change under review.
+
+Testcontainers' `startupAttempts` defaults to 1, so a single crash ends the run. `KafkaAvroStack` and
+`TestcontainersConfiguration` now pass `withStartupAttempts(3)`: each attempt discards the dead
+container and starts a fresh one. `SecureKafkaStack` deliberately does not, because it runs the JVM
+image for the reason above and has never shown this.
+
+Two things this is not, both of which were checked before the retry was added. It is not resource
+pressure from the number of integration classes, and it is not Docker network-pool exhaustion. The
+same commit passed on the next run with no change at all, which is what a crashing broker looks like
+and what a saturated runner does not.
+
 ## The native image cannot act as a SASL server
 
 `KafkaAvroStack` uses `apache/kafka-native:4.1.0` because it starts faster. `SecureKafkaStack` pins

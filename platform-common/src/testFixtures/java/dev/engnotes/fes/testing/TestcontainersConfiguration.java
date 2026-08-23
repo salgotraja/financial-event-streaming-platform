@@ -34,7 +34,9 @@ public class TestcontainersConfiguration {
     @Bean
     @ServiceConnection
     KafkaContainer kafkaContainer() {
-        return new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE));
+        // withStartupAttempts for the same reason KafkaAvroStack carries it: this is the GraalVM
+        // native broker build, and it can segfault during launch on a CI runner.
+        return new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE)).withStartupAttempts(3);
     }
 
     @Bean

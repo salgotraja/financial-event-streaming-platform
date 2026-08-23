@@ -37,7 +37,14 @@ public final class KafkaAvroStack {
     private static final KafkaContainer KAFKA = new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE))
             .withNetwork(NETWORK)
             .withNetworkAliases(KAFKA_ALIAS)
-            .withListener(KAFKA_ALIAS + ":" + KAFKA_INTERNAL_PORT);
+            .withListener(KAFKA_ALIAS + ":" + KAFKA_INTERNAL_PORT)
+            // The broker image is a GraalVM native build, and it occasionally segfaults during
+            // launch on a CI runner. Testcontainers then times out waiting for the RECOVERY to
+            // RUNNING line and fails the whole class with an initializationError, which reads like
+            // a test failure and is not one. startupAttempts defaults to 1, so a single crash ends
+            // the run; each retry discards the dead container and starts a fresh one. Observed once
+            // on a pull request whose next run against identical code passed.
+            .withStartupAttempts(3);
 
     private static final GenericContainer<?> SCHEMA_REGISTRY =
             new GenericContainer<>(DockerImageName.parse(SCHEMA_REGISTRY_IMAGE))
