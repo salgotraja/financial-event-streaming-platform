@@ -47,22 +47,29 @@ import org.slf4j.LoggerFactory;
  * that every trade for that ticker dead-letters with {@code instrument_missing} until a corrected
  * record is published, which is visible in the metric rather than silent.
  *
- * <p><strong>Thread ownership around {@code close()}.</strong> {@link KafkaConsumer} is not
- * thread-safe, and {@code wakeup()} is the only one of its methods documented safe to call from a
- * thread other than the one currently polling. Exactly one thread ever calls {@code poll} at a
- * time: the caller of {@link #loadInitialSnapshot()} while the catch-up loop runs, then the
- * follower thread started by {@link #startFollowing()} once the gate opens. {@code close()} never
- * touches the consumer directly except through {@code wakeup()}; it signals the owning thread to
- * stop, joins it, and only calls {@code consumer.close()} once it has confirmed that thread has
- * actually exited. The {@code closed} flag and the lock guarding it exist to close two windows that
- * timing alone does not close: a {@code close()} that arrives before {@link #startFollowing()} has
- * assigned the {@code follower} field, which must prevent the follower from starting at all rather
- * than starting it unsupervised, and a {@code close()} that arrives while
- * {@link #loadInitialSnapshot()} is still blocked in {@code poll}, which surfaces as a caught
- * {@link WakeupException} and a clean early return rather than an uncaught exception out of a
- * startup path whose only documented failure is {@link IllegalStateException}. If the follower does
- * not exit within the join window, {@code close()} logs a warning and leaves the consumer open
- * rather than closing it underneath a thread that might still be inside {@code poll}.
+ * <p><strong>Thread ownership.</strong> {@link KafkaConsumer} is not thread-safe: every method on
+ * it other than {@code wakeup()} must be called by whichever single thread currently owns it, and
+ * that includes closing it. Ownership moves exactly once, forward, and the thread holding it at
+ * each moment is the only one that ever calls {@code consumer.close()} for it:
+ * <ul>
+ *   <li>The caller of {@link #loadInitialSnapshot()} owns the consumer for the whole catch-up loop.
+ *   If it exits without handing ownership onward, on timeout or because {@link #close()} woke it out
+ *   of {@code poll}, it closes the consumer itself before returning or throwing.
+ *   <li>If the loop finishes, ownership passes to the follower thread started by
+ *   {@link #startFollowing()}, which closes the consumer in a {@code finally} block that runs no
+ *   matter why its loop ends, unless {@link #close()} had already run first, in which case no
+ *   follower is started at all and the loading thread, still the owner, closes the consumer itself
+ *   before returning from {@link #startFollowing()}.
+ * </ul>
+ * {@code close()} itself never calls anything on the consumer except {@code wakeup()}, which is the
+ * one method documented safe to call from outside the owning thread. It sets a {@code closed} flag
+ * and reads the {@code follower} field under {@link #lifecycleLock}, the same lock
+ * {@link #startFollowing()} takes before starting a follower, so the two can never disagree about
+ * whether a follower exists or is about to exist. {@code close()} then joins whatever follower it
+ * found; if the follower does not exit within the join window it logs a warning and returns without
+ * touching the consumer, because a live thread might still be inside {@code poll}. This makes the
+ * invariant structural rather than a narrowed timing window: whichever thread is executing
+ * {@code consumer.close()} is always the same thread that was the last to call {@code poll()} on it.
  */
 public class InstrumentCacheLoader implements AutoCloseable {
 
@@ -105,9 +112,10 @@ public class InstrumentCacheLoader implements AutoCloseable {
      * that starts the trade listener.
      *
      * <p>If {@link #close()} runs while this is blocked in {@code poll}, the resulting
-     * {@link WakeupException} is caught here and treated as a clean shutdown: the method returns
-     * without setting {@link #isLoaded()} and without starting the follower, rather than propagating
-     * a stack trace out of a startup path.
+     * {@link WakeupException} is caught here. This thread still owns the consumer at that point, so
+     * it closes it itself before returning, without setting {@link #isLoaded()} and without starting
+     * the follower, rather than propagating a stack trace out of a startup path or leaving the
+     * consumer for a {@code close()} call that will never touch it directly.
      *
      * @throws IllegalStateException if the condition is not met within the configured timeout
      */
@@ -122,6 +130,7 @@ public class InstrumentCacheLoader implements AutoCloseable {
 
         while (!caughtUp(ends)) {
             if (System.nanoTime() > deadline) {
+                consumer.close();
                 throw new IllegalStateException(
                         "Timed out after " + timeout + " reading the instrument master from " + topic
                                 + ". Starting the trade listener now would dead-letter every trade "
@@ -132,6 +141,7 @@ public class InstrumentCacheLoader implements AutoCloseable {
             } catch (WakeupException e) {
                 log.info("Instrument master load for {} interrupted by close() before the catch-up "
                         + "condition was met; the trade listener was never started", topic);
+                consumer.close();
                 return;
             }
         }
@@ -146,31 +156,38 @@ public class InstrumentCacheLoader implements AutoCloseable {
     /**
      * Keeps folding after the gate opens, so a reference-data update reaches a running service.
      *
-     * <p>Starting the thread and assigning {@link #follower} happen under {@link #lifecycleLock},
-     * the same lock {@link #close()} takes before it decides whether a follower exists to join. A
-     * loader closed after the catch-up loop finished but before this method ran must never start a
-     * follower against a consumer that {@code close()} is about to hand off to {@code wakeup()}.
+     * <p>Whether a follower starts at all is decided under {@link #lifecycleLock}, the same lock
+     * {@link #close()} takes before it decides whether a follower exists to join. If {@code close()}
+     * already ran, no follower is started, and this method closes the consumer itself: the loading
+     * thread is still its owner and nothing else will ever close it otherwise. If a follower does
+     * start, ownership passes to it, and it closes the consumer in a {@code finally} block that runs
+     * regardless of how its loop ends.
      */
     private void startFollowing() {
+        boolean loaderClosed;
         synchronized (lifecycleLock) {
-            if (closed) {
-                return;
-            }
-            follower = Thread.ofVirtual().name("instrument-cache-follower").start(() -> {
-                while (running) {
+            loaderClosed = closed;
+            if (!loaderClosed) {
+                follower = Thread.ofVirtual().name("instrument-cache-follower").start(() -> {
                     try {
-                        fold(consumer.poll(POLL));
+                        while (running) {
+                            fold(consumer.poll(POLL));
+                        }
                     } catch (WakeupException e) {
-                        return;
+                        // close() woke this thread; the finally block below closes the consumer.
                     } catch (RuntimeException e) {
-                        // The gate has already opened, so a failure here degrades freshness rather than
-                        // correctness: the map keeps serving what it holds. Killing the thread silently
-                        // is the one outcome to avoid.
+                        // The gate has already opened, so a failure here degrades freshness rather
+                        // than correctness: the map keeps serving what it holds until this thread
+                        // exits. Killing the thread silently is the one outcome to avoid.
                         log.error("Instrument master follow failed, the cache is now frozen", e);
-                        return;
+                    } finally {
+                        consumer.close();
                     }
-                }
-            });
+                });
+            }
+        }
+        if (loaderClosed) {
+            consumer.close();
         }
     }
 
@@ -200,10 +217,10 @@ public class InstrumentCacheLoader implements AutoCloseable {
     }
 
     /**
-     * Idempotent: a second call is a no-op. {@code wakeup()} is the only consumer method called
-     * from this thread while the follower or the loading thread might still own {@code poll}; the
-     * consumer itself is only closed once the follower has been confirmed exited, or was never
-     * started at all.
+     * Idempotent: a second call is a no-op. This never calls anything on the consumer except
+     * {@code wakeup()}; the thread that owns the consumer at the time closes it, as described in the
+     * class javadoc. If a follower does not exit within the join window, this leaves the consumer
+     * open rather than closing it out from under a thread that might still be inside {@code poll}.
      */
     @Override
     public void close() {
@@ -233,11 +250,7 @@ public class InstrumentCacheLoader implements AutoCloseable {
                 log.warn("Instrument cache follower for {} did not stop within {} of close(); "
                         + "leaving the consumer open rather than closing it under a live thread",
                         topic, SHUTDOWN_JOIN);
-                return;
             }
-        }
-        if (client != null) {
-            client.close();
         }
     }
 }
