@@ -3,19 +3,15 @@
 Everything on this page exists as a design decision, a requirement, or an Avro schema, and has no
 implementation in the repository. It is here so the rest of the guide can stay free of plans.
 
-The one thing on this page you *can* open today is the schema set: eleven of the sixteen files in
+The one thing on this page you *can* open today is the schema set: ten of the sixteen files in
 `contracts/src/main/avro/` are contracts for services that do not exist yet, and they are already under
 the compatibility gate.
 
 ## Phase 2, deterministic streaming
 
-Three services remain. [The market cache projector](projector.md) is built, and Redis joined the local
-stack with it, so what follows is the rest of the queue.
-
-**trade-enrichment-service.** Consumes `trades.raw`, joins market state and instrument reference data,
-produces `trades.enriched`. One constraint is fixed in advance: on a cache miss it must not fall back
-to a synchronous call to the simulator (ADR-027). A read path that reaches back into a producer turns
-a cache miss into an availability dependency.
+Two services remain. [The market cache projector](projector.md) is built and Redis joined the local
+stack with it, and [trade enrichment](enrichment.md) is built and reads that cache on every trade, so
+what follows is the rest of the queue.
 
 **risk-alert-service.** Evaluates governed, versioned rules against enriched trades and produces
 `notifications.alerts`. Sub-5ms p99 is the target.

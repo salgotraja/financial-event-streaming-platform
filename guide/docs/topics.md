@@ -1,7 +1,8 @@
 # Topics and schemas
 
-The local stack provisions 22 topics and 19 schema subjects. Five of those topics have a producer or a
-consumer today, and `market-data.ticks` now has two consumers. The rest exist because the inventory is the architecture's, not the current sprint's,
+The local stack provisions 22 topics and 19 schema subjects. Six of those topics have a producer or a
+consumer today, and `trades.raw` and `market-data.ticks` each have two consumers. The rest exist
+because the inventory is the architecture's, not the current sprint's,
 and a topic that appears the day its service ships would have to be created by hand or by
 auto-creation, and auto-creation quietly produces single-partition topics.
 
@@ -12,11 +13,11 @@ Source: `deploy/compose/topics.tsv`. Replication is 3 for every topic, matching
 
 | Topic | Partitions | Retention | Key | Used today |
 | --- | ---: | --- | --- | --- |
-| `trades.raw` | 12 | 7 days | ticker | written by `trade-producer`, read by `audit-service` |
-| `trades.enriched` | 12 | 7 days | ticker | no |
+| `trades.raw` | 12 | 7 days | ticker | written by `trade-producer`, read by `audit-service` and `trade-enrichment-service` |
+| `trades.enriched` | 12 | 7 days | ticker | written by `trade-enrichment-service` |
 | `market-data.ticks` | 12 | 1 day | ticker | written by `market-data-simulator`, read by `audit-service` and `market-data-cache-projector` |
 | `corporate-actions` | 6 | 30 days | ticker | written by `corporate-action-producer`, read by `audit-service` |
-| `reference-data.instruments` | 6 | compacted | instrumentId | written by `reference-data-service`, read by `audit-service` |
+| `reference-data.instruments` | 6 | compacted | instrumentId | written by `reference-data-service`, read by `audit-service` and `trade-enrichment-service` |
 | `positions.snapshots` | 12 | 7 days | | no |
 | `notifications.alerts` | 6 | 3 days | | no |
 | `risk-rules.events` | 6 | 365 days | | no |
@@ -30,7 +31,7 @@ Source: `deploy/compose/topics.tsv`. Replication is 3 for every topic, matching
 | `review.decisions` | 6 | 365 days | | no |
 | `remediation.requested` | 6 | 30 days | | no |
 | `precedent.graph.sync` | 6 | 7 days | | no |
-| `trades.raw.dlq` | 12 | 30 days | source key | written by `audit-service` on quarantine |
+| `trades.raw.dlq` | 12 | 30 days | source key | written by `audit-service` and `trade-enrichment-service` on quarantine |
 | `market-data.ticks.dlq` | 12 | 30 days | source key | written by `audit-service` and `market-data-cache-projector` on quarantine |
 | `corporate-actions.dlq` | 6 | 30 days | source key | written by `audit-service` on quarantine |
 | `reference-data.instruments.dlq` | 6 | 30 days | source key | written by `audit-service` on quarantine |

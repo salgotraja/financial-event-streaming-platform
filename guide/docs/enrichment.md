@@ -128,6 +128,13 @@ trade, cannot improve: the same guarantee that shrinks age for the other four ma
 negative for this one, so it dead-letters on the first attempt instead of spending the back-off on a
 reason that can never resolve.
 
+**What a cache miss must never do is call the simulator.** Market state reaches this service through
+Redis and nowhere else, and ADR-027 fixes that as the single route. A read path that fell back to a
+synchronous call into `market-data-simulator` on a miss would turn a cache miss into an availability
+dependency on a producer, which is exactly what projecting the ticks into a cache removes. So a miss
+dead-letters after bounded retry rather than reaching backwards for the value. [Identity](#identity)
+below shows the policy half of the same constraint.
+
 **A stalled market-data feed still dead-letters the trade flow eventually**, once the bounded retry is
 exhausted, because every trade keeps breaching the freshness bound. That is a deliberate choice, not an
 oversight. ADR-027 scopes circuit breakers to calls against a failing dependency, and a Redis read that
