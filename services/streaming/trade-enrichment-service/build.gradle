@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// ADR-027: market state reaches this service through Redis, projected from market-data.ticks, and
+// never through a synchronous call to the simulator on a cache miss. ADR-034: the instrument master
+// is folded into an in-memory map from an assign()-ed compacted topic, and the freshness policy is
+// an event-time comparison bounded at both ends.
+// Workload identity: trade-enrichment-service. Consumer group: the same name.
+// Kafka permission: read trades.raw and reference-data.instruments, write trades.enriched and
+// trades.raw.dlq. Redis permission: read only, scoped to market:*.
+
+description = 'Enriches trades.raw with market state and instrument reference data into trades.enriched'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation libs.confluent.kafka.avro.serializer
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation 'io.micrometer:micrometer-registry-prometheus'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}

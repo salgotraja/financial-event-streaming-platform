@@ -12,9 +12,14 @@
 # The grant holds +hkeys and not +hgetall: pruning the window needs the field names only, so the
 # narrower grant is correct and the script never reads bucket values it does not use.
 #
+# trade-enrichment-service only ever reads. Its script issues HGETALL against both market keys in
+# one call (ADR-034), so its grant holds +hgetall and no write command at all: an edit to the script
+# that added one would fail inside EVAL rather than silently succeeding.
+#
 # This file is a template. scripts/generate-dev-security-material.sh renders it into
 # deploy/compose/redis/users.acl, substituting the password below. The rendered file carries the
 # real password and is never committed; only this template is.
 
 user default off
 user market-data-cache-projector on >__FES_REDIS_PROJECTOR_SECRET__ ~market:* resetchannels +eval +evalsha +hget +hset +hincrbyfloat +hkeys +hdel +expire
+user trade-enrichment-service on >__FES_REDIS_ENRICHMENT_SECRET__ ~market:* resetchannels +eval +evalsha +hgetall

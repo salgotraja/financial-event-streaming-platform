@@ -147,6 +147,60 @@ can manufacture the prices it is supposed to be observing.
 Its Redis access is scoped the same way and is covered in
 [the market cache projector](projector.md).
 
+## A consumer with two inputs, and the denial that matters most
+
+`trade-enrichment-service` reads two topics rather than one: `trades.raw` and
+`reference-data.instruments`, the compacted instrument master. Only `trades.raw` carries a `GROUP`
+grant. The instrument master is folded by a consumer that `assign()`s every partition and joins no
+group at all, so a `GROUP` grant for it would be both unused and a permission this identity has no
+reason to hold (ADR-034). It also writes `trades.enriched` and, for quarantine, `trades.raw.dlq`.
+
+`TradeEnrichmentServiceAuthorizationTest` proves three allowed actions and three denied ones:
+
+**ALLOW** read `trades.raw` through its own consumer group, read the instrument master with no group
+at all, and write `trades.enriched`.
+
+**DENY** read `market-data.ticks`. This is the assertion that matters most in the whole file. Market
+state reaches this service through Redis, projected by `market-data-cache-projector` (ADR-027). A
+grant on the tick topic would be a second route to the same data and a way to bypass the projection
+that ADR-027 exists to enforce, regardless of what the Redis ACL restricts.
+
+**DENY** write `trades.raw`, the topic it consumes. A service that can write its own input can replay
+its own backlog.
+
+**DENY** join `market-data-cache-projector`'s consumer group.
+
+`TradeEnrichmentServiceIdentityStackTest` proves this identity's ungranted run is denied and its
+granted run actually enriches a trade, but nothing pins the ungranted run to one exception class.
+`InstrumentCacheLoader`'s readiness gate calls `partitionsFor` on `reference-data.instruments` before
+the trade listener ever attempts to join its group, so the two Kafka calls a fully ungranted identity
+makes on startup, a topic describe and a group join, are independent, and either could be the one
+the broker denies first. Both raise a subclass of `org.apache.kafka.common.errors.AuthorizationException`,
+so the test matches that shared substring rather than committing to whichever one happens to fire.
+
+Its Redis grant holds `+eval`, `+evalsha` and `+hgetall`, and nothing that writes, in
+`deploy/compose/redis/users.acl.template`. `EnrichmentRedisAclIntegrationTest` renders that template
+with a test password, the same substitution `scripts/generate-dev-security-material.sh` performs, and
+proves two denials that have to use different Redis features to mean anything.
+
+The first sends `HSET` inside the same `EVAL` the read script uses. Redis wraps a denial raised inside
+a script differently from a denial on a direct command: the message is `ERR ACL failure in script:
+User trade-enrichment-service has no permissions to run the 'hset' command`, not the bare `NOPERM` a
+direct command gets. It still names the ACL rather than failing with `unknown command`, which is what
+tells the two apart: the second would mean the probe never reached the authorizer at all.
+
+The second sends `HGETALL`, a command this identity does hold, against a key outside `market:*`. That
+one does carry `NOPERM No permissions to access a key` verbatim, because Redis reaches the key-space
+check on a command it already recognises. The projector's own key-space probe made this exact
+distinction first, after an earlier attempt used a never-granted command for both checks and ended up
+proving command denial twice rather than proving the key scope at all.
+
+`deploy/compose/docker-compose.strict-security.yml` gains no second healthcheck for this identity. The
+projector's healthcheck authenticates as the projector user, so it says nothing about whether
+`FES_REDIS_ENRICHMENT_SECRET` renders into the ACL file correctly; only `EnrichmentRedisAclIntegrationTest`
+proves that, by rendering the committed template itself rather than a liveness probe against a
+container that is already known to be reachable.
+
 ## The consumer contract is the inverse
 
 `audit-service` does not extend the producer contract, because its shape is reversed. Its policy grants

@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: trade-enrichment-service
+  data:
+    redis:
+      # An unavailable Redis must surface as an exception the error handler can classify, far inside
+      # max.poll.interval.ms. Without these Lettuce blocks on the frozen connection, the consumer
+      # thread stops polling, and the broker evicts the consumer: the failure the pausing back-off
+      # handler exists to prevent.
+      timeout: 2s
+      connect-timeout: 2s
+  kafka:
+    properties:
+      schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+    consumer:
+      # The group name is the service name, fixed by specification-v1.2 line 645 and by the IAM
+      # policy and KEDA query that scope it. Never suffixed. The instrument consumer does not use
+      # it: it assign()s partitions and joins no group at all.
+      group-id: trade-enrichment-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: io.confluent.kafka.serializers.KafkaAvroDeserializer
+        specific.avro.reader: true
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      properties:
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+        auto.register.schemas: false
+
+# Redis host and port are absent on purpose. Boot defaults them to localhost:6379 and a deployment
+# overrides SPRING_DATA_REDIS_HOST, _PORT, _USERNAME and _PASSWORD. Declaring them here with empty
+# defaults would make Lettuce AUTH with an empty username against the dev profile's unauthenticated
+# Redis, which fails for a reason that looks like a credential bug.
+
+# enable.auto.commit=false and MANUAL_IMMEDIATE come from platform-common's
+# ConsumerAcknowledgementConfiguration, so this service cannot ship weaker offset management by
+# omission. isolation.level is deliberately unset (ADR-019).
+
+fes:
+  trade-enrichment-service:
+    topic: trades.raw
+    reference-topic: reference-data.instruments
+    output-topic: trades.enriched
+    consumer-instance: ${HOSTNAME:trade-enrichment-service-local}
+    market-data-max-age: 30s
+    instrument-cache-timeout: 60s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
