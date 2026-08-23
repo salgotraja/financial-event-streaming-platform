@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -111,6 +112,20 @@ class InstrumentCacheLoaderIntegrationTest {
 
         assertThat(loader.isLoaded()).isTrue();
         assertThat(cache.size()).isZero();
+    }
+
+    @Test
+    @DisplayName("should close cleanly once loaded, and treat a second close as a no-op")
+    void should_close_cleanly_once_loaded_and_treat_a_second_close_as_a_noop() {
+        // Nothing exercised close() before this test. A loader that threw out of close(), or that
+        // closed the shared consumer twice, would only be caught here.
+        InstrumentCache cache = new InstrumentCache();
+        InstrumentCacheLoader loader = loader(cache, Duration.ofSeconds(60));
+        loader.loadInitialSnapshot();
+        assertThat(loader.isLoaded()).isTrue();
+
+        assertThatCode(loader::close).doesNotThrowAnyException();
+        assertThatCode(loader::close).doesNotThrowAnyException();
     }
 
     private static InstrumentCacheLoader loader(InstrumentCache cache, Duration timeout) {
