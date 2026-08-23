@@ -38,16 +38,16 @@ class TradeEnrichmentServiceIdentityStackTest extends ServiceIdentityContract {
 
     @Override
     protected String authorizationErrorMarker() {
-        // Resolved empirically, and not to a single exception class. This service makes two
-        // independent Kafka calls before either could succeed: InstrumentCacheLoader's readiness
-        // gate calls partitionsFor(reference-data.instruments), and the trade listener joins the
-        // "trade-enrichment-service" group. An ungranted run was observed denying each of the two in
-        // different runs (TopicAuthorizationException once, GroupAuthorizationException another
-        // time), which is exactly the "stopped by the group check or the topic check first"
-        // ambiguity this contract's class javadoc warns about, except here it is a genuine race
-        // rather than a fixed per-service order. Both classes share
-        // org.apache.kafka.common.errors.AuthorizationException, so matching that substring is
-        // correct regardless of which check wins, and it still excludes SaslAuthenticationException.
+        // Not resolved to a single exception class, deliberately. This service makes two independent
+        // Kafka calls on startup: InstrumentCacheLoader's readiness gate calls
+        // partitionsFor(reference-data.instruments), and the trade listener joins the
+        // "trade-enrichment-service" group. Either can be the one the broker denies first, which is
+        // the "stopped by the group check or the topic check first" ambiguity this contract's class
+        // javadoc already warns about, so pinning the marker to one of TopicAuthorizationException or
+        // GroupAuthorizationException would make this test depend on an ordering nothing guarantees.
+        // Both are subclasses of org.apache.kafka.common.errors.AuthorizationException, so matching
+        // that shared substring is correct regardless of which check wins, and it still excludes
+        // SaslAuthenticationException.
         return "AuthorizationException";
     }
 

@@ -171,13 +171,12 @@ its own backlog.
 **DENY** join `market-data-cache-projector`'s consumer group.
 
 `TradeEnrichmentServiceIdentityStackTest` proves this identity's ungranted run is denied and its
-granted run actually enriches a trade, but which exception the ungranted run raises is a genuine race
-rather than a fixed order: `InstrumentCacheLoader`'s readiness gate calls `partitionsFor` on
-`reference-data.instruments` before the trade listener ever attempts to join its group, so an
-observed denied run has raised `TopicAuthorizationException` there in one run and
-`GroupAuthorizationException` from the group join in another. Both share
-`org.apache.kafka.common.errors.AuthorizationException`, so the test matches that substring rather
-than a single exception class.
+granted run actually enriches a trade, but nothing pins the ungranted run to one exception class.
+`InstrumentCacheLoader`'s readiness gate calls `partitionsFor` on `reference-data.instruments` before
+the trade listener ever attempts to join its group, so the two Kafka calls a fully ungranted identity
+makes on startup, a topic describe and a group join, are independent, and either could be the one
+the broker denies first. Both raise a subclass of `org.apache.kafka.common.errors.AuthorizationException`,
+so the test matches that shared substring rather than committing to whichever one happens to fire.
 
 Its Redis grant holds `+eval`, `+evalsha` and `+hgetall`, and nothing that writes, in
 `deploy/compose/redis/users.acl.template`. `EnrichmentRedisAclIntegrationTest` renders that template
