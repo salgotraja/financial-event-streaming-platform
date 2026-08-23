@@ -57,13 +57,15 @@ class TradeEnricherTest {
     @Test
     @DisplayName("should report market capitalisation in crores from the last traded price")
     void should_report_market_capitalisation_in_crores_from_the_last_traded_price() {
-        // 1,000,000 shares at 100 INR is 100,000,000 INR, which is 10 crore. Using the trade's own
-        // price of 105 would report 10.5, letting one odd fill move the whole instrument's cap.
-        given(snapshot(TRADE_AT - 1_000, 99.0, 101.0, 100.0, 2000.0, 20.0), 1_000_000L);
+        // Bid/ask asymmetric on purpose: mid is 100.0 but lastTradedPrice is 105.0, so this test
+        // fails if marketCap is ever computed from mid instead. 1,000,000 shares at 105 INR is
+        // 105,000,000 INR, which is 10.5 crore; the mid-price would silently produce 10.0 instead.
+        // Do not "tidy" these back to symmetric bid/ask/last, that would erase the discrimination.
+        given(snapshot(TRADE_AT - 1_000, 98.0, 102.0, 105.0, 2000.0, 20.0), 1_000_000L);
 
         EnrichedTradeEvent enriched = enricher.enrich(trade(105.0), TRADE_AT - 20);
 
-        assertThat(enriched.getMarketCap()).isEqualTo(10.0);
+        assertThat(enriched.getMarketCap()).isEqualTo(10.5);
     }
 
     @Test
