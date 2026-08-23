@@ -1,9 +1,15 @@
 package dev.engnotes.fes.tradeenrichment;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import dev.engnotes.fes.common.cache.MarketCacheKeys;
+import dev.engnotes.fes.testing.KafkaAvroStack;
+import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +26,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The script against a real Redis: both keys read in one call, an absent tick reported as empty
  * rather than as a zeroed snapshot, and an expired window folded as empty rather than failing the
  * read.
+ *
+ * <p>{@code spring.kafka.listener.auto-startup=false} alone is not enough to make this context
+ * Kafka-free once Task 6 wired the instrument-master readiness gate: that gate is a blocking
+ * {@code SmartInitializingSingleton} that runs regardless of any listener's auto-start setting, so
+ * this context needs a reachable broker and an empty reference topic, not just a disabled listener.
+ * An empty topic loads immediately (its captured end offset already equals its beginning), so this
+ * costs the test nothing beyond the broker's own startup time, which {@link KafkaAvroStack} already
+ * pays once per JVM for every other module test.
  */
 @SpringBootTest(properties = {
         "management.otlp.metrics.export.enabled=false",
@@ -32,6 +46,8 @@ class MarketStateReaderIntegrationTest {
     private static final GenericContainer<?> REDIS =
             new GenericContainer<>(DockerImageName.parse("redis:8.10.1-alpine")).withExposedPorts(6379);
 
+    private static final String REFERENCE_TOPIC = "reader-it-ref-" + UUID.randomUUID();
+
     private static final String TICKER = "reader-it-" + UUID.randomUUID();
     private static final String EXPIRED = "reader-it-expired-" + UUID.randomUUID();
 
@@ -42,10 +58,23 @@ class MarketStateReaderIntegrationTest {
     private StringRedisTemplate redis;
 
     @DynamicPropertySource
-    static void redisProperties(DynamicPropertyRegistry registry) {
+    static void properties(DynamicPropertyRegistry registry) {
+        KafkaAvroStack.start();
         REDIS.start();
+        registry.add("spring.kafka.bootstrap-servers", KafkaAvroStack::bootstrapServers);
+        registry.add("spring.kafka.properties.schema.registry.url", KafkaAvroStack::schemaRegistryUrl);
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
+        registry.add("fes.trade-enrichment-service.reference-topic", () -> REFERENCE_TOPIC);
+    }
+
+    @BeforeAll
+    static void createTheEmptyReferenceTopic() throws Exception {
+        KafkaAvroStack.start();
+        try (Admin admin = Admin.create(Map.of(
+                AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaAvroStack.bootstrapServers()))) {
+            admin.createTopics(List.of(new NewTopic(REFERENCE_TOPIC, 1, (short) 1))).all().get();
+        }
     }
 
     @Test

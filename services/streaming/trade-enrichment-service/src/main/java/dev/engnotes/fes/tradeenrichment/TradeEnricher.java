@@ -6,6 +6,7 @@ import java.time.Instant;
 
 import dev.engnotes.fes.events.EnrichedTradeEvent;
 import dev.engnotes.fes.events.TradeEvent;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,6 +35,10 @@ public class TradeEnricher {
     private final Duration maxAge;
     private final Clock clock;
 
+    // Explicit, because a second (package-private, test-only) constructor with the same arity
+    // means Spring cannot infer which one to autowire and falls back to a default constructor that
+    // does not exist, failing every real ApplicationContext this service starts.
+    @Autowired
     public TradeEnricher(MarketStateReader reader,
                          InstrumentCache instruments,
                          EnrichmentProperties properties,
