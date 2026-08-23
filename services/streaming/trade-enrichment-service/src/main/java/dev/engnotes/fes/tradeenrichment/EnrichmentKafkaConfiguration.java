@@ -250,10 +250,10 @@ public class EnrichmentKafkaConfiguration {
         return false;
     }
 
-    private static void quarantine(DeadLetterPublisher publisher,
-                                   EnrichmentMetrics metrics,
-                                   ConsumerRecord<?, ?> record,
-                                   Exception exception) {
+    static void quarantine(DeadLetterPublisher publisher,
+                           EnrichmentMetrics metrics,
+                           ConsumerRecord<?, ?> record,
+                           Exception exception) {
 
         @SuppressWarnings("unchecked")
         ConsumerRecord<String, ?> failed = (ConsumerRecord<String, ?>) record;
