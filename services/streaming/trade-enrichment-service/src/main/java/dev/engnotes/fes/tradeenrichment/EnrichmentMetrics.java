@@ -1,7 +1,7 @@
 package dev.engnotes.fes.tradeenrichment;
 
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import dev.engnotes.fes.events.EnrichedTradeEvent;
 import io.micrometer.core.instrument.Counter;

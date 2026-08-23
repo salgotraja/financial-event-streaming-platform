@@ -67,4 +67,13 @@ public class KafkaSecurityConfiguration {
     DefaultKafkaConsumerFactoryCustomizer securityConsumerCustomizer() {
         return factory -> factory.updateConfigs(saslProfile);
     }
+
+    /**
+     * Exposed for a hand-built consumer or producer outside Spring Boot's own factories. See
+     * {@link KafkaSaslProfile} for why the two customizers above do not reach every client.
+     */
+    @Bean
+    KafkaSaslProfile kafkaSaslProfile() {
+        return new KafkaSaslProfile(saslProfile);
+    }
 }

@@ -1,0 +1,35 @@
+# Least-privilege Kafka policy for the trade-enrichment-service workload identity.
+# See trade-producer's policy for the rules that govern this file. Everything absent is denied.
+#
+# Two READ grants, because this service has two inputs. reference-data.instruments is consumed by an
+# assign()-ed consumer that joins no group, which is why only one GROUP grant appears: a subscription
+# there would need a second one and would also be functionally wrong (ADR-034).
+#
+# There is no grant on market-data.ticks. Market state reaches this service through Redis, and an
+# identity that could also read the tick topic would hold a second route to the same data and a way
+# to bypass the projection ADR-027 exists to enforce.
+#
+# There is no reference-data.instruments.dlq grant. A malformed instrument record is logged and
+# skipped; specification-v1.2 line 604 gives this identity no DLQ there.
+#
+# Denials proved in TradeEnrichmentServiceAuthorizationTest: it may not read market-data.ticks, it
+# may not write the topic it consumes, and it may not join another workload's consumer group.
+
+principal: trade-enrichment-service
+
+allowed:
+  - resourceType: TOPIC
+    name: trades.raw
+    operations: [READ]
+  - resourceType: TOPIC
+    name: reference-data.instruments
+    operations: [READ]
+  - resourceType: TOPIC
+    name: trades.enriched
+    operations: [WRITE]
+  - resourceType: TOPIC
+    name: trades.raw.dlq
+    operations: [WRITE]
+  - resourceType: GROUP
+    name: trade-enrichment-service
+    operations: [READ]

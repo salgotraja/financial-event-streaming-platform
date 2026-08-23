@@ -88,6 +88,7 @@ log "writing SASL credentials"
     'org.apache.kafka.common.security.plain.PlainLoginModule required' "$(secret_for admin)"
 
   printf 'FES_REDIS_PROJECTOR_SECRET=%s\n' "$(secret_for market-data-cache-projector)"
+  printf 'FES_REDIS_ENRICHMENT_SECRET=%s\n' "$(secret_for trade-enrichment-service)"
 } > "$REPO_ROOT/deploy/compose/.env"
 chmod 600 "$REPO_ROOT/deploy/compose/.env"
 
@@ -108,7 +109,9 @@ log "wrote deploy/compose/.env and per-identity client properties"
 
 log "rendering the Redis ACL"
 sed "s/__FES_REDIS_PROJECTOR_SECRET__/$(secret_for market-data-cache-projector)/" \
-  "$REPO_ROOT/deploy/compose/redis/users.acl.template" > "$REPO_ROOT/deploy/compose/redis/users.acl"
+  "$REPO_ROOT/deploy/compose/redis/users.acl.template" \
+  | sed "s/__FES_REDIS_ENRICHMENT_SECRET__/$(secret_for trade-enrichment-service)/" \
+  > "$REPO_ROOT/deploy/compose/redis/users.acl"
 chmod 600 "$REPO_ROOT/deploy/compose/redis/users.acl"
 log "wrote deploy/compose/redis/users.acl"
 

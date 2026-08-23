@@ -52,7 +52,13 @@ public class RawTradeConsumer {
         this.metrics = metrics;
     }
 
+    // idIsGroup = false: id names the listener container bean for the readiness gate's
+    // SmartLifecycle lookup and for the test registry, not the consumer group. Left at its default
+    // of true, @KafkaListener silently overrides the configured group.id with this id, so the
+    // running consumer would join a group named "trades-raw" instead of "trade-enrichment-service",
+    // the one name the committed Kafka policy's GROUP grant actually authorizes.
     @KafkaListener(id = LISTENER_ID,
+            idIsGroup = false,
             topics = "${fes.trade-enrichment-service.topic}",
             autoStartup = "false")
     public void consume(ConsumerRecord<String, TradeEvent> record, Acknowledgment acknowledgment) {

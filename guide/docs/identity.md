@@ -34,7 +34,7 @@ security protocol all come from the environment, because those are facts about a
 identity is not, so it is not configurable (ADR-031).
 
 This is the shape `ProducerDurabilityConfiguration` already takes, for the same reason: what the
-platform must guarantee is imposed by shared code, not restated in six service configurations that
+platform must guarantee is imposed by shared code, not restated in seven service configurations that
 are each free to drift.
 
 Two tests hold the rule up rather than merely stating it:

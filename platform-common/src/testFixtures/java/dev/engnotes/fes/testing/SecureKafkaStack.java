@@ -86,7 +86,8 @@ public final class SecureKafkaStack {
             "corporate-action-producer",
             "reference-data-service",
             "audit-service",
-            "market-data-cache-projector");
+            "market-data-cache-projector",
+            "trade-enrichment-service");
 
     private static final String KAFKA_ALIAS = "kafka";
     private static final int IN_NETWORK_PORT = 19092;

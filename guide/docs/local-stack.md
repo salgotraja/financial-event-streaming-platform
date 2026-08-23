@@ -165,7 +165,16 @@ machine and says nothing about how the platform authenticates.
 PostgreSQL. It joins when the Phase 2 services that need it land, so FR-09.1 is partly met rather
 than met. Redis arrived with [the market cache projector](projector.md): unauthenticated in the dev
 profile, and in `strict-security` behind an ACL file with `user default off` and one user per
-workload, scoped to the key space that workload owns.
+workload, scoped to the key space that workload owns. `trade-enrichment-service` is the second such
+user; its grant holds `+eval`, `+evalsha` and `+hgetall` and no write command at all, since it only
+ever reads the state the projector writes.
+
+The compose file's Redis healthcheck still authenticates as the projector alone. It was not
+duplicated for the enrichment identity, because a second liveness probe would prove the container is
+reachable, which the first probe already establishes, not that the enrichment secret rendered into
+the ACL file correctly. That is what `EnrichmentRedisAclIntegrationTest` proves instead, by rendering
+the committed template with a test password and authenticating against a real Redis, the same
+substitution `scripts/generate-dev-security-material.sh` performs.
 
 The services themselves, in this stack. They still run from Gradle or an IDE against it. Each service
 now builds an image, and [service identity](identity.md) proves the binding to a Kafka principal by

@@ -6,11 +6,13 @@ import java.util.Optional;
 
 import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.common.kafka.FailureTracker;
+import dev.engnotes.fes.common.kafka.KafkaSaslProfile;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
@@ -171,7 +173,8 @@ public class EnrichmentKafkaConfiguration {
     InstrumentCacheLoader instrumentCacheLoader(InstrumentCache cache,
                                                 EnrichmentProperties properties,
                                                 KafkaProperties kafkaProperties,
-                                                EnrichmentMetrics metrics) {
+                                                EnrichmentMetrics metrics,
+                                                ObjectProvider<KafkaSaslProfile> saslProfile) {
 
         // Boot 4.1 moved this class out of spring-boot-autoconfigure. The import is
         // org.springframework.boot.kafka.autoconfigure.KafkaProperties, and buildConsumerProperties
@@ -179,6 +182,13 @@ public class EnrichmentKafkaConfiguration {
         // spring-boot-kafka-4.1.0 jar, not assumed.
         Map<String, Object> consumerProperties =
                 new HashMap<>(kafkaProperties.buildConsumerProperties());
+        // This consumer is built by hand rather than through Spring Boot's autoconfigured
+        // ConsumerFactory, so KafkaSecurityConfiguration's DefaultKafkaConsumerFactoryCustomizer
+        // never touches it. Without this, the instrument master would connect as PLAINTEXT under
+        // the secure-kafka profile regardless of the broker's own listener, and the readiness gate
+        // would fail every startup with a metadata timeout rather than an authorization error.
+        // KafkaSaslProfile only exists under that profile, hence the optional provider.
+        saslProfile.ifAvailable(profile -> consumerProperties.putAll(profile.properties()));
         // No group and no committed offsets: this consumer assign()s every partition, so a group id
         // would be misleading and a GROUP grant for it would be an unnecessary permission.
         consumerProperties.remove(ConsumerConfig.GROUP_ID_CONFIG);
