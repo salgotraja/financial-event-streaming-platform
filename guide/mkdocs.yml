@@ -90,6 +90,7 @@ nav:
       - The four producers: producers.md
       - The audit consumer: audit.md
       - The market cache projector: projector.md
+      - The trade enrichment service: enrichment.md
       - Workload authorization: authorization.md
       - Service identity: identity.md
       - Build gates and CI: gates.md

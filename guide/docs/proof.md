@@ -142,6 +142,27 @@ order.
 | The projector's Redis grant runs the projection script and nothing wider | `users.acl.template` | `should_run_the_projection_script_against_a_market_key_as_the_granted_user`, `should_deny_a_granted_command_outside_the_market_key_space`, `should_refuse_an_unauthenticated_connection` |
 | The projector cannot read the trade stream or write the topic it projects | `security/kafka-acls.yml` | `should_deny_reading_the_trade_stream`, `should_deny_writing_the_topic_it_projects`, `should_deny_joining_a_consumer_group_other_than_its_own` |
 
+## Trade enrichment
+
+| Behaviour | Implementation | Proof |
+| --- | --- | --- |
+| A cached tick older than the freshness limit is not used | `TradeEnricher` | `should_accept_an_age_exactly_on_the_maximum`, `should_reject_an_age_one_millisecond_over_the_maximum_as_stale` |
+| A cached tick that postdates the trade is not used either, so a replay cannot enrich from the future | `TradeEnricher` | `should_reject_a_cache_entry_newer_than_the_trade_rather_than_enriching_from_the_future`, `should_accept_an_age_of_exactly_zero` |
+| The VWAP fold ignores buckets newer than the trade, so a replay reproduces the live value | `MarketStateReader` | `should_discard_a_bucket_newer_than_the_trade_so_replay_reproduces_the_live_value`, `should_keep_the_bucket_exactly_on_the_upper_bound_which_is_the_trades_own` |
+| The fold keeps the five-minute horizon and ignores the window's `lastOffset` field | `MarketStateReader` | `should_keep_the_bucket_exactly_on_the_lower_bound`, `should_discard_a_bucket_older_than_the_trades_five_minute_horizon`, `should_ignore_last_offset_and_any_field_that_is_not_a_bucket` |
+| Market capitalisation comes from the last traded price, not the mid-price | `TradeEnricher` | `should_report_market_capitalisation_in_crores_from_the_last_traded_price`, whose fixture makes mid and last differ so the swap is detectable |
+| A quote that would make `priceDeviation` infinite is rejected before the event is built | `TradeEnricher` | `should_reject_a_zero_mid_price_before_it_makes_price_deviation_infinite` |
+| An empty window is refused rather than divided by | `TradeEnricher` | `should_reject_a_window_with_no_volume_rather_than_dividing_by_zero` |
+| Each reason a trade cannot be enriched reaches the DLQ separately | `EnrichmentKafkaConfiguration` | `should_quarantine_a_trade_whose_ticker_has_no_projected_market_state`, `..._is_older_than_the_freshness_limit`, `..._postdates_it`, `..._carries_no_volume`, `..._the_instrument_master_does_not_carry` |
+| A Redis outage pauses the container instead of dead-lettering a good trade | `EnrichmentKafkaConfiguration` | `should_pause_the_container_during_a_redis_outage_rather_than_dead_letter_a_good_trade` |
+| No trade is delivered before the instrument master has been folded | `EnrichmentKafkaConfiguration` | `should_not_deliver_any_trade_before_the_instrument_master_has_been_folded`, watched failing with the gate bean removed |
+| The loader waits for every partition, and an empty master starts rather than hangs | `InstrumentCacheLoader` | `should_not_report_loaded_until_every_partition_has_been_read_to_its_captured_end`, `should_report_loaded_immediately_when_the_master_is_empty` |
+| A failed load fails startup instead of serving a partial map | `InstrumentCacheLoader` | `should_fail_startup_rather_than_release_a_partial_map_when_the_wait_times_out`, `should_fail_loading_and_report_not_loaded_when_the_onLoaded_callback_throws` |
+| Whichever thread owns the consumer closes it, on every exit path | `InstrumentCacheLoader` | `should_close_cleanly_once_loaded_and_treat_a_second_close_as_a_noop`, `should_close_its_own_consumer_when_setup_fails_before_the_catch_up_loop_is_reached` |
+| The listener joins the configured group, not one named after its listener id | `RawTradeConsumer` | `should_join_trade_enrichment_service_not_a_group_named_after_the_listener_id`, asserting the group Spring Kafka actually computes |
+| Enrichment cannot read the tick stream, write its own input, or join another group | `security/kafka-acls.yml` | `should_deny_reading_the_market_data_tick_stream`, `should_deny_writing_the_topic_it_consumes`, `should_deny_joining_a_consumer_group_other_than_its_own` |
+| The enrichment Redis grant is read-only and confined to the market key space | `users.acl.template` | `should_deny_a_write_inside_eval_because_the_grant_holds_no_write_command` for command denial, `should_deny_reading_outside_market_star_using_a_command_the_identity_does_hold` for key-space denial |
+
 ## Structure
 
 | Behaviour | Implementation | Proof |

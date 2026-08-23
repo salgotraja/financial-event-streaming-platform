@@ -8,8 +8,10 @@ so that trade enrichment can read a price without calling the simulator. That co
 and it is a throughput decision rather than a stylistic one: a synchronous call per record on the
 enrichment path would put a network round trip inside the hot loop.
 
-Nothing reads the cache yet. Trade enrichment does not exist, so this service currently fills a cache
-with no readers. That is the order the phases run in, not an oversight.
+Until trade enrichment landed, this service filled a cache with no readers, which was the order the
+phases run in rather than an oversight. Both keys are now read on every trade: see
+[the trade enrichment service](enrichment.md), which applies its own freshness policy to what this
+service stores and folds the window into a five-minute VWAP.
 
 ## What it consumes and what it writes
 
