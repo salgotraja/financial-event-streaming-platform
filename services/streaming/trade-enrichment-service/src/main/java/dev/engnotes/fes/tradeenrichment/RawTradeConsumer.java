@@ -19,9 +19,19 @@ import org.springframework.stereotype.Component;
  * distinguishes. A metrics failure is neither: by the time metrics runs the record is already on the
  * topic, so letting it propagate would retry the enrichment and publish the trade twice.
  *
- * <p>The listener is declared with {@code autoStartup = false} and is started by
- * {@link InstrumentCacheLoader} once the instrument master has been folded. Starting it earlier
- * dead-letters every trade whose instrument the process has not reached yet.
+ * <p><strong>What actually gates this listener is not {@code autoStartup = false}.</strong> The
+ * real guarantee is that {@link InstrumentCacheLoader#loadInitialSnapshot()} runs inside a blocking
+ * {@code SmartInitializingSingleton} in {@code EnrichmentKafkaConfiguration}, and every
+ * {@code SmartInitializingSingleton} in a Spring context completes during
+ * {@code finishBeanFactoryInitialization()}, strictly before {@code finishRefresh()}, the later
+ * phase in which any container's auto-start actually runs. So by the time this or any other listener
+ * could start, the instrument master has already finished loading or the loader has already thrown
+ * and aborted context startup. {@code autoStartup = false} is a second, redundant belt: it is what
+ * lets {@code EnrichmentKafkaConfiguration}'s {@code SmartLifecycle} bean start this specific
+ * container explicitly, once loading succeeds, rather than racing the framework's own auto-start,
+ * but it is not the thing preventing an early delivery. Starting this listener before the master has
+ * loaded, however it happened, would dead-letter every trade whose instrument the process has not
+ * reached yet.
  */
 @Component
 public class RawTradeConsumer {

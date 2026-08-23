@@ -8,6 +8,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import dev.engnotes.fes.common.cache.MarketCacheKeys;
+import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import dev.engnotes.fes.events.EnrichedTradeEvent;
 import dev.engnotes.fes.events.InstrumentReferenceEvent;
@@ -75,7 +76,7 @@ class RawTradeConsumerIntegrationTest {
     private static final String TRADE_TOPIC = "tes-it-" + UUID.randomUUID();
     private static final String REFERENCE_TOPIC = "tes-ref-it-" + UUID.randomUUID();
     private static final String OUTPUT_TOPIC = "tes-out-it-" + UUID.randomUUID();
-    private static final String DLQ_TOPIC = TRADE_TOPIC + ".dlq";
+    private static final String DLQ_TOPIC = TRADE_TOPIC + DeadLetterPublisher.DLQ_SUFFIX;
 
     private static final int REFERENCE_PARTITIONS = 6;
     // Large enough that the catch-up loop spans several polls (as in

@@ -9,6 +9,8 @@ import dev.engnotes.fes.common.kafka.FailureTracker;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
@@ -63,6 +65,8 @@ import org.springframework.util.backoff.FixedBackOff;
  */
 @Configuration(proxyBeanMethods = false)
 public class EnrichmentKafkaConfiguration {
+
+    private static final Logger log = LoggerFactory.getLogger(EnrichmentKafkaConfiguration.class);
 
     // Three attempts total, so two retries after the first failure.
     private static final long MAX_RETRIES = 2;
@@ -254,8 +258,18 @@ public class EnrichmentKafkaConfiguration {
         @SuppressWarnings("unchecked")
         ConsumerRecord<String, ?> failed = (ConsumerRecord<String, ?>) record;
         publisher.publish(failed, originalPayload(failed, exception), exception).join();
-        metrics.recordQuarantined();
-        reasonOf(exception).ifPresent(metrics::recordUnavailable);
+
+        // The dead letter is already published by the time this runs. setAckAfterHandle(true) means
+        // a metrics failure here would prevent the ack and redeliver the record, quarantining it a
+        // second time, so this must be swallowed exactly like RawTradeConsumer swallows its own
+        // metrics failure after a successful publish.
+        try {
+            metrics.recordQuarantined();
+            reasonOf(exception).ifPresent(metrics::recordUnavailable);
+        } catch (RuntimeException e) {
+            log.warn("Metrics recording failed for quarantined topic={} partition={} offset={}",
+                    failed.topic(), failed.partition(), failed.offset(), e);
+        }
     }
 
     private static Optional<UnavailableReason> reasonOf(Throwable failure) {
