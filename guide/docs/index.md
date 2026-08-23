@@ -45,7 +45,7 @@ trade execution and no regulatory reporting.
 | Service identity binding, each service proven to authenticate as its own principal | Built, against a local broker with ACLs, not against MSK IAM |
 | Service container images, one per module, from buildpacks | Built |
 | Local stack, both profiles, with observability | Built |
-| Deterministic streaming: enrichment, risk alerting, position read model | Not started |
+| Deterministic streaming: risk alerting, position read model | Not started |
 | CDC migration, control plane, agent plane | Not started |
 | Throughput and latency evidence | Not measured |
 
