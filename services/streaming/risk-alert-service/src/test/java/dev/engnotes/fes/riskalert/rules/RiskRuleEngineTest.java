@@ -68,4 +68,22 @@ class RiskRuleEngineTest {
         assertThat(engine.evaluate(EnrichedTrades.withDeviationAt(0.1, Instant.ofEpochMilli(2_000L))))
                 .isEmpty();
     }
+
+    @Test
+    void a_malformed_governed_rule_version_is_skipped_and_does_not_abort_the_other_rules() {
+        RiskRuleRegistry registry = new RiskRuleRegistry(BOOTSTRAP);
+        registry.apply(new RuleTransition("pd-broken", "price-deviation", 1, RuleState.ACTIVE,
+                Map.of("warn-deviation-percent", "2.0"), 1_000L));
+        registry.apply(new RuleTransition("pd-ok", "price-deviation", 1, RuleState.ACTIVE, BANDS, 1_000L));
+        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()));
+
+        // pd-broken is missing critical-deviation-percent, so PriceDeviationParameters.from rejects
+        // it. That must not stop pd-ok, evaluated in the same loop, from alerting on the same trade.
+        List<RiskAlertEvent> alerts = engine.evaluate(
+                EnrichedTrades.withDeviationAt(6.0, Instant.ofEpochMilli(2_000L)));
+
+        assertThat(alerts).hasSize(1)
+                .extracting(RiskAlertEvent::getRuleId)
+                .containsExactly("pd-ok");
+    }
 }
