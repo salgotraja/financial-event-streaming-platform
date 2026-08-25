@@ -17,6 +17,10 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.log.LogAccessor;
+import org.springframework.kafka.support.KafkaUtils;
+import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.kafka.support.serializer.SerializationUtils;
 
 /**
  * Folds the governed rule history from {@code risk-rules.events} into {@link RiskRuleRegistry}, and
@@ -52,6 +56,22 @@ import org.slf4j.LoggerFactory;
  * counted through {@code onRejected}, and skipped: it must never fail startup, because the fold
  * gates the listener and a control-plane data error would otherwise become an availability failure
  * of the deterministic streaming plane.
+ *
+ * <p><strong>A decode failure must reach this class as a null value, not as an exception out of
+ * {@code poll()}.</strong> {@code KafkaConsumer} deserializes every record inside {@code poll()}
+ * itself, before any {@link ConsumerRecords} is returned, so a plain {@code KafkaAvroDeserializer}
+ * throws a {@code SerializationException} out of {@code poll()} directly and {@link #fold} is never
+ * invoked for that batch at all: the exception would be caught only by the timeout catch in
+ * {@link #loadInitialSnapshot()}, which closes the consumer and rethrows, failing startup on a
+ * corrupt control-plane record. That is exactly the failure mode this class exists to prevent, so
+ * the configured deserializer wraps {@code KafkaAvroDeserializer} in Spring Kafka's
+ * {@code ErrorHandlingDeserializer}, which catches the decode failure inside its own
+ * {@code deserialize()} call, records it on a header, and returns null instead of throwing. That
+ * makes a decode failure indistinguishable from a genuinely null value at the point
+ * {@link #fold} reads {@code record.value()}, so {@link #fold} inspects
+ * {@code KafkaUtils.VALUE_DESERIALIZER_EXCEPTION_HEADER} to tell them apart and reports
+ * {@code malformed_record} for a decode failure and {@code null_value} only for a genuinely null
+ * one, since Task 10 binds both slugs as separate metric labels.
  *
  * <p>Mutation happens only through {@link RiskRuleRegistry#apply(RuleTransition)}, never directly on
  * a {@link RuleTimeline}: the registry owns the concurrency across the fold thread and the listener
@@ -95,6 +115,10 @@ public class RuleTimelineLoader implements AutoCloseable {
     private static final Duration SHUTDOWN_JOIN = Duration.ofSeconds(5);
 
     private static final Logger log = LoggerFactory.getLogger(RuleTimelineLoader.class);
+    // SerializationUtils.getExceptionFromHeader wants a LogAccessor, not an slf4j Logger, to log a
+    // foreign or corrupt header; read off org.springframework.core.log.LogAccessor in the resolved
+    // spring-core jar rather than assumed.
+    private static final LogAccessor DESERIALIZATION_LOG = new LogAccessor(RuleTimelineLoader.class);
 
     private final RiskRuleRegistry registry;
     private final Map<String, Object> consumerProperties;
@@ -252,13 +276,31 @@ public class RuleTimelineLoader implements AutoCloseable {
         for (ConsumerRecord<String, RiskRuleLifecycleEvent> record : records) {
             RiskRuleLifecycleEvent event = record.value();
             if (event == null) {
-                // Not a tombstone. risk-rules.events is not compacted and rule history is
-                // deliberately immutable, so a null value here is a malformed record and not a
-                // deletion; it is skipped.
-                log.error("Null value on {} partition={} offset={}. This topic is not compacted, so "
-                                + "this is a malformed record and not a deletion; it is skipped.",
-                        topic, record.partition(), record.offset());
-                onRejected.accept("null_value");
+                // ErrorHandlingDeserializer, wrapping KafkaAvroDeserializer, catches a
+                // SerializationException inside its own deserialize() call and returns null with
+                // the failure recorded in this header, rather than letting the exception escape
+                // consumer.poll() itself. A genuinely undecodable payload and a genuinely absent
+                // value both arrive here as record.value() == null, so the header is what tells
+                // them apart: without it, this branch would report every corrupt record as
+                // "null_value" and Task 10's metric would lose the distinction between a malformed
+                // control-plane record and one that was never written.
+                DeserializationException deserializationException = SerializationUtils.getExceptionFromHeader(
+                        record, KafkaUtils.VALUE_DESERIALIZER_EXCEPTION_HEADER, DESERIALIZATION_LOG);
+                if (deserializationException != null) {
+                    log.error("Undecodable record on {} partition={} offset={}: {}",
+                            topic, record.partition(), record.offset(),
+                            deserializationException.getMessage(), deserializationException);
+                    onRejected.accept("malformed_record");
+                } else {
+                    // Not a tombstone. risk-rules.events is not compacted and rule history is
+                    // deliberately immutable, so a genuinely null value here is a malformed record
+                    // and not a deletion; it is skipped.
+                    log.error("Null value on {} partition={} offset={}. This topic is not "
+                                    + "compacted, so this is a malformed record and not a deletion; "
+                                    + "it is skipped.",
+                            topic, record.partition(), record.offset());
+                    onRejected.accept("null_value");
+                }
                 continue;
             }
             try {

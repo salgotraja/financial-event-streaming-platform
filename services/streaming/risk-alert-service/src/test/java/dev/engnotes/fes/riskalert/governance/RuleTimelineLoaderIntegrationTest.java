@@ -23,6 +23,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeAll;
@@ -83,6 +84,21 @@ class RuleTimelineLoaderIntegrationTest {
         }
     }
 
+    private static void publishRawBytes(String topic, String key, byte[] value) {
+        Properties properties = new Properties();
+        properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaAvroStack.bootstrapServers());
+        properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+
+        // Bytes with no Confluent magic byte, so KafkaAvroDeserializer's delegate throws a
+        // SerializationException while decoding this record: a genuinely undecodable payload,
+        // not merely a payload whose decoded parameters are semantically wrong.
+        try (KafkaProducer<String, byte[]> producer = new KafkaProducer<>(properties)) {
+            producer.send(new ProducerRecord<>(topic, key, value));
+            producer.flush();
+        }
+    }
+
     private static RiskRuleLifecycleEvent lifecycle(String ruleId, long version, RuleState state,
                                                     Map<String, String> parameters, long effectiveAt) {
         return RiskRuleLifecycleEvent.newBuilder()
@@ -105,7 +121,16 @@ class RuleTimelineLoaderIntegrationTest {
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaAvroStack.bootstrapServers());
         properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
                 org.apache.kafka.common.serialization.StringDeserializer.class);
-        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class);
+        // ErrorHandlingDeserializer wrapping KafkaAvroDeserializer, matching
+        // RiskAlertKafkaConfiguration's production wiring exactly: a plain KafkaAvroDeserializer
+        // throws SerializationException out of poll() itself for an undecodable payload, before
+        // RuleTimelineLoader.fold() ever runs, which is the fix-round-1 CRITICAL finding this test
+        // class now covers.
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                org.springframework.kafka.support.serializer.ErrorHandlingDeserializer.class);
+        properties.put(
+                org.springframework.kafka.support.serializer.ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS,
+                KafkaAvroDeserializer.class);
         properties.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG,
                 KafkaAvroStack.schemaRegistryUrl());
         properties.put("specific.avro.reader", true);
@@ -220,6 +245,34 @@ class RuleTimelineLoaderIntegrationTest {
             assertThat(registry.inForceAt("price-deviation", 2_000L)).singleElement()
                     .satisfies(rule -> assertThat(rule.ruleId()).isEqualTo("pd-good"));
             assertThat(rejections).containsExactly("missing_parameter");
+        }
+    }
+
+    @Test
+    void an_undecodable_record_is_skipped_and_the_gate_still_opens() {
+        String topic = freshTopic();
+        // No Confluent magic byte, so this never reaches RuleTransition.of(...) at all: it fails
+        // inside the deserializer, before fold() ever sees a decoded event. This is a different
+        // and earlier failure than a decoded record with semantically invalid parameters.
+        publishRawBytes(topic, "undecodable", new byte[] {1, 2, 3, 4, 5});
+        publish(topic, lifecycle("pd-good", 1, RuleState.ACTIVE, BANDS, 1_000L));
+
+        RiskRuleRegistry registry = new RiskRuleRegistry(NO_BOOTSTRAP);
+        List<String> rejections = new CopyOnWriteArrayList<>();
+
+        try (RuleTimelineLoader loader = loader(topic, registry, Duration.ofSeconds(30), rejections)) {
+            // The availability assertion for a decode failure, distinct from the one above for a
+            // validation failure. A SerializationException is thrown by the consumer inside
+            // poll() itself, before any ConsumerRecords are returned, so it must never propagate
+            // out of loadInitialSnapshot() and fail startup.
+            loader.loadInitialSnapshot();
+
+            assertThat(loader.isLoaded()).isTrue();
+            assertThat(registry.inForceAt("price-deviation", 2_000L)).singleElement()
+                    .satisfies(rule -> assertThat(rule.ruleId()).isEqualTo("pd-good"));
+            // malformed_record, not null_value: the two must stay distinguishable because they
+            // become separate metric labels in Task 10.
+            assertThat(rejections).containsExactly("malformed_record");
         }
     }
 

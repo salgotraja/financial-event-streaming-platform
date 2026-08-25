@@ -103,11 +103,28 @@ public class RiskAlertKafkaConfiguration {
         // No group and no committed offsets: this consumer assign()s every partition, so a group id
         // would be misleading and a GROUP grant for it would be an unnecessary permission.
         consumerProperties.remove(ConsumerConfig.GROUP_ID_CONFIG);
-        // Plain KafkaAvroDeserializer, not ErrorHandlingDeserializer: there is no DLQ for
-        // risk-rules.events and this identity holds no write grant on it, so a wrapper here would
-        // have nowhere to send a poison payload. The fold's own catch handles a decode failure by
-        // logging, counting through onRejected, and skipping the record.
+        // ErrorHandlingDeserializer wrapping KafkaAvroDeserializer, not the plain delegate the
+        // Task 7 brief's Step 5 named. That instruction and the brief's own requirement that a
+        // decode failure on this topic "must never fail startup" cannot both hold: KafkaConsumer
+        // deserializes every record inside poll() itself, before any ConsumerRecords is returned,
+        // so a plain KafkaAvroDeserializer throws SerializationException straight out of poll(),
+        // never reaching RuleTimelineLoader.fold() at all, and loadInitialSnapshot()'s outer
+        // catch (RuntimeException) closes the consumer and rethrows, failing the readiness gate
+        // and therefore startup on one corrupt control-plane record. That is precisely the
+        // streaming-plane outage ADR-027 and this class exist to prevent, so the requirement wins
+        // over the mechanism copied from EnrichmentKafkaConfiguration, whose failure surface
+        // differs because its trade listener runs under Spring Kafka's container and error
+        // handler rather than a hand-rolled poll() loop. ErrorHandlingDeserializer catches the
+        // SerializationException inside its own deserialize() call and returns null with the
+        // failure recorded on a header instead of throwing, so poll() returns normally and
+        // fold() sees an ordinary null value it can log, count, and skip. There is still no DLQ
+        // for risk-rules.events and this identity still holds no write grant on it: the wrapper
+        // exists to keep the exception inside this process rather than to quarantine the bytes
+        // anywhere.
         consumerProperties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                org.springframework.kafka.support.serializer.ErrorHandlingDeserializer.class);
+        consumerProperties.put(
+                org.springframework.kafka.support.serializer.ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS,
                 io.confluent.kafka.serializers.KafkaAvroDeserializer.class);
         consumerProperties.put("specific.avro.reader", true);
 
