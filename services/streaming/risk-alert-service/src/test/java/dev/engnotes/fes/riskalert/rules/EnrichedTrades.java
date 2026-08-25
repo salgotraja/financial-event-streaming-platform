@@ -10,12 +10,12 @@ import dev.engnotes.fes.events.TradeEvent;
 /**
  * Shared enriched-trade fixture builder for the rule engine tests. Not a production class.
  */
-final class EnrichedTrades {
+public final class EnrichedTrades {
 
     private EnrichedTrades() {
     }
 
-    static EnrichedTradeEvent withDeviationAt(double deviation, Instant eventTimestamp) {
+    public static EnrichedTradeEvent withDeviationAt(double deviation, Instant eventTimestamp) {
         TradeEvent trade = TradeEvent.newBuilder()
                 .setTradeId("trade-1")
                 .setCorrelationId("corr-1")

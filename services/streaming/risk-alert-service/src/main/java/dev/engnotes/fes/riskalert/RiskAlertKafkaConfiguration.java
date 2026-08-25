@@ -20,8 +20,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 
 /**
  * Rules-consumer wiring and the readiness gate for the governed rule fold (ADR-035).
@@ -137,5 +139,40 @@ public class RiskAlertKafkaConfiguration {
     @Bean
     SmartInitializingSingleton openTheReadinessGate(RuleTimelineLoader loader) {
         return loader::loadInitialSnapshot;
+    }
+
+    /**
+     * See {@link #ruleTimelineLoader} for why this is a {@link SmartLifecycle} rather than part of
+     * the loader's {@code onLoaded} callback: {@link KafkaListenerEndpointRegistry} is populated by
+     * Spring Kafka's own {@code SmartInitializingSingleton}, and those callbacks run in
+     * bean-definition registration order rather than dependency order, so a lookup from the loader's
+     * callback can return null. {@code SmartLifecycle.start()} runs in {@code finishRefresh()},
+     * unconditionally after every {@code SmartInitializingSingleton} callback in the same context,
+     * including the one that runs {@link RuleTimelineLoader#loadInitialSnapshot()}, so the registry
+     * is always populated by the time this runs. If the loader had timed out, its exception would
+     * already have aborted {@code refresh()} before {@code finishRefresh()} is ever reached, so no
+     * explicit dependency on the gate is needed here.
+     */
+    @Bean
+    SmartLifecycle startTheTradeListenerOnceLoaded(KafkaListenerEndpointRegistry registry) {
+        return new SmartLifecycle() {
+            private volatile boolean running;
+
+            @Override
+            public void start() {
+                registry.getListenerContainer(EnrichedTradeConsumer.LISTENER_ID).start();
+                running = true;
+            }
+
+            @Override
+            public void stop() {
+                running = false;
+            }
+
+            @Override
+            public boolean isRunning() {
+                return running;
+            }
+        };
     }
 }
