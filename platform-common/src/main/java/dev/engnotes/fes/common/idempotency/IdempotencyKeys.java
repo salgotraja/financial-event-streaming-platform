@@ -22,9 +22,9 @@ import java.util.UUID;
  */
 public final class IdempotencyKeys {
 
-    // A unit separator cannot appear in any component this platform derives keys from, so it makes
-    // component boundaries unambiguous. Joining on a printable character would let ("ab", "c") and
-    // ("a", "bc") hash identical bytes and collide.
+    // The unit separator makes component boundaries unambiguous: without it, ("ab", "c") and
+    // ("a", "bc") would hash identical bytes and collide. That only holds if the separator itself
+    // never occurs inside a component, so its presence is rejected below rather than trusted.
     private static final char SEPARATOR = '\u001F';
 
     private IdempotencyKeys() {
@@ -41,6 +41,10 @@ public final class IdempotencyKeys {
                 throw new IllegalArgumentException(
                         "Component " + i + " is null. A null component would make the key depend on "
                                 + "how null happens to be rendered, so it is rejected here instead.");
+            }
+            if (components[i].indexOf(SEPARATOR) >= 0) {
+                throw new IllegalArgumentException(
+                        "Component " + i + " contains the reserved separator character");
             }
             if (i > 0) {
                 joined.append(SEPARATOR);

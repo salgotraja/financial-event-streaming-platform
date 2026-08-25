@@ -56,4 +56,11 @@ class IdempotencyKeysTest {
         assertThatIllegalArgumentException()
                 .isThrownBy(IdempotencyKeys::deterministic);
     }
+
+    @Test
+    void a_component_containing_the_separator_is_rejected_rather_than_silently_joined() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> IdempotencyKeys.deterministic("trade-1", "a" + '\u001F' + "b"))
+                .withMessageContaining("separator");
+    }
 }
