@@ -1,8 +1,8 @@
 # Topics and schemas
 
-The local stack provisions 22 topics and 19 schema subjects. Six of those topics have a producer or a
-consumer today, and `trades.raw` and `market-data.ticks` each have two consumers. The rest exist
-because the inventory is the architecture's, not the current sprint's,
+The local stack provisions 23 topics and 20 schema subjects. Seven of those topics have a producer or
+a consumer today, plus the five dead-letter topics, and `trades.raw` and `market-data.ticks` each have
+two consumers. The rest exist because the inventory is the architecture's, not the current sprint's,
 and a topic that appears the day its service ships would have to be created by hand or by
 auto-creation, and auto-creation quietly produces single-partition topics.
 
@@ -14,13 +14,13 @@ Source: `deploy/compose/topics.tsv`. Replication is 3 for every topic, matching
 | Topic | Partitions | Retention | Key | Used today |
 | --- | ---: | --- | --- | --- |
 | `trades.raw` | 12 | 7 days | ticker | written by `trade-producer`, read by `audit-service` and `trade-enrichment-service` |
-| `trades.enriched` | 12 | 7 days | ticker | written by `trade-enrichment-service` |
+| `trades.enriched` | 12 | 7 days | ticker | written by `trade-enrichment-service`, read by `risk-alert-service` |
 | `market-data.ticks` | 12 | 1 day | ticker | written by `market-data-simulator`, read by `audit-service` and `market-data-cache-projector` |
 | `corporate-actions` | 6 | 30 days | ticker | written by `corporate-action-producer`, read by `audit-service` |
 | `reference-data.instruments` | 6 | compacted | instrumentId | written by `reference-data-service`, read by `audit-service` and `trade-enrichment-service` |
 | `positions.snapshots` | 12 | 7 days | | no |
-| `notifications.alerts` | 6 | 3 days | | no |
-| `risk-rules.events` | 6 | 365 days | | no |
+| `notifications.alerts` | 6 | 3 days | ticker | written by `risk-alert-service` |
+| `risk-rules.events` | 6 | 365 days | ruleId | read by `risk-alert-service`, written by nothing yet |
 | `alert-cases.events` | 6 | 365 days | | no |
 | `controls.reconciliation` | 6 | 365 days | | no |
 | `security.events` | 6 | 365 days | | no |
@@ -32,12 +32,18 @@ Source: `deploy/compose/topics.tsv`. Replication is 3 for every topic, matching
 | `remediation.requested` | 6 | 30 days | | no |
 | `precedent.graph.sync` | 6 | 7 days | | no |
 | `trades.raw.dlq` | 12 | 30 days | source key | written by `audit-service` and `trade-enrichment-service` on quarantine |
+| `trades.enriched.dlq` | 12 | 30 days | source key | written by `risk-alert-service` on quarantine |
 | `market-data.ticks.dlq` | 12 | 30 days | source key | written by `audit-service` and `market-data-cache-projector` on quarantine |
 | `corporate-actions.dlq` | 6 | 30 days | source key | written by `audit-service` on quarantine |
 | `reference-data.instruments.dlq` | 6 | 30 days | source key | written by `audit-service` on quarantine |
 
 Twelve partitions is the scaling ceiling for trade-path consumer groups. The control-plane topics use
 six deliberately: ordering and auditability matter more than throughput there.
+
+`risk-rules.events` is the one control-plane topic a streaming service reads. Its 365-day retention is
+load-bearing rather than conservative: [the risk alert service](risk-alerts.md) folds the full history
+into a per-rule version timeline, so a compaction policy or a shorter retention would destroy the
+version history it selects from.
 
 Dead-letter topics are source-aligned in partition count, so a replay preserves per-key ordering, and
 carry 30 days rather than the source topic's retention, because triage happens after the source
@@ -62,7 +68,7 @@ outright.
 Source: `deploy/compose/subjects.tsv`. Each row maps a topic to a schema file and, where the schema
 embeds another record, to the subject that record is registered under.
 
-Nineteen subjects: fifteen domain subjects and the four dead-letter subjects, all four carrying
+Twenty subjects: fifteen domain subjects and the five dead-letter subjects, all five carrying
 `DeadLetterEvent`. The subject name is `{topic}-value`.
 
 One row is different from the rest:

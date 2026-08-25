@@ -81,16 +81,16 @@ touches `Project`, which is what keeps the task compatible with the Gradle confi
 
 ```console
 $ ./gradlew checkPlaneIsolation
-Plane isolation: 10 deterministic-plane module(s) checked
+Plane isolation: 11 deterministic-plane module(s) checked
 ```
 
 Without that line, a check that inspects nothing looks exactly like a check that found nothing. The
 count runs ahead of the number of services because it includes the intermediate container projects
 `:services:ingestion`, `:services:audit` and `:services:streaming`. Adding the first module under a
 new group moves the count by two, the group and the leaf, which is why it went from seven to nine
-when `market-data-cache-projector` landed. `trade-enrichment-service` landed under the same
-`:services:streaming` group that `market-data-cache-projector` already created, so it moved the count
-by one rather than two, to ten.
+when `market-data-cache-projector` landed. `trade-enrichment-service` and then `risk-alert-service`
+landed under the same `:services:streaming` group that `market-data-cache-projector` already created,
+so each moved the count by one rather than two, to ten and then to eleven.
 
 ## Layering inside a service
 

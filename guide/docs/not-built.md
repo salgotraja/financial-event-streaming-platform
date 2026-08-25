@@ -3,21 +3,25 @@
 Everything on this page exists as a design decision, a requirement, or an Avro schema, and has no
 implementation in the repository. It is here so the rest of the guide can stay free of plans.
 
-The one thing on this page you *can* open today is the schema set: ten of the sixteen files in
+The one thing on this page you *can* open today is the schema set: eight of the sixteen files in
 `contracts/src/main/avro/` are contracts for services that do not exist yet, and they are already under
 the compatibility gate.
 
 ## Phase 2, deterministic streaming
 
-Two services remain. [The market cache projector](projector.md) is built and Redis joined the local
-stack with it, and [trade enrichment](enrichment.md) is built and reads that cache on every trade, so
-what follows is the rest of the queue.
-
-**risk-alert-service.** Evaluates governed, versioned rules against enriched trades and produces
-`notifications.alerts`. Sub-5ms p99 is the target.
+One service remains. [The market cache projector](projector.md) is built and Redis joined the local
+stack with it, [trade enrichment](enrichment.md) is built and reads that cache on every trade, and
+[the risk alert service](risk-alerts.md) is built and reads the enriched stream, so what follows is
+the rest of the queue.
 
 **position-exposure-service.** An event-driven read model, idempotent by `tradeId` and rebuildable
 from event history (ADR-017).
+
+Three of the four rules FR-04.2 names are also still absent, so FR-04 is not met even though the risk
+service is built. `POSITION_LIMIT_BREACH` and `UNUSUAL_VOLUME` are later increments of that service.
+`WASH_TRADE_DETECTED` is blocked on a definition rather than on effort: `contracts/` carries
+`accountId` but no account-relationship source, so the rule as specified cannot be implemented against
+the events that exist. The sub-5ms p99 evaluation target for the rules that do exist is unmeasured.
 
 ## Phase 3, security enforcement
 
@@ -102,7 +106,7 @@ These qualify claims made elsewhere in this guide:
   `deploy/compose/topics.tsv` and `subjects.tsv`, and nothing checks that the two agree.
 - The audit archive has no durable sink, and the other 13 evidence topics in FR-05.1 are unsubscribed
   because nothing writes them.
-- The identity trust matrix has entries for 11 services; 8 more arrive with their phases.
+- The identity trust matrix has entries for 12 services; 7 more arrive with their phases.
 - There is no runtime validation of Schema Registry subject naming or per-subject compatibility
   configuration.
 - PostgreSQL is absent from the local stack, so FR-09.1 is partly met. Redis is present in both profiles.
