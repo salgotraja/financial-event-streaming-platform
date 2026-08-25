@@ -179,7 +179,7 @@ order.
 | An undecodable governance record is skipped rather than failing startup | `RuleTimelineLoader` | `an_undecodable_record_is_skipped_and_the_gate_still_opens`, `a_governed_version_with_invalid_parameters_is_skipped_and_the_gate_still_opens` |
 | A rejected version leaves the previously in-force version alone | `RuleTimelineLoader` | `a_rejected_version_leaves_the_previously_in_force_version_alone` |
 | An empty rule topic opens the gate, and a fold that cannot finish fails startup | `RuleTimelineLoader` | `the_gate_opens_on_an_empty_rule_topic`, `the_load_fails_startup_when_it_cannot_reach_the_end_offsets_in_time` |
-| No trade is evaluated before the fold completes | `RiskAlertKafkaConfiguration` | `should_call_load_initial_snapshot_on_the_loader_during_context_refresh`, and `a_breaching_trade_produces_an_alert_through_a_real_broker_and_registry` watched failing with the gate bean removed |
+| No trade is evaluated before the fold completes | `RiskAlertKafkaConfiguration` | `should_call_load_initial_snapshot_on_the_loader_during_context_refresh`, and `changes_the_verdict` watched failing with the gate bean removed, alone among the twelve |
 | Severity is banded, both edges inclusive, and the critical band wins | `PriceDeviationRule` | `a_deviation_at_the_warning_band_produces_a_warning`, `a_deviation_at_the_critical_band_produces_a_critical`, `a_deviation_below_the_warning_band_produces_no_alert` |
 | A downward breach alerts identically to an upward one of the same magnitude | `PriceDeviationRule` | `a_negative_deviation_of_the_same_magnitude_alerts_identically` |
 | A non-finite deviation is rejected rather than silently passing every comparison | `PriceDeviationRule` | `a_non_finite_deviation_is_rejected_rather_than_evaluated` |

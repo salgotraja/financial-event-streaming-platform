@@ -97,8 +97,9 @@ simply a malformed record, counted and skipped.
 The fold gates the trade listener, so anything that fails the fold would fail startup. That makes the
 error handling here load-bearing in a way it would not be on an ordinary listener.
 
-Three ways a governance record can be bad, and all three are logged, counted and skipped, leaving the
-previously in-force version untouched:
+Three classes of bad governance record, and all three are logged, counted and skipped, leaving the
+previously in-force version untouched. The third splits into five reasons, because a parameter set can
+fail validation in five distinct ways:
 
 | reason | Meaning |
 | --- | --- |
@@ -276,10 +277,12 @@ loader's own callback can return null.
 
 Two tests hold the gate in place at different levels.
 `should_call_load_initial_snapshot_on_the_loader_during_context_refresh` proves the mechanism fires
-during refresh, without a broker. The round trip
-`a_breaching_trade_produces_an_alert_through_a_real_broker_and_registry` proves the effect: deleting
-the gate bean makes exactly that test fail, because the trade is evaluated before the governed
-version is in force.
+during refresh, without a broker. `GovernedRuleVersion.changes_the_verdict` proves the effect, and it
+is the only test on the branch that can: it publishes a governed rule with a 0.2 percent critical
+band and then a trade deviating 0.5 percent, which is under the bootstrap's own 2.0 percent warning
+band. That trade alerts only if the governed version actually reached the running service. Deleting
+the gate bean makes exactly that test fail, and the other eleven stay green, because the trade
+listener would still start against a registry holding only the bootstrap set.
 
 On timeout, controlled by `rule-timeline-timeout`, startup fails rather than proceeding with a partial
 fold: `the_load_fails_startup_when_it_cannot_reach_the_end_offsets_in_time`. An empty rule topic is
