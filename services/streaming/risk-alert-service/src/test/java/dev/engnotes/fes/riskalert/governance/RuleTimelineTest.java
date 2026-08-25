@@ -122,4 +122,13 @@ class RuleTimelineTest {
         assertThat(timeline.inForceAt(1_500L)).get().extracting(ActiveRule::version).isEqualTo(1L);
         assertThat(timeline.size()).isEqualTo(1);
     }
+
+    @Test
+    void a_timeline_reports_the_rule_type_it_governs_even_when_nothing_is_in_force() {
+        RuleTimeline timeline = new RuleTimeline();
+        timeline.apply(transition(1, RuleState.RETIRED, 1_000L));
+
+        assertThat(timeline.inForceAt(2_000L)).isEmpty();
+        assertThat(timeline.governs("price-deviation")).isTrue();
+    }
 }

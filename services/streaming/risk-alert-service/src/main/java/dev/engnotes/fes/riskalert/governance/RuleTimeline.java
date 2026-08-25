@@ -35,13 +35,29 @@ public class RuleTimeline {
     // Keyed by (version, state) so a replayed record is idempotent, while a version that legitimately
     // moves DRAFT then ACTIVE keeps both transitions.
     private final Map<String, RuleTransition> transitions = new HashMap<>();
+    private volatile String ruleType;
 
     public void apply(RuleTransition transition) {
+        this.ruleType = transition.ruleType();
         transitions.put(transition.version() + ":" + transition.state(), transition);
     }
 
     public int size() {
         return transitions.size();
+    }
+
+    public boolean governs(String candidateType) {
+        return candidateType.equals(ruleType);
+    }
+
+    // Instant-scoped, unlike governs(): a transition dated in the future has not taken the type over
+    // yet, so the bootstrap must still apply. Once a transition has taken effect by the instant, the
+    // type stays governed even if the current resolution at that instant is a retirement.
+    public boolean governsAt(String candidateType, long instant) {
+        return candidateType.equals(ruleType) && transitions.values().stream()
+                .filter(transition -> transition.inForceFrom() <= instant)
+                .anyMatch(transition -> transition.state() == RuleState.ACTIVE
+                        || transition.state() == RuleState.RETIRED);
     }
 
     public Optional<ActiveRule> inForceAt(long instant) {
