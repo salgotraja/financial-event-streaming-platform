@@ -5,7 +5,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
+import dev.engnotes.fes.common.kafka.FailureTracker;
 import dev.engnotes.fes.common.kafka.KafkaSaslProfile;
+import dev.engnotes.fes.events.DeadLetterEvent;
 import dev.engnotes.fes.riskalert.governance.BootstrapRuleProperties;
 import dev.engnotes.fes.riskalert.governance.RiskRuleRegistry;
 import dev.engnotes.fes.riskalert.governance.RuleTimelineLoader;
@@ -15,29 +18,60 @@ import dev.engnotes.fes.riskalert.rules.PriceDeviationRule;
 import dev.engnotes.fes.riskalert.rules.RiskRule;
 import dev.engnotes.fes.riskalert.rules.RiskRuleEngine;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.util.backoff.BackOff;
+import org.springframework.util.backoff.ExponentialBackOff;
 
 /**
- * Rules-consumer wiring and the readiness gate for the governed rule fold (ADR-035).
+ * Rules-consumer wiring, the readiness gate for the governed rule fold (ADR-035), and the
+ * {@code trades.enriched} error handler that separates ADR-027's two failure classes.
  *
- * <p>The error handler for {@code trades.enriched} arrives in Task 9; this class carries only the
- * rule fold and the beans that make {@link RiskRuleRegistry}, the {@link RiskRule} implementations
- * and {@link RiskRuleEngine} usable as Spring beans. Task 6 deliberately shipped those three
- * unannotated, because the registry was not itself a bean yet and annotating them broke the
- * context; this configuration class is where that wiring belongs instead.
+ * <p>A malformed payload or a failed validation is one quarantined record, with zero retries.
+ * {@code DeserializationException} and {@code IllegalArgumentException} are registered as not
+ * retryable, so the recoverer runs on the first attempt and publishes to {@code trades.enriched.dlq},
+ * and the offset advances so the partition keeps moving. Retrying either does not help: the bytes do
+ * not decode differently on a second attempt, and a non-finite {@code priceDeviation} is a validation
+ * verdict on the payload that will not change either.
+ *
+ * <p>This service calls no external datastore, unlike {@code trade-enrichment-service}. There is no
+ * Redis and no reference-data gap here, so there is no dependency-outage branch and no
+ * {@code ContainerPausingBackOffHandler}: {@link #riskAlertErrorHandler} takes three arguments, not
+ * the five {@code EnrichmentKafkaConfiguration.enrichmentErrorHandler} takes, and every failure other
+ * than the two listed above falls through to the same bounded back-off.
+ *
+ * <p>{@code InvalidRuleParametersException} never reaches this handler. It is thrown during the fold,
+ * on the loader's own thread, never on the listener thread, because parameters are validated when a
+ * transition is folded rather than when a trade is evaluated.
+ *
+ * <p>The quarantined bytes come from the exception. {@code ErrorHandlingDeserializer} sets the record
+ * value to null and carries the delivered bytes on the {@link DeserializationException}, and
+ * {@link DeadLetterPublisher} substitutes an empty array for a null payload. Passing
+ * {@code record.value()} through would quarantine nothing at all and lose the only copy of the
+ * evidence.
  */
 @Configuration(proxyBeanMethods = false)
 public class RiskAlertKafkaConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RiskAlertKafkaConfiguration.class);
+
+    // Three attempts total, so two retries after the first failure, matching FR-03.4's shape.
+    private static final long MAX_RETRIES = 2;
+    private static final long INITIAL_BACKOFF_MS = 100;
+    private static final long MAX_BACKOFF_MS = 5_000;
+    private static final long MAX_ELAPSED_MS = 5_000;
 
     @Bean
     RiskRuleRegistry riskRuleRegistry(BootstrapRuleProperties bootstrap) {
@@ -52,6 +86,52 @@ public class RiskAlertKafkaConfiguration {
     @Bean
     RiskRuleEngine riskRuleEngine(RiskRuleRegistry registry, List<RiskRule> rules) {
         return new RiskRuleEngine(registry, rules);
+    }
+
+    @Bean
+    FailureTracker failureTracker() {
+        return new FailureTracker();
+    }
+
+    @Bean
+    DeadLetterPublisher deadLetterPublisher(KafkaTemplate<String, DeadLetterEvent> kafkaTemplate,
+                                            FailureTracker failureTracker,
+                                            RiskAlertProperties properties,
+                                            @Value("${spring.kafka.consumer.group-id}") String consumerGroup) {
+
+        return new DeadLetterPublisher(kafkaTemplate, failureTracker, consumerGroup,
+                properties.consumerInstance());
+    }
+
+    /**
+     * The two failure classes ADR-027 separates for {@code trades.enriched}. See the class javadoc
+     * for the full reasoning; this differs from {@code EnrichmentKafkaConfiguration.
+     * enrichmentErrorHandler} only in that there is no dependency to protect here, so there is no
+     * back-off function, no {@code ListenerContainerRegistry} and no pausing handler.
+     *
+     * <p>{@code metrics} is accepted for signature parity with the test this bean is built for, but
+     * this increment records no quarantine metric: {@link RiskAlertMetrics} carries only
+     * {@code recordAlert} today, and Task 10 is what adds a rejection counter. Calling a method that
+     * does not exist yet is not this task's call to make.
+     */
+    @Bean
+    DefaultErrorHandler riskAlertErrorHandler(DeadLetterPublisher deadLetterPublisher,
+                                              FailureTracker failureTracker,
+                                              RiskAlertMetrics metrics) {
+
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+                (record, exception) -> quarantine(deadLetterPublisher, record, exception),
+                poisonBackOff());
+
+        // Retrying either of these does not help. A DeserializationException's bytes do not improve
+        // on a second attempt. An IllegalArgumentException is a validation verdict on the payload
+        // that will not change either.
+        errorHandler.addNotRetryableExceptions(DeserializationException.class, IllegalArgumentException.class);
+        errorHandler.setRetryListeners(failureTracker);
+        // The container commits the recovered record's offset, so one poison payload does not block
+        // the partition behind it.
+        errorHandler.setAckAfterHandle(true);
+        return errorHandler;
     }
 
     /**
@@ -174,5 +254,34 @@ public class RiskAlertKafkaConfiguration {
                 return running;
             }
         };
+    }
+
+    private static void quarantine(DeadLetterPublisher publisher,
+                                   ConsumerRecord<?, ?> record,
+                                   Exception exception) {
+
+        @SuppressWarnings("unchecked")
+        ConsumerRecord<String, ?> failed = (ConsumerRecord<String, ?>) record;
+        publisher.publish(failed, originalPayload(failed, exception), exception).join();
+    }
+
+    private static byte[] originalPayload(ConsumerRecord<String, ?> record, Throwable failure) {
+        for (Throwable cause = failure; cause != null && cause != cause.getCause();
+             cause = cause.getCause()) {
+            if (cause instanceof DeserializationException deserialization) {
+                return deserialization.getData();
+            }
+        }
+        return record.value() instanceof byte[] bytes ? bytes : null;
+    }
+
+    private static BackOff poisonBackOff() {
+        ExponentialBackOff backOff = new ExponentialBackOff();
+        backOff.setInitialInterval(INITIAL_BACKOFF_MS);
+        backOff.setMultiplier(2.0);
+        backOff.setMaxInterval(MAX_BACKOFF_MS);
+        backOff.setMaxElapsedTime(MAX_ELAPSED_MS);
+        backOff.setMaxAttempts(MAX_RETRIES);
+        return backOff;
     }
 }

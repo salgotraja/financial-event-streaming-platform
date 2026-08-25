@@ -32,6 +32,7 @@ precedent.graph.sync	6	retention.ms=604800000
 # Dead-letter topics, source-aligned partitions, 30 days. Only the topics that have a consumer today
 # need one; the rest arrive with their consumers.
 trades.raw.dlq	12	retention.ms=2592000000
+trades.enriched.dlq	12	retention.ms=2592000000
 market-data.ticks.dlq	12	retention.ms=2592000000
 corporate-actions.dlq	6	retention.ms=2592000000
 reference-data.instruments.dlq	6	retention.ms=2592000000

@@ -28,6 +28,7 @@ review.decisions	HumanReviewDecisionEvent.avsc	-
 
 # Every dead-letter topic carries DeadLetterEvent. These are the ones with a consumer today.
 trades.raw.dlq	DeadLetterEvent.avsc	-
+trades.enriched.dlq	DeadLetterEvent.avsc	-
 market-data.ticks.dlq	DeadLetterEvent.avsc	-
 corporate-actions.dlq	DeadLetterEvent.avsc	-
 reference-data.instruments.dlq	DeadLetterEvent.avsc	-
