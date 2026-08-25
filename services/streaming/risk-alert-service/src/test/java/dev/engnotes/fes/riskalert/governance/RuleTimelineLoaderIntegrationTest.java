@@ -10,7 +10,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 import dev.engnotes.fes.events.RiskRuleLifecycleEvent;
 import dev.engnotes.fes.events.RuleState;
-import dev.engnotes.fes.riskalert.rules.InvalidRuleParametersException;
 import dev.engnotes.fes.riskalert.rules.PriceDeviationParameters;
 import dev.engnotes.fes.testing.KafkaAvroStack;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
