@@ -109,10 +109,8 @@ public class RiskAlertKafkaConfiguration {
      * enrichmentErrorHandler} only in that there is no dependency to protect here, so there is no
      * back-off function, no {@code ListenerContainerRegistry} and no pausing handler.
      *
-     * <p>{@code metrics} is accepted for signature parity with the test this bean is built for, but
-     * this increment records no quarantine metric: {@link RiskAlertMetrics} carries only
-     * {@code recordAlert} today, and Task 10 is what adds a rejection counter. Calling a method that
-     * does not exist yet is not this task's call to make.
+     * <p>{@code metrics} records the quarantine through {@link RiskAlertMetrics#recordQuarantined()},
+     * added in Task 10.
      */
     @Bean
     DefaultErrorHandler riskAlertErrorHandler(DeadLetterPublisher deadLetterPublisher,
@@ -120,7 +118,7 @@ public class RiskAlertKafkaConfiguration {
                                               RiskAlertMetrics metrics) {
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
-                (record, exception) -> quarantine(deadLetterPublisher, record, exception),
+                (record, exception) -> quarantine(deadLetterPublisher, metrics, record, exception),
                 poisonBackOff());
 
         // Retrying either of these does not help. A DeserializationException's bytes do not improve
@@ -159,8 +157,8 @@ public class RiskAlertKafkaConfiguration {
      * bean, not this callback: {@link org.springframework.kafka.config.KafkaListenerEndpointRegistry}
      * is populated by Spring Kafka's own {@code SmartInitializingSingleton}, and those callbacks run
      * in bean-definition registration order rather than dependency order, so a lookup from this
-     * callback can return null. {@code onLoaded} here is a no-op until Task 10 wires the metrics
-     * gauge, exactly as {@code EnrichmentKafkaConfiguration} leaves listener start to a separate
+     * callback can return null. {@code onLoaded} here only binds the {@link RiskAlertMetrics} gauge,
+     * exactly as {@code EnrichmentKafkaConfiguration} leaves listener start to a separate
      * {@code SmartLifecycle} bean.
      */
     @Bean(destroyMethod = "close")
@@ -168,6 +166,7 @@ public class RiskAlertKafkaConfiguration {
                                           RiskAlertProperties properties,
                                           KafkaProperties kafkaProperties,
                                           Consumer<RuleTransition> ruleTransitionValidator,
+                                          RiskAlertMetrics metrics,
                                           ObjectProvider<KafkaSaslProfile> saslProfile) {
 
         // Boot 4.1 moved this class out of spring-boot-autoconfigure. The import is
@@ -212,8 +211,24 @@ public class RiskAlertKafkaConfiguration {
 
         return new RuleTimelineLoader(registry, consumerProperties, properties.ruleTopic(),
                 properties.ruleTimelineTimeout(), ruleTransitionValidator,
-                reason -> log.warn("Rejected governed rule version, reason={}", reason),
-                () -> { });
+                reason -> {
+                    // fold() already logs at ERROR on all three rejection paths; this call must
+                    // never throw out of fold(), because the catch-up loop in loadInitialSnapshot()
+                    // treats a RuntimeException as fatal and fails startup. A metrics failure here
+                    // is a data-visibility problem, not a reason to turn a control-plane record
+                    // error into a streaming-plane outage.
+                    try {
+                        metrics.recordRejectedRuleVersion(reason);
+                    } catch (RuntimeException e) {
+                        log.warn("Metrics recording failed for rejected rule version reason={}",
+                                reason, e);
+                    }
+                },
+                // Bind the gauge before the listener can possibly start, so it can never report a
+                // partial fold as though it were complete. Unlike onRejected, this is not swallowed:
+                // it runs once, before readiness, matching EnrichmentKafkaConfiguration's own
+                // unguarded onLoaded callback.
+                () -> metrics.bindRuleRegistry(registry));
     }
 
     @Bean
@@ -257,12 +272,24 @@ public class RiskAlertKafkaConfiguration {
     }
 
     private static void quarantine(DeadLetterPublisher publisher,
+                                   RiskAlertMetrics metrics,
                                    ConsumerRecord<?, ?> record,
                                    Exception exception) {
 
         @SuppressWarnings("unchecked")
         ConsumerRecord<String, ?> failed = (ConsumerRecord<String, ?>) record;
         publisher.publish(failed, originalPayload(failed, exception), exception).join();
+
+        // The dead letter is already published by the time this runs. setAckAfterHandle(true) means
+        // a metrics failure here would prevent the ack and redeliver the record, quarantining it a
+        // second time, so this must be swallowed the same way EnrichmentKafkaConfiguration.quarantine
+        // swallows its own metrics failure after a successful publish.
+        try {
+            metrics.recordQuarantined();
+        } catch (RuntimeException e) {
+            log.warn("Metrics recording failed for quarantined topic={} partition={} offset={}",
+                    failed.topic(), failed.partition(), failed.offset(), e);
+        }
     }
 
     private static byte[] originalPayload(ConsumerRecord<String, ?> record, Throwable failure) {
