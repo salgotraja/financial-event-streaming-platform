@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: risk-alert-service
+  kafka:
+    properties:
+      schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+    consumer:
+      # The group name is the service name, fixed by the IAM policy and the KEDA query that scope
+      # it. Never suffixed. The rule consumer does not use it: it assign()s partitions and joins no
+      # group at all.
+      group-id: risk-alert-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: io.confluent.kafka.serializers.KafkaAvroDeserializer
+        specific.avro.reader: true
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      properties:
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+        auto.register.schemas: false
+
+# enable.auto.commit=false and MANUAL_IMMEDIATE come from platform-common's
+# ConsumerAcknowledgementConfiguration, so this service cannot ship weaker offset management by
+# omission. isolation.level is deliberately unset (ADR-019).
+
+fes:
+  risk-alert-service:
+    topic: trades.enriched
+    rule-topic: risk-rules.events
+    output-topic: notifications.alerts
+    consumer-instance: ${HOSTNAME:risk-alert-service-local}
+    rule-timeline-timeout: 60s
+
+risk:
+  rules:
+    # The ungoverned bootstrap set. Version 0 by definition, and it applies only while no governed
+    # ACTIVE version of the same rule-type is in force (ADR-035). A governed version outranks it and
+    # these values then never return.
+    - rule-id: price-deviation
+      rule-type: price-deviation
+      parameters:
+        warn-deviation-percent: "2.0"
+        critical-deviation-percent: "5.0"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
