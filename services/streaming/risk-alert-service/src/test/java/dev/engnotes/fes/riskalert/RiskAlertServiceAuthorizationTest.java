@@ -20,14 +20,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The risk-alert-service identity's authorization contract: one allowed action and two denied ones
- * (NFR-05.19).
+ * The risk-alert-service identity's authorization contract: one allowed action and three denied
+ * ones (NFR-05.19).
  *
  * <p>There is no grant on risk-rules.events to prove an allow for here, deliberately. That topic is
  * the control plane's governance record, and this identity only ever reads it; the read grant is
  * exercised by {@code RiskAlertServiceIdentityStackTest} and by the governed-rule integration test,
- * not restated here as a third allow. What this class proves is the shape every consuming,
- * producing identity in this repository must prove: it can do its own job, it cannot write the
+ * not restated here as a third allow.
+ *
+ * <p>The denial that matters most is writing risk-rules.events. The entire justification for
+ * {@code RuleTimelineLoader} logging and skipping a malformed or invalid governed version, rather
+ * than dead-lettering it, is that this identity holds no write grant there: a streaming workload
+ * that could write its own governance record could manufacture the approved rule version it then
+ * evaluates against, which defeats maker-checker entirely. The other two denials are the general
+ * shape every consuming, producing identity in this repository must prove: it cannot write the
  * topic it consumes, and it cannot join another workload's consumer group.
  */
 @DisplayName("risk-alert-service workload identity")
@@ -36,6 +42,7 @@ class RiskAlertServiceAuthorizationTest {
     private static final String PRINCIPAL = "risk-alert-service";
     private static final String CONSUMED_TOPIC = "trades.enriched";
     private static final String PRODUCED_TOPIC = "notifications.alerts";
+    private static final String RULE_TOPIC = "risk-rules.events";
     private static final String OWN_GROUP = "risk-alert-service";
     private static final String FOREIGN_GROUP = "trade-enrichment-service";
 
@@ -65,6 +72,23 @@ class RiskAlertServiceAuthorizationTest {
         try (KafkaProducer<String, byte[]> producer =
                      new KafkaProducer<>(SecureKafkaStack.producerConfig(PRINCIPAL))) {
             producer.send(new ProducerRecord<>(PRODUCED_TOPIC, "K", new byte[]{1})).get();
+        }
+    }
+
+    @Test
+    @DisplayName("should deny writing the governed rule topic")
+    void should_deny_writing_the_governed_rule_topic() {
+        // The assertion that matters most. risk-rules.events is the control plane's governance
+        // record, and RuleTimelineLoader logs and skips a malformed or invalid governed version
+        // rather than dead-lettering it precisely because this identity can never write here: a
+        // grant on this topic would let a streaming workload manufacture the approved rule version
+        // it then evaluates against, defeating maker-checker entirely.
+        try (KafkaProducer<String, byte[]> producer =
+                     new KafkaProducer<>(SecureKafkaStack.producerConfig(PRINCIPAL))) {
+            assertThatThrownBy(() ->
+                    producer.send(new ProducerRecord<>(RULE_TOPIC, "K", new byte[]{1})).get())
+                    .isInstanceOf(ExecutionException.class)
+                    .hasCauseInstanceOf(TopicAuthorizationException.class);
         }
     }
 

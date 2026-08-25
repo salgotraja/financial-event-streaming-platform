@@ -12,8 +12,8 @@
 # in risk_rule_versions_rejected_total, and skipped, and the previously in-force version stays in
 # force. Granting a DLQ write here would be the control-plane write the paragraph above rules out.
 #
-# Denials proved in RiskAlertServiceAuthorizationTest: it may not write the topic it consumes, and it
-# may not join another workload's consumer group.
+# Denials proved in RiskAlertServiceAuthorizationTest: it may not write risk-rules.events, it may
+# not write the topic it consumes, and it may not join another workload's consumer group.
 
 principal: risk-alert-service
 
