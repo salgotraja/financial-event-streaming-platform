@@ -52,6 +52,15 @@ public class EnrichedTradeConsumer {
     public void consume(ConsumerRecord<String, EnrichedTradeEvent> record,
                         Acknowledgment acknowledgment) {
 
+        if (record.value() == null) {
+            // A decode failure never reaches here: ErrorHandlingDeserializer carries it on a
+            // DeserializationException instead. A null value with no such header is a distinct
+            // payload verdict, so it joins the same zero-retry class as the others rather than
+            // NPE-ing three attempts deep into engine.evaluate.
+            throw new IllegalArgumentException("Null value on topic=" + record.topic()
+                    + ", partition=" + record.partition() + ", offset=" + record.offset());
+        }
+
         List<RiskAlertEvent> alerts = engine.evaluate(record.value());
         for (RiskAlertEvent alert : alerts) {
             publisher.publish(record, alert);

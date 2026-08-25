@@ -183,4 +183,28 @@ class QuarantineIntegrationTest {
             assertThat(quarantined.getOriginalTopic()).hasToString(TRADE_TOPIC);
         }
     }
+
+    @Test
+    void a_null_valued_record_is_quarantined_on_the_first_attempt() {
+        try (KafkaProducer<String, byte[]> raw = rawProducer();
+             KafkaConsumer<String, DeadLetterEvent> dlq = dlqConsumer()) {
+
+            raw.send(new ProducerRecord<>(TRADE_TOPIC, "NULLVALUE", null));
+            raw.flush();
+
+            // A genuinely null value with no DeserializationException header. retryCount pins this
+            // to the same zero-retry class as the other two verdicts above: without the guard,
+            // engine.evaluate(null) throws NullPointerException, which is not registered
+            // not-retryable, and this record is only attempted a third time before it recovers.
+            DeadLetterEvent quarantined =
+                    quarantinedRecordFor(dlq, "NULLVALUE", Duration.ofSeconds(30));
+            assertThat(quarantined.getOriginalTopic()).hasToString(TRADE_TOPIC);
+            assertThat(quarantined.getExceptionClass())
+                    .isEqualTo(IllegalArgumentException.class.getName());
+            assertThat(quarantined.getRetryCount())
+                    .as("a null value is not a recoverable failure, so this must quarantine on the "
+                            + "first attempt rather than spending the bounded back-off")
+                    .isEqualTo(1);
+        }
+    }
 }
