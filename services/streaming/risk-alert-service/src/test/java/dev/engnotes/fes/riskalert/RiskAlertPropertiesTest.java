@@ -13,8 +13,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = {
-                "spring.kafka.listener.auto-startup=false",
-                "spring.autoconfigure.exclude=org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration"
+                "management.otlp.metrics.export.enabled=false",
+                "management.otlp.tracing.export.enabled=false"
         })
 @ActiveProfiles("test")
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
