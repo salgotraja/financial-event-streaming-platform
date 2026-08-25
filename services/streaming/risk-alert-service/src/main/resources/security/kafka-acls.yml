@@ -1,0 +1,35 @@
+# Least-privilege Kafka policy for the risk-alert-service workload identity.
+# See trade-producer's policy for the rules that govern this file. Everything absent is denied.
+#
+# Two READ grants, because this service has two inputs. risk-rules.events is consumed by an
+# assign()-ed consumer that joins no group, which is why only one GROUP grant appears (ADR-035).
+#
+# There is no WRITE grant on risk-rules.events and there deliberately never will be. That topic is
+# the control plane's governance record; a streaming workload that could write it could manufacture
+# the approved rule version it then evaluates against, which defeats maker-checker entirely.
+#
+# There is no risk-rules.events.dlq grant. A malformed or invalid governed version is logged, counted
+# in risk_rule_versions_rejected_total, and skipped, and the previously in-force version stays in
+# force. Granting a DLQ write here would be the control-plane write the paragraph above rules out.
+#
+# Denials proved in RiskAlertServiceAuthorizationTest: it may not write the topic it consumes, and it
+# may not join another workload's consumer group.
+
+principal: risk-alert-service
+
+allowed:
+  - resourceType: TOPIC
+    name: trades.enriched
+    operations: [READ]
+  - resourceType: TOPIC
+    name: risk-rules.events
+    operations: [READ]
+  - resourceType: TOPIC
+    name: notifications.alerts
+    operations: [WRITE]
+  - resourceType: TOPIC
+    name: trades.enriched.dlq
+    operations: [WRITE]
+  - resourceType: GROUP
+    name: risk-alert-service
+    operations: [READ]
