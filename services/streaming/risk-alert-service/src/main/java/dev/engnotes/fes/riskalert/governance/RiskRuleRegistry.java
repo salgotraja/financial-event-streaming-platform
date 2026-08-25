@@ -53,13 +53,15 @@ public class RiskRuleRegistry {
 
         for (RuleTimeline timeline : timelines.values()) {
             ActiveRule resolved;
+            boolean governsAt;
             synchronized (timeline) {
                 resolved = timeline.inForceAt(instant).orElse(null);
+                governsAt = timeline.governsAt(ruleType, instant);
             }
             if (resolved != null && resolved.ruleType().equals(ruleType)) {
                 governed.add(resolved);
             }
-            if (timeline.governsAt(ruleType, instant)) {
+            if (governsAt) {
                 anyTimelineOfThisType = true;
             }
         }

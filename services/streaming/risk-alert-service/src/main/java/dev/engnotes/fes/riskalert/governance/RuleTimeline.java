@@ -46,13 +46,10 @@ public class RuleTimeline {
         return transitions.size();
     }
 
-    public boolean governs(String candidateType) {
-        return candidateType.equals(ruleType);
-    }
-
-    // Instant-scoped, unlike governs(): a transition dated in the future has not taken the type over
-    // yet, so the bootstrap must still apply. Once a transition has taken effect by the instant, the
-    // type stays governed even if the current resolution at that instant is a retirement.
+    // A transition dated in the future has not taken the type over yet, so the bootstrap must still
+    // apply. Once a transition has taken effect by the instant, the type stays governed even if the
+    // current resolution at that instant is a retirement, so a governed type never falls back to the
+    // bootstrap once it has been governed as of that instant.
     public boolean governsAt(String candidateType, long instant) {
         return candidateType.equals(ruleType) && transitions.values().stream()
                 .filter(transition -> transition.inForceFrom() <= instant)

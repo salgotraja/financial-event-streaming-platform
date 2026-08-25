@@ -2,6 +2,7 @@ package dev.engnotes.fes.riskalert;
 
 import java.time.Duration;
 
+import dev.engnotes.fes.riskalert.governance.BootstrapRuleProperties;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,9 @@ class RiskAlertPropertiesTest {
     @Autowired
     RiskAlertProperties properties;
 
+    @Autowired
+    BootstrapRuleProperties bootstrapRuleProperties;
+
     @Test
     void the_topics_bind_from_application_yml() {
         assertThat(properties.topic()).isEqualTo("trades.enriched");
@@ -33,5 +37,17 @@ class RiskAlertPropertiesTest {
     @Test
     void the_fold_timeout_binds_as_a_duration() {
         assertThat(properties.ruleTimelineTimeout()).isEqualTo(Duration.ofSeconds(60));
+    }
+
+    @Test
+    void the_bootstrap_rule_set_binds_from_application_yml() {
+        assertThat(bootstrapRuleProperties.rules()).singleElement()
+                .satisfies(rule -> {
+                    assertThat(rule.ruleId()).isEqualTo("price-deviation");
+                    assertThat(rule.ruleType()).isEqualTo("price-deviation");
+                    assertThat(rule.parameters())
+                            .containsEntry("warn-deviation-percent", "2.0")
+                            .containsEntry("critical-deviation-percent", "5.0");
+                });
     }
 }

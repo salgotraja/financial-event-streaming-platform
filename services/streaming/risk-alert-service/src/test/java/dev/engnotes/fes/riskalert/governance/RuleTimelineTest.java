@@ -124,11 +124,28 @@ class RuleTimelineTest {
     }
 
     @Test
-    void a_timeline_reports_the_rule_type_it_governs_even_when_nothing_is_in_force() {
+    void governs_at_is_false_for_a_transition_dated_after_the_instant() {
         RuleTimeline timeline = new RuleTimeline();
-        timeline.apply(transition(1, RuleState.RETIRED, 1_000L));
+        timeline.apply(transition(1, RuleState.ACTIVE, 2_000L));
 
-        assertThat(timeline.inForceAt(2_000L)).isEmpty();
-        assertThat(timeline.governs("price-deviation")).isTrue();
+        assertThat(timeline.governsAt("price-deviation", 1_500L)).isFalse();
+    }
+
+    @Test
+    void governs_at_is_true_for_a_past_active_transition() {
+        RuleTimeline timeline = new RuleTimeline();
+        timeline.apply(transition(1, RuleState.ACTIVE, 1_000L));
+
+        assertThat(timeline.governsAt("price-deviation", 1_500L)).isTrue();
+    }
+
+    @Test
+    void governs_at_stays_true_for_a_past_retirement_even_though_nothing_is_in_force() {
+        RuleTimeline timeline = new RuleTimeline();
+        timeline.apply(transition(1, RuleState.ACTIVE, 1_000L));
+        timeline.apply(transition(2, RuleState.RETIRED, 2_000L));
+
+        assertThat(timeline.inForceAt(2_500L)).isEmpty();
+        assertThat(timeline.governsAt("price-deviation", 2_500L)).isTrue();
     }
 }
