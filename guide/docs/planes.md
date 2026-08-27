@@ -15,8 +15,9 @@ legacy PostgreSQL source. Four producers are built. The migration normalizer is 
 
 **Plane 2, deterministic streaming.** Enrichment, risk evaluation, position and exposure read models.
 This is where the 50,000 events/sec and sub-200ms figures live, and they are targets rather than
-measurements. One of the four services is built, [the market cache projector](projector.md).
-Enrichment, risk alerting and the position read model are not.
+measurements. Three of the four services are built: [the market cache projector](projector.md),
+[trade enrichment](enrichment.md) and [risk alerting](risk-alerts.md), the last of which implements
+one of the four rules FR-04.2 names. The position and exposure read model is not built.
 
 **Plane 3, audit and control.** An immutable evidence archive with signed manifests, and a
 reconciliation control that proves the archive covers the stream. The archival consumer is built; the

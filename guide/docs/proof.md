@@ -163,6 +163,37 @@ order.
 | Enrichment cannot read the tick stream, write its own input, or join another group | `security/kafka-acls.yml` | `should_deny_reading_the_market_data_tick_stream`, `should_deny_writing_the_topic_it_consumes`, `should_deny_joining_a_consumer_group_other_than_its_own` |
 | The enrichment Redis grant is read-only and confined to the market key space | `users.acl.template` | `should_deny_a_write_inside_eval_because_the_grant_holds_no_write_command` for command denial, `should_deny_reading_outside_market_star_using_a_command_the_identity_does_hold` for key-space denial |
 
+## Risk alerting
+
+| Behaviour | Implementation | Proof |
+| --- | --- | --- |
+| A trade is evaluated against the rule version in force at its own event time, not the latest one | `RiskRuleEngine` | `a_trade_is_evaluated_against_the_rule_in_force_at_its_own_event_time` |
+| The timeline resolves the version in force at an instant, inclusive at the effective edge | `RuleTimeline` | `a_version_is_not_in_force_before_its_effective_instant`, `the_highest_version_effective_at_the_instant_wins`, `two_transitions_sharing_an_instant_are_ordered_by_version` |
+| Retirement closes the interval from its own instant, and a later approval reopens it | `RuleTimeline` | `a_retirement_turns_the_rule_off_from_its_own_instant_onward`, `a_later_activation_reinstates_a_retired_rule` |
+| A draft or a rejected proposal never takes a live version out of force | `RuleTimeline` | `a_draft_alongside_a_live_version_does_not_take_the_rule_out_of_force`, `a_rejected_proposal_does_not_retire_the_live_version` |
+| Applying the same transition twice changes nothing, so a replayed fold is idempotent | `RuleTimeline` | `applying_the_same_transition_twice_changes_nothing` |
+| A governed version of a rule type suppresses the bootstrap set for that type, evaluated at the queried instant | `RiskRuleRegistry` | `a_governed_version_of_the_same_rule_type_suppresses_the_bootstrap`, `the_bootstrap_returns_for_instants_before_the_governed_version_took_effect`, `a_retired_governed_rule_does_not_hand_the_type_back_to_the_bootstrap` |
+| Several governed rules of one type are all in force and each can alert | `RiskRuleRegistry`, `RiskRuleEngine` | `two_governed_rules_of_one_type_are_both_in_force`, `every_in_force_rule_of_the_type_is_evaluated_and_each_can_alert` |
+| One malformed governed version degrades only itself, not the whole trade | `RiskRuleEngine` | `a_malformed_governed_rule_version_is_skipped_and_does_not_abort_the_other_rules` |
+| The full version history is folded, not just the latest record per rule | `RuleTimelineLoader` | `the_full_history_of_a_rule_is_folded_not_just_its_latest_record` |
+| An undecodable governance record is skipped rather than failing startup | `RuleTimelineLoader` | `an_undecodable_record_is_skipped_and_the_gate_still_opens`, `a_governed_version_with_invalid_parameters_is_skipped_and_the_gate_still_opens` |
+| A rejected version leaves the previously in-force version alone | `RuleTimelineLoader` | `a_rejected_version_leaves_the_previously_in_force_version_alone` |
+| An empty rule topic opens the gate, and a fold that cannot finish fails startup | `RuleTimelineLoader` | `the_gate_opens_on_an_empty_rule_topic`, `the_load_fails_startup_when_it_cannot_reach_the_end_offsets_in_time` |
+| No trade is evaluated before the fold completes | `RiskAlertKafkaConfiguration` | `should_call_load_initial_snapshot_on_the_loader_during_context_refresh`, and `changes_the_verdict` watched failing with the gate bean removed, alone among the twelve |
+| Severity is banded, both edges inclusive, and the critical band wins | `PriceDeviationRule` | `a_deviation_at_the_warning_band_produces_a_warning`, `a_deviation_at_the_critical_band_produces_a_critical`, `a_deviation_below_the_warning_band_produces_no_alert` |
+| A downward breach alerts identically to an upward one of the same magnitude | `PriceDeviationRule` | `a_negative_deviation_of_the_same_magnitude_alerts_identically` |
+| A non-finite deviation is rejected rather than silently passing every comparison | `PriceDeviationRule` | `a_non_finite_deviation_is_rejected_rather_than_evaluated` |
+| The specification's single-threshold parameter name is refused rather than guessed at | `PriceDeviationParameters` | `the_specifications_single_threshold_name_is_not_silently_accepted`, `a_critical_band_below_the_warning_band_is_rejected`, `equal_bands_are_rejected` |
+| Redelivery of the same trade under the same rule version produces the same alert id | `PriceDeviationRule`, `IdempotencyKeys` | `redelivering_the_same_trade_produces_the_same_alert_id`, `a_different_rule_version_produces_a_different_alert_id` |
+| The alert timestamp is the trade's event time, so a replay reproduces it | `PriceDeviationRule` | `the_alert_timestamp_is_the_trades_event_time_not_the_wall_clock` |
+| Every alert is published before the offset is acknowledged | `EnrichedTradeConsumer` | `the_alert_is_published_before_the_offset_is_acknowledged`, `two_alerts_from_one_trade_are_both_published_before_the_acknowledgement`, `a_trade_that_breaches_nothing_is_acknowledged_without_publishing` |
+| A metrics failure after a successful publish does not re-deliver the trade | `EnrichedTradeConsumer` | `a_metrics_failure_after_a_successful_publish_does_not_prevent_the_acknowledgement` |
+| The listener joins the configured group, not one named after its listener id | `EnrichedTradeConsumer` | `the_listener_id_does_not_override_the_configured_consumer_group` |
+| A poison record is quarantined per record and the partition keeps moving | `RiskAlertKafkaConfiguration` | `a_malformed_record_is_quarantined_and_the_record_behind_it_is_still_evaluated`, `the_recovered_records_offset_is_acknowledged_so_the_partition_keeps_moving`, `the_quarantined_payload_comes_from_the_exception_not_the_null_record_value` |
+| A decode failure and an invalid argument are never retried | `RiskAlertKafkaConfiguration` | `a_deserialization_failure_is_not_retried`, `an_invalid_argument_is_not_retried` |
+| The meters scrape through a real Prometheus registry | `RiskAlertMetrics` | `every_meter_in_this_class_scrapes_through_a_real_prometheus_registry_without_throwing` |
+| Risk alerting cannot write the governance topic, its own input, or join another group | `security/kafka-acls.yml` | `should_deny_writing_the_governed_rule_topic`, `should_deny_writing_the_topic_it_consumes`, `should_deny_joining_a_consumer_group_other_than_its_own`, the first watched failing with a WRITE grant added |
+
 ## Structure
 
 | Behaviour | Implementation | Proof |
@@ -174,7 +205,8 @@ order.
 
 ## What has no proof yet
 
-Anything that would need a service that does not exist: enrichment latency, risk evaluation,
-read-model rebuild, the agent tool boundary, sustained throughput, and evidence integrity end to end.
+Anything that would need a service that does not exist: read-model rebuild, the agent tool boundary,
+sustained throughput, and evidence integrity end to end. Enrichment and risk evaluation now have
+behavioural proof but no latency proof: no run has measured either against its budget.
 Dependency failure has one proof now, on the projector's Redis connection, and none on PostgreSQL. Those rows appear in `.claude/rules/testing.md` as required
 categories and are waiting on their subjects.

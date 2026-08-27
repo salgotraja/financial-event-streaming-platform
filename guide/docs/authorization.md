@@ -147,6 +147,30 @@ can manufacture the prices it is supposed to be observing.
 Its Redis access is scoped the same way and is covered in
 [the market cache projector](projector.md).
 
+## The workload that must not write its own governance
+
+`risk-alert-service` also reads two topics, `trades.enriched` and `risk-rules.events`, and again only
+one carries a `GROUP` grant: the governed rule history is folded by a consumer that `assign()`s every
+partition and joins no group (ADR-035). It writes `notifications.alerts` and, for quarantine,
+`trades.enriched.dlq`.
+
+`RiskAlertServiceAuthorizationTest` proves one allowed action and three denied ones.
+
+**DENY** write `risk-rules.events`. This is the assertion that matters most in that file, for a
+different reason than the tick-topic denial above. `risk-rules.events` is the control plane's
+governance record: which rule version was approved, by whom, and from when. A streaming workload that
+could write it could manufacture the approved rule version it then evaluates itself against, which
+defeats maker-checker entirely. The denial is not a tidy-up, it is the separation between the plane
+that decides the rules and the plane that applies them.
+
+There is no `risk-rules.events.dlq` grant either, and the absence has a visible consequence in the
+service's behaviour: a malformed governed version cannot be dead-lettered, so it is logged, counted
+and skipped, and the previously in-force version stays in force. See
+[the risk alert service](risk-alerts.md#a-control-plane-typo-must-not-become-a-plane-outage).
+
+**DENY** write `trades.enriched`, the topic it consumes, and **DENY** join another workload's consumer
+group, both for the same reasons as every other service here.
+
 ## A consumer with two inputs, and the denial that matters most
 
 `trade-enrichment-service` reads two topics rather than one: `trades.raw` and

@@ -1,0 +1,34 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// ADR-019: at-least-once, so alertId is derived deterministically rather than randomly.
+// ADR-027: per-record quarantine to trades.enriched.dlq, no event-type-wide breaker.
+// ADR-035: the governed rule set is folded from a non-compacted topic into a per-ruleId version
+// timeline, and the version in force is selected by the trade's own event time.
+// Workload identity: risk-alert-service. Consumer group: the same name.
+// Kafka permission: read trades.enriched and risk-rules.events, write notifications.alerts and
+// trades.enriched.dlq.
+
+description = 'Evaluates governed risk rules against trades.enriched and publishes notifications.alerts'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation libs.confluent.kafka.avro.serializer
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation 'io.micrometer:micrometer-registry-prometheus'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}

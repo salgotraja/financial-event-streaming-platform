@@ -20,8 +20,8 @@ control-plane HTTP APIs, structured logs and audit manifest metadata.
 | `DeadLetterEvent` | every `{topic}.dlq` | yes |
 | `EnrichedTradeEvent` | `trades.enriched` | yes |
 | `PositionSnapshotEvent` | `positions.snapshots` | schema only |
-| `RiskAlertEvent` | `notifications.alerts` | schema only |
-| `RiskRuleLifecycleEvent` | `risk-rules.events` | schema only |
+| `RiskAlertEvent` | `notifications.alerts` | yes |
+| `RiskRuleLifecycleEvent` | `risk-rules.events` | yes |
 | `AlertCaseEvent` | `alert-cases.events` | schema only |
 | `ReconciliationEvent` | `controls.reconciliation` | schema only |
 | `ReconciliationObservationEvent` | `reconciliation.observations` | schema only |
@@ -30,9 +30,14 @@ control-plane HTTP APIs, structured logs and audit manifest metadata.
 | `AgentDecisionEvent` | `agent.decisions` | schema only |
 | `HumanReviewDecisionEvent` | `review.decisions` | schema only |
 
-Ten of the sixteen are contracts for services that do not exist. They are still under the
-compatibility gate, so a change to `RiskAlertEvent` today is checked with the same strictness as a
+Eight of the sixteen are contracts for services that do not exist. They are still under the
+compatibility gate, so a change to `AlertCaseEvent` today is checked with the same strictness as a
 change to `TradeEvent`, and the code generated from them compiles.
+
+`RiskRuleLifecycleEvent` is in use in a way worth naming, because it is the first schema whose
+consumer has no matching producer in this repository. [The risk alert service](risk-alerts.md) folds
+that topic into its governed rule timeline, but `risk-rule-governance-service` is Phase 5, so nothing
+writes it outside tests yet.
 
 ## Generation
 

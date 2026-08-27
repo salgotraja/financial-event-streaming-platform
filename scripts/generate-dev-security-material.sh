@@ -64,7 +64,7 @@ log "wrote deploy/compose/tls: ca.pem (truststore), broker.keystore.pem (broker 
 
 # Identities the broker accepts. Must match SecureKafkaStack.PRINCIPALS, or a service proven to be
 # least-privilege in a test would authenticate as something else in the stack.
-PRINCIPALS=(admin trade-producer market-data-simulator corporate-action-producer reference-data-service audit-service)
+PRINCIPALS=(admin trade-producer market-data-simulator corporate-action-producer reference-data-service audit-service market-data-cache-projector trade-enrichment-service risk-alert-service)
 
 secret_for() { printf '%s-local-secret' "$1"; }
 

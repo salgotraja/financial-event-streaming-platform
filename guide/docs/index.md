@@ -40,12 +40,13 @@ trade execution and no regulatory reporting.
 | Four ingestion producers | Built |
 | Audit archival consumer | Built, writing to a logging stand-in rather than to S3 |
 | Market cache projector, ticks into Redis with a 5-minute VWAP window | Built, and read on every trade by enrichment |
-| Trade enrichment, `trades.raw` into `trades.enriched` | Built, and nothing consumes the enriched stream yet because risk alerting does not exist |
+| Trade enrichment, `trades.raw` into `trades.enriched` | Built, and read on every trade by risk alerting |
 | Per-service Kafka policy, authenticated broker, negative authorization tests | Built |
 | Service identity binding, each service proven to authenticate as its own principal | Built, against a local broker with ACLs, not against MSK IAM |
 | Service container images, one per module, from buildpacks | Built |
 | Local stack, both profiles, with observability | Built |
-| Deterministic streaming: risk alerting, position read model | Not started |
+| Risk alerting, governed rule versions into `notifications.alerts` | Built for `PRICE_DEVIATION` only, and nothing consumes the alert stream yet |
+| Deterministic streaming: position read model | Not started |
 | CDC migration, control plane, agent plane | Not started |
 | Throughput and latency evidence | Not measured |
 

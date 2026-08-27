@@ -6,10 +6,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import com.github.dockerjava.api.command.InspectContainerResponse;
@@ -21,6 +24,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.acl.AccessControlEntry;
 import org.apache.kafka.common.acl.AclBinding;
+import org.apache.kafka.common.acl.AclBindingFilter;
 import org.apache.kafka.common.acl.AclPermissionType;
 import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.errors.TopicExistsException;
@@ -30,6 +34,8 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -69,12 +75,18 @@ import org.testcontainers.utility.DockerImageName;
  */
 public final class SecureKafkaStack {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SecureKafkaStack.class);
+
     /** Pinned: an upstream release must not change what the authorization tests run against. */
     private static final String KAFKA_IMAGE = "apache/kafka:4.1.0";
 
     private static final String SUPER_USER = "admin";
 
     private static final Duration BLOCK_TIMEOUT = Duration.ofSeconds(20);
+
+    /** Bounded wait for a created ACL to reach the broker's own authorizer; see {@link #apply}. */
+    private static final Duration ACL_VISIBILITY_TIMEOUT = Duration.ofSeconds(20);
+    private static final Duration ACL_VISIBILITY_POLL_INTERVAL = Duration.ofMillis(50);
 
     /**
      * Every shipped service identity. The broker needs all credentials at startup, so this list is
@@ -87,7 +99,8 @@ public final class SecureKafkaStack {
             "reference-data-service",
             "audit-service",
             "market-data-cache-projector",
-            "trade-enrichment-service");
+            "trade-enrichment-service",
+            "risk-alert-service");
 
     private static final String KAFKA_ALIAS = "kafka";
     private static final int IN_NETWORK_PORT = 19092;
@@ -400,11 +413,58 @@ public final class SecureKafkaStack {
                                     AclPermissionType.ALLOW))))
                     .toList();
             admin.createAcls(bindings).all().get();
+            awaitAclVisibility(admin, policy.principal(), bindings);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted applying the ACL policy", e);
         } catch (Exception e) {
             throw new IllegalStateException("Could not apply the ACL policy for " + policy.principal(), e);
+        }
+    }
+
+    /**
+     * {@code createAcls().all().get()} returns once the KRaft controller has committed the ACL
+     * record, not once this broker's {@code StandardAuthorizer} has replicated and applied it.
+     * A produce or consume issued in that gap is denied by the broker's deny-by-default authorizer,
+     * indistinguishable from a genuine policy failure unless something waits the gap out first.
+     * {@code describeAcls} is answered from the same authorizer that decides a produce request, so
+     * seeing a binding there is proof it is enforced, not merely proof it was accepted.
+     */
+    private static void awaitAclVisibility(Admin admin, String principal, List<AclBinding> bindings) {
+        Instant deadline = Instant.now().plus(ACL_VISIBILITY_TIMEOUT);
+        int attempt = 0;
+        while (true) {
+            attempt++;
+            Collection<AclBinding> visible;
+            try {
+                visible = admin.describeAcls(AclBindingFilter.ANY).values().get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(
+                        "Interrupted waiting for ACL visibility for " + principal, e);
+            } catch (ExecutionException e) {
+                throw new IllegalStateException(
+                        "Could not describe ACLs while waiting for visibility for " + principal,
+                        e.getCause());
+            }
+            List<AclBinding> pending = bindings.stream().filter(b -> !visible.contains(b)).toList();
+            if (pending.isEmpty()) {
+                LOG.debug("ACL bindings for {} visible to the broker after {} attempt(s)",
+                        principal, attempt);
+                return;
+            }
+            if (Instant.now().isAfter(deadline)) {
+                throw new IllegalStateException("ACL bindings for " + principal
+                        + " never became visible to the broker's authorizer within "
+                        + ACL_VISIBILITY_TIMEOUT + ": " + pending);
+            }
+            try {
+                Thread.sleep(ACL_VISIBILITY_POLL_INTERVAL.toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(
+                        "Interrupted waiting for ACL visibility for " + principal, e);
+            }
         }
     }
 
