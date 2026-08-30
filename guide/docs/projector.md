@@ -168,7 +168,9 @@ act on rather than failing inside the deserialiser, where it would stall the par
 registered as not retryable, because the bytes do not improve on a second attempt, so the recoverer
 runs immediately, publishes to `market-data.ticks.dlq`, and the offset advances.
 
-The bytes that reach the dead-letter topic come off the exception, not off the record:
+The bytes that reach the dead-letter topic come off the exception, not off the record. Every consumer
+that quarantines per record needs this, so it lives in `PoisonRecordPolicy` in `platform-common`
+rather than in each service:
 
 ```java
 if (cause instanceof DeserializationException deserialization) {

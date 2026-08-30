@@ -4,6 +4,7 @@ import java.util.Map;
 
 import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.common.kafka.FailureTracker;
+import dev.engnotes.fes.common.kafka.PoisonRecordPolicy;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
@@ -14,8 +15,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.util.backoff.BackOff;
-import org.springframework.util.backoff.ExponentialBackOff;
 
 /**
  * Consumer-side wiring: what a failure costs, and where a record goes when it cannot be archived.
@@ -30,12 +29,6 @@ import org.springframework.util.backoff.ExponentialBackOff;
  */
 @Configuration(proxyBeanMethods = false)
 public class AuditKafkaConfiguration {
-
-    // Three attempts total, so two retries after the first failure.
-    private static final long MAX_RETRIES = 2;
-    private static final long INITIAL_BACKOFF_MS = 100;
-    private static final long MAX_BACKOFF_MS = 5_000;
-    private static final long MAX_ELAPSED_MS = 5_000;
 
     @Bean
     KafkaAvroDeserializer auditPayloadDeserializer(
@@ -71,7 +64,7 @@ public class AuditKafkaConfiguration {
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
                 (record, exception) -> quarantine(deadLetterPublisher, record, exception),
-                backOff());
+                PoisonRecordPolicy.poisonBackOff());
         errorHandler.addNotRetryableExceptions(AuditDecodeException.class);
         errorHandler.setRetryListeners(failureTracker);
         // The container commits the recovered record's offset, so one poison payload does not block
@@ -87,15 +80,5 @@ public class AuditKafkaConfiguration {
 
         ConsumerRecord<String, byte[]> failed = (ConsumerRecord<String, byte[]>) record;
         publisher.publish(failed, failed.value(), exception).join();
-    }
-
-    private static BackOff backOff() {
-        ExponentialBackOff backOff = new ExponentialBackOff();
-        backOff.setInitialInterval(INITIAL_BACKOFF_MS);
-        backOff.setMultiplier(2.0);
-        backOff.setMaxInterval(MAX_BACKOFF_MS);
-        backOff.setMaxElapsedTime(MAX_ELAPSED_MS);
-        backOff.setMaxAttempts(MAX_RETRIES);
-        return backOff;
     }
 }

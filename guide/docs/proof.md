@@ -49,6 +49,10 @@ order.
 | `retryCount` and `firstFailureAt` are measured, not invented | `FailureTracker` | `should_report_the_attempts_actually_made_and_when_the_record_first_failed` |
 | The failure names the root cause, not the container's wrapper | `DeadLetterPublisher` | `should_name_the_root_cause_not_the_wrapper_the_container_reported` |
 | A tombstone that fails is quarantined rather than crashing the publisher | `DeadLetterPublisher` | `should_quarantine_an_empty_payload_rather_than_fail_when_the_record_was_a_tombstone` |
+| The quarantined bytes come off the exception when the record value is null | `PoisonRecordPolicy` | `a_decode_failure_yields_the_bytes_the_deserializer_rejected`, `a_decode_failure_is_found_however_deeply_it_is_wrapped` |
+| A record that decoded and then failed carries no fabricated payload | `PoisonRecordPolicy` | `a_value_that_is_not_bytes_yields_no_payload`, `a_processing_failure_falls_back_to_the_record_value` |
+| Every consumer that quarantines per record shares one retry bound | `PoisonRecordPolicy` | `the_back_off_is_bounded_at_three_attempts_in_total`, `the_back_off_is_configured_the_same_way_for_every_service` |
+| A self-referential cause chain cannot hang the consumer thread | `PoisonRecordPolicy` | `a_self_referential_cause_chain_terminates` |
 
 ## Contracts and evolution
 

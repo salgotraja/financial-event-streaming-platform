@@ -43,6 +43,7 @@ deliberate breaking change gets accepted.
 | `ConsumerAcknowledgementConfiguration` | Forces `enable.auto.commit=false` and `MANUAL_IMMEDIATE` on every consumer |
 | `DeadLetterPublisher` | Builds a `DeadLetterEvent` and sends it to `{topic}.dlq` |
 | `FailureTracker` | Remembers first failure time and attempt count so the DLQ event carries real numbers |
+| `PoisonRecordPolicy` | The shared retry bound before quarantine, and the bytes the dead letter carries |
 
 Its test fixtures are shared too, consumed with
 `testImplementation testFixtures(project(':platform-common'))`:

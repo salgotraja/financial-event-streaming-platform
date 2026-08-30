@@ -7,6 +7,7 @@ import java.util.Optional;
 import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.common.kafka.FailureTracker;
 import dev.engnotes.fes.common.kafka.KafkaSaslProfile;
+import dev.engnotes.fes.common.kafka.PoisonRecordPolicy;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -31,7 +32,6 @@ import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.util.backoff.BackOff;
-import org.springframework.util.backoff.ExponentialBackOff;
 import org.springframework.util.backoff.FixedBackOff;
 
 /**
@@ -55,9 +55,10 @@ import org.springframework.util.backoff.FixedBackOff;
  * every fresher tick. Only {@code future}, where the cached tick already postdates the trade, cannot
  * improve: the same monotonic guarantee that shrinks age for the other four makes it grow more
  * negative for this one. {@code setBackOffFunction} gives {@code future} a zero-attempt back-off and
- * gives every other {@code ReferenceDataUnavailableException} the same {@link #poisonBackOff()} the
- * other listener failures get, so a newly listed ticker, or the first trade after a projector
- * restart, gets a second chance instead of dead-lettering with zero attempts.
+ * gives every other {@code ReferenceDataUnavailableException} the same
+ * {@link PoisonRecordPolicy#poisonBackOff()} the other listener failures get, so a newly listed ticker,
+ * or the first trade after a projector restart, gets a second chance instead of dead-lettering with zero
+ * attempts.
  *
  * <p><strong>A Redis outage pauses the container.</strong> The back-off function returns an
  * unlimited-attempt back-off for a connection failure or a command timeout, so the recoverer is never
@@ -78,12 +79,6 @@ import org.springframework.util.backoff.FixedBackOff;
 public class EnrichmentKafkaConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(EnrichmentKafkaConfiguration.class);
-
-    // Three attempts total, so two retries after the first failure.
-    private static final long MAX_RETRIES = 2;
-    private static final long INITIAL_BACKOFF_MS = 100;
-    private static final long MAX_BACKOFF_MS = 5_000;
-    private static final long MAX_ELAPSED_MS = 5_000;
 
     // How long the container stays paused between attempts while Redis is down.
     private static final long OUTAGE_PAUSE_MS = 5_000;
@@ -124,7 +119,7 @@ public class EnrichmentKafkaConfiguration {
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
                 (record, exception) -> quarantine(deadLetterPublisher, metrics, record, exception),
-                poisonBackOff(),
+                PoisonRecordPolicy.poisonBackOff(),
                 pausing);
 
         errorHandler.setBackOffFunction((record, exception) -> backOffFor(exception));
@@ -269,7 +264,7 @@ public class EnrichmentKafkaConfiguration {
 
         @SuppressWarnings("unchecked")
         ConsumerRecord<String, ?> failed = (ConsumerRecord<String, ?>) record;
-        publisher.publish(failed, originalPayload(failed, exception), exception).join();
+        publisher.publish(failed, PoisonRecordPolicy.originalPayload(failed, exception), exception).join();
 
         // The dead letter is already published by the time this runs. setAckAfterHandle(true) means
         // a metrics failure here would prevent the ack and redeliver the record, quarantining it a
@@ -287,7 +282,8 @@ public class EnrichmentKafkaConfiguration {
     /**
      * The back-off for one listener failure, in priority order: a Redis outage always pauses the
      * container regardless of what triggered it, then {@code future} gets zero attempts because it
-     * cannot improve, then everything else falls through to the bounded {@link #poisonBackOff()}.
+     * cannot improve, then everything else falls through to the bounded
+     * {@link PoisonRecordPolicy#poisonBackOff()}.
      */
     static BackOff backOffFor(Throwable exception) {
         if (isRedisOutage(exception)) {
@@ -299,7 +295,7 @@ public class EnrichmentKafkaConfiguration {
             // not-retryable exception.
             return new FixedBackOff(0L, 0L);
         }
-        return poisonBackOff();
+        return PoisonRecordPolicy.poisonBackOff();
     }
 
     private static Optional<UnavailableReason> reasonOf(Throwable failure) {
@@ -310,25 +306,5 @@ public class EnrichmentKafkaConfiguration {
             }
         }
         return Optional.empty();
-    }
-
-    private static byte[] originalPayload(ConsumerRecord<String, ?> record, Throwable failure) {
-        for (Throwable cause = failure; cause != null && cause != cause.getCause();
-             cause = cause.getCause()) {
-            if (cause instanceof DeserializationException deserialization) {
-                return deserialization.getData();
-            }
-        }
-        return record.value() instanceof byte[] bytes ? bytes : null;
-    }
-
-    private static BackOff poisonBackOff() {
-        ExponentialBackOff backOff = new ExponentialBackOff();
-        backOff.setInitialInterval(INITIAL_BACKOFF_MS);
-        backOff.setMultiplier(2.0);
-        backOff.setMaxInterval(MAX_BACKOFF_MS);
-        backOff.setMaxElapsedTime(MAX_ELAPSED_MS);
-        backOff.setMaxAttempts(MAX_RETRIES);
-        return backOff;
     }
 }
