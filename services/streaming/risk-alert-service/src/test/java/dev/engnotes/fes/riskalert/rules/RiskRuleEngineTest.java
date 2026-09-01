@@ -213,6 +213,11 @@ class RiskRuleEngineTest {
         assertThat(engine.evaluate(EnrichedTrades.withPosition(
                 "t-1", "trader-1", "RELIANCE", Side.BUY, 100L, Instant.ofEpochMilli(2_000L))))
                 .isEmpty();
+
+        assertThat(registry.calls)
+                .as("one registry read per rule type per evaluate: the guard and the dispatch "
+                        + "loop must share it rather than each reading independently")
+                .isEqualTo(1);
     }
 
     @Test

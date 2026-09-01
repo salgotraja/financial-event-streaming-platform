@@ -95,9 +95,9 @@ public class RiskRuleEngine {
                                                  ActiveRule governed,
                                                  NetPosition post) {
 
-        // post is non-null on every path that reaches here with a position-aware rule: the guard
-        // and this dispatch both read the same snapshot, so a rule found in force here was also
-        // found in force by the guard that decided whether to apply the trade.
+        // The guard and this dispatch loop read the same snapshot, so a rule found in force here
+        // was also seen by the guard that decided whether to apply the trade: post is therefore
+        // non-null on every path that reaches here with a position-aware rule.
         return rule instanceof PositionAwareRiskRule positionAware
                 ? positionAware.evaluate(trade, governed, post)
                 : rule.evaluate(trade, governed);
