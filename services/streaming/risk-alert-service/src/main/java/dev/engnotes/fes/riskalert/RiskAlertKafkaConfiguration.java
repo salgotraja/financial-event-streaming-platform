@@ -14,6 +14,7 @@ import dev.engnotes.fes.riskalert.governance.BootstrapRuleProperties;
 import dev.engnotes.fes.riskalert.governance.RiskRuleRegistry;
 import dev.engnotes.fes.riskalert.governance.RuleTimelineLoader;
 import dev.engnotes.fes.riskalert.governance.RuleTransition;
+import dev.engnotes.fes.riskalert.position.RiskPositionStore;
 import dev.engnotes.fes.riskalert.rules.PriceDeviationParameters;
 import dev.engnotes.fes.riskalert.rules.PriceDeviationRule;
 import dev.engnotes.fes.riskalert.rules.RiskRule;
@@ -29,6 +30,7 @@ import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -69,6 +71,11 @@ public class RiskAlertKafkaConfiguration {
     @Bean
     RiskRuleRegistry riskRuleRegistry(BootstrapRuleProperties bootstrap) {
         return new RiskRuleRegistry(bootstrap);
+    }
+
+    @Bean
+    RiskPositionStore riskPositionStore(JdbcClient jdbcClient) {
+        return new RiskPositionStore(jdbcClient);
     }
 
     @Bean
