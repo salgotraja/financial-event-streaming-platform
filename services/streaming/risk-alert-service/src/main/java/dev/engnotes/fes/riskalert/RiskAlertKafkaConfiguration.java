@@ -32,11 +32,20 @@ import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ContainerPausingBackOffHandler;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.listener.ListenerContainerPauseService;
+import org.springframework.kafka.listener.ListenerContainerRegistry;
 import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.util.backoff.BackOff;
+import org.springframework.util.backoff.FixedBackOff;
 
 /**
  * Rules-consumer wiring, the readiness gate for the governed rule fold (ADR-035), and the
@@ -49,11 +58,17 @@ import org.springframework.kafka.support.serializer.DeserializationException;
  * not decode differently on a second attempt, and a non-finite {@code priceDeviation} is a validation
  * verdict on the payload that will not change either.
  *
- * <p>This service calls no external datastore, unlike {@code trade-enrichment-service}. There is no
- * Redis and no reference-data gap here, so there is no dependency-outage branch and no
- * {@code ContainerPausingBackOffHandler}: {@link #riskAlertErrorHandler} takes three arguments, not
- * the five {@code EnrichmentKafkaConfiguration.enrichmentErrorHandler} takes, and every failure other
- * than the two listed above falls through to the same bounded back-off.
+ * <p><strong>A PostgreSQL outage pauses the container.</strong> Increment 2 gave this service its
+ * first datastore, so the handler now takes the same five arguments
+ * {@code EnrichmentKafkaConfiguration.enrichmentErrorHandler} takes and for the same reason. The
+ * back-off function returns an unlimited-attempt back-off for a lost connection or a statement
+ * timeout, so the recoverer is never reached and no dead letter is written for a trade that was
+ * never bad. The handler is given a {@link ContainerPausingBackOffHandler} rather than the default
+ * one, and the difference decides whether this works: the default handler sleeps the consumer
+ * thread, so {@code poll()} stops being called, and an unbounded sleep crosses
+ * {@code max.poll.interval.ms} and gets the consumer evicted from the group. That turns an outage
+ * into a rebalance storm. Pausing keeps the consumer polling and in the group while it declines to
+ * deliver records.
  *
  * <p>{@code InvalidRuleParametersException} never reaches this handler. It is thrown during the fold,
  * on the loader's own thread, never on the listener thread, because parameters are validated when a
@@ -69,6 +84,9 @@ import org.springframework.kafka.support.serializer.DeserializationException;
 public class RiskAlertKafkaConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RiskAlertKafkaConfiguration.class);
+
+    // How long the container stays paused between attempts while PostgreSQL is down.
+    private static final long OUTAGE_PAUSE_MS = 5_000;
 
     @Bean
     RiskRuleRegistry riskRuleRegistry(BootstrapRuleProperties bootstrap) {
@@ -110,11 +128,20 @@ public class RiskAlertKafkaConfiguration {
                 properties.consumerInstance());
     }
 
+    @Bean
+    TaskScheduler riskAlertPauseScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("risk-alert-pause-");
+        scheduler.initialize();
+        return scheduler;
+    }
+
     /**
      * The two failure classes ADR-027 separates for {@code trades.enriched}. See the class javadoc
-     * for the full reasoning; this differs from {@code EnrichmentKafkaConfiguration.
-     * enrichmentErrorHandler} only in that there is no dependency to protect here, so there is no
-     * back-off function, no {@code ListenerContainerRegistry} and no pausing handler.
+     * for the full reasoning; this matches {@code EnrichmentKafkaConfiguration.
+     * enrichmentErrorHandler}'s five-argument shape now that this service has its own dependency to
+     * protect.
      *
      * <p>{@code metrics} records the quarantine through {@link RiskAlertMetrics#recordQuarantined()},
      * added in Task 10.
@@ -122,11 +149,19 @@ public class RiskAlertKafkaConfiguration {
     @Bean
     DefaultErrorHandler riskAlertErrorHandler(DeadLetterPublisher deadLetterPublisher,
                                               FailureTracker failureTracker,
+                                              ListenerContainerRegistry registry,
+                                              TaskScheduler riskAlertPauseScheduler,
                                               RiskAlertMetrics metrics) {
+
+        ContainerPausingBackOffHandler pausing = new ContainerPausingBackOffHandler(
+                new ListenerContainerPauseService(registry, riskAlertPauseScheduler));
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
                 (record, exception) -> quarantine(deadLetterPublisher, metrics, record, exception),
-                PoisonRecordPolicy.poisonBackOff());
+                PoisonRecordPolicy.poisonBackOff(),
+                pausing);
+
+        errorHandler.setBackOffFunction((record, exception) -> backOffFor(exception));
 
         // Retrying either of these does not help. A DeserializationException's bytes do not improve
         // on a second attempt. An IllegalArgumentException is a validation verdict on the payload
@@ -137,6 +172,38 @@ public class RiskAlertKafkaConfiguration {
         // the partition behind it.
         errorHandler.setAckAfterHandle(true);
         return errorHandler;
+    }
+
+    private static boolean isPostgresOutage(Throwable failure) {
+        for (Throwable cause = failure; cause != null && cause != cause.getCause();
+             cause = cause.getCause()) {
+            // Two types, because an unavailable database presents as either. A refused connection or
+            // an exhausted pool raises CannotGetJdbcConnectionException; a database that accepted the
+            // connection and then stopped answering raises a statement timeout, which Spring
+            // translates to QueryTimeoutException. Matching only the first sends a valid trade to the
+            // DLQ during exactly the outage this branch exists to survive.
+            //
+            // DataIntegrityViolationException is deliberately not matched: a constraint violation is
+            // a verdict on the data, not a failing dependency, and pausing the whole container on one
+            // would turn a bad record into an outage.
+            if (cause instanceof CannotGetJdbcConnectionException
+                    || cause instanceof QueryTimeoutException) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The back-off for one listener failure, in priority order: a PostgreSQL outage always pauses the
+     * container regardless of what triggered it, then everything else falls through to the bounded
+     * {@link PoisonRecordPolicy#poisonBackOff()}.
+     */
+    static BackOff backOffFor(Throwable exception) {
+        if (isPostgresOutage(exception)) {
+            return new FixedBackOff(OUTAGE_PAUSE_MS, FixedBackOff.UNLIMITED_ATTEMPTS);
+        }
+        return PoisonRecordPolicy.poisonBackOff();
     }
 
     /**
