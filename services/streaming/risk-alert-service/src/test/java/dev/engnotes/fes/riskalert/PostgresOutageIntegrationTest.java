@@ -8,6 +8,7 @@ import java.util.Properties;
 import java.util.UUID;
 import javax.sql.DataSource;
 
+import com.zaxxer.hikari.HikariDataSource;
 import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import dev.engnotes.fes.events.EnrichedTradeEvent;
@@ -91,15 +92,11 @@ class PostgresOutageIntegrationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
-        // A paused container keeps its TCP connections open but stops answering on them, so a
-        // query already in flight over an idle pooled connection would otherwise hang until the
-        // OS's own TCP retransmission timeout, tens of minutes away, rather than surface as the
-        // QueryTimeoutException isPostgresOutage classifies. socketTimeout bounds that read.
-        registry.add("spring.datasource.hikari.data-source-properties.socketTimeout", () -> "3");
-        // Bounds acquiring a new physical connection while the container is paused and none of the
-        // pool's existing connections are idle and usable, so CannotGetJdbcConnectionException
-        // surfaces within the test's own await window rather than Hikari's 30s default.
-        registry.add("spring.datasource.hikari.connection-timeout", () -> "3000");
+        // Deliberately no override of spring.datasource.hikari.*: this test relies on the same
+        // connection-timeout, connectTimeout and socketTimeout bounds application.yml gives every
+        // deployment, so it proves the outage handling works with the configuration that actually
+        // ships rather than a test-only shortcut. socketTimeout=10s is comfortably inside this
+        // test's 30s Awaitility window, so no narrower override is needed here.
     }
 
     @BeforeEach
@@ -133,6 +130,19 @@ class PostgresOutageIntegrationTest {
 
     private MessageListenerContainer listenerContainer() {
         return listenerRegistry.getListenerContainer(EnrichedTradeConsumer.LISTENER_ID);
+    }
+
+    @Test
+    void the_production_hikari_bounds_from_application_yml_actually_bind() {
+        // Reads the resolved pool back rather than assuming the application.yml nesting under
+        // spring.datasource.hikari.data-source-properties bound correctly: that key is a common
+        // place to get the YAML structure wrong with no startup error, since an unrecognised
+        // property there is silently ignored rather than rejected.
+        HikariDataSource hikari = (HikariDataSource) dataSource;
+        assertThat(hikari.getConnectionTimeout()).isEqualTo(5_000L);
+        assertThat(hikari.getDataSourceProperties())
+                .containsEntry("connectTimeout", "5")
+                .containsEntry("socketTimeout", "10");
     }
 
     @Test
