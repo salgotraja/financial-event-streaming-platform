@@ -1,5 +1,6 @@
 package dev.engnotes.fes.riskalert;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 import javax.sql.DataSource;
@@ -17,11 +18,13 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 @SpringBootTest(properties = {
@@ -132,6 +135,50 @@ class RiskPositionStoreIntegrationTest {
         assertThat(jdbc.sql("SELECT version FROM risk_position").query(Long.class).single())
                 .as("ADR-008's audit intent: the row records how many times it moved")
                 .isEqualTo(2L);
+    }
+
+    /**
+     * Exists to fail if {@code RiskPositionStore.apply} ever stops being one transaction. If
+     * {@code @Transactional} were removed, the method split, or the class or method made
+     * {@code final}, Spring's CGLIB proxy silently disappears and the three statements inside
+     * {@code apply} (the ledger insert, the position upsert, and the ledger write-back of
+     * {@code net_quantity_after}) become three independent autocommits. Nothing else in this suite
+     * would notice: the ledger insert would simply commit on its own before the upsert fails.
+     *
+     * <p>The scenario: seed the position at {@code Long.MAX_VALUE} so the ledger insert (statement
+     * 1) succeeds but the upsert (statement 2) overflows PostgreSQL's {@code BIGINT}. Under a real
+     * transaction, statement 1's insert rolls back with statement 2's failure, so the ledger ends up
+     * with zero rows for this {@code tradeId}. Without the proxy, statement 1 would have already
+     * committed, and a later redelivery of the same trade would hit the {@code claimed == 0} branch,
+     * find {@code net_quantity_after} still {@code NULL}, and throw {@code IllegalStateException},
+     * which routes to the poison path and dead-letters a good trade after bounded retry.
+     */
+    @Test
+    void the_ledger_insert_rolls_back_when_the_position_upsert_fails() {
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        jdbc.sql("""
+                        INSERT INTO risk_position
+                            (trader_id, ticker, net_quantity, gross_buy, gross_sell,
+                             last_event_timestamp, version, updated_at)
+                        VALUES (?, ?, ?, 0, 0, ?, 1, ?)
+                        """)
+                .params("trader-1", "RELIANCE", Long.MAX_VALUE,
+                        Timestamp.from(Instant.ofEpochMilli(1_000L)), Timestamp.from(Instant.now()))
+                .update();
+
+        assertThatThrownBy(() -> store.apply(trade("t-overflow", Side.BUY, 1L, 2_000L)))
+                .as("the upsert overflows BIGINT once net_quantity is already Long.MAX_VALUE")
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        long ledgerRows = jdbc.sql("SELECT COUNT(*) FROM risk_position_applied_trade WHERE trade_id = ?")
+                .param("t-overflow")
+                .query(Long.class)
+                .single();
+
+        assertThat(ledgerRows)
+                .as("the ledger insert must roll back with the failed upsert; a surviving row here "
+                        + "means @Transactional stopped being effective")
+                .isZero();
     }
 
     private long storedNet() {
