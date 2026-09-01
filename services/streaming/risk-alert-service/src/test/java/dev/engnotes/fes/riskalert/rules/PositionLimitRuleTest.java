@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 
+import dev.engnotes.fes.common.idempotency.IdempotencyKeys;
 import dev.engnotes.fes.events.AlertType;
 import dev.engnotes.fes.events.EnrichedTradeEvent;
 import dev.engnotes.fes.events.RiskAlertEvent;
@@ -64,6 +65,15 @@ class PositionLimitRuleTest {
     }
 
     @Test
+    void a_position_exactly_at_the_critical_band_warns_rather_than_criticals() {
+        RiskAlertEvent alert = rule.evaluate(trade(), RULE, position(50_000L)).orElseThrow();
+
+        assertThat(alert.getSeverity())
+                .as("strict exceedance: exactly at the band is not above it")
+                .isEqualTo(Severity.WARNING);
+    }
+
+    @Test
     void a_short_position_breaches_at_the_same_magnitude_as_a_long_one() {
         Optional<RiskAlertEvent> shortSide = rule.evaluate(trade(), RULE, position(-50_001L));
         Optional<RiskAlertEvent> longSide = rule.evaluate(trade(), RULE, position(50_001L));
@@ -106,6 +116,19 @@ class PositionLimitRuleTest {
         RiskAlertEvent replayed = rule.evaluate(trade(), RULE, position(60_000L)).orElseThrow();
 
         assertThat(first.getAlertId()).isEqualTo(replayed.getAlertId());
+        assertThat(first.getAlertId())
+                .hasToString(IdempotencyKeys.deterministic("t-1", "pl-1", "3").toString());
+    }
+
+    @Test
+    void a_different_governed_version_derives_a_different_alert_id() {
+        ActiveRule newerVersion = new ActiveRule("pl-1", "position-limit", 4L, RULE.parameters());
+
+        RiskAlertEvent original = rule.evaluate(trade(), RULE, position(60_000L)).orElseThrow();
+        RiskAlertEvent underNewerVersion =
+                rule.evaluate(trade(), newerVersion, position(60_000L)).orElseThrow();
+
+        assertThat(original.getAlertId()).isNotEqualTo(underNewerVersion.getAlertId());
     }
 
     @Test

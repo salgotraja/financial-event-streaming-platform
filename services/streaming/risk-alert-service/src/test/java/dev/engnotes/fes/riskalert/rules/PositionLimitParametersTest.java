@@ -57,6 +57,13 @@ class PositionLimitParametersTest {
     }
 
     @Test
+    void a_band_too_large_for_a_long_is_rejected_rather_than_truncated() {
+        assertThatThrownBy(() -> PositionLimitParameters.from(bands("99999999999999999999", "50000")))
+                .isInstanceOf(InvalidRuleParametersException.class)
+                .hasMessageContaining("not a whole number");
+    }
+
+    @Test
     void a_non_positive_band_is_rejected() {
         assertThatThrownBy(() -> PositionLimitParameters.from(bands("0", "50000")))
                 .isInstanceOf(InvalidRuleParametersException.class)
