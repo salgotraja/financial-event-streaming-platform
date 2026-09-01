@@ -15,6 +15,8 @@ import dev.engnotes.fes.riskalert.governance.RiskRuleRegistry;
 import dev.engnotes.fes.riskalert.governance.RuleTimelineLoader;
 import dev.engnotes.fes.riskalert.governance.RuleTransition;
 import dev.engnotes.fes.riskalert.position.RiskPositionStore;
+import dev.engnotes.fes.riskalert.rules.PositionLimitParameters;
+import dev.engnotes.fes.riskalert.rules.PositionLimitRule;
 import dev.engnotes.fes.riskalert.rules.PriceDeviationParameters;
 import dev.engnotes.fes.riskalert.rules.PriceDeviationRule;
 import dev.engnotes.fes.riskalert.rules.RiskRule;
@@ -84,6 +86,11 @@ public class RiskAlertKafkaConfiguration {
     }
 
     @Bean
+    PositionLimitRule positionLimitRule() {
+        return new PositionLimitRule();
+    }
+
+    @Bean
     RiskRuleEngine riskRuleEngine(RiskRuleRegistry registry, List<RiskRule> rules, RiskPositionStore positions) {
         return new RiskRuleEngine(registry, rules, positions);
     }
@@ -143,6 +150,8 @@ public class RiskAlertKafkaConfiguration {
         return transition -> {
             if (PriceDeviationRule.RULE_TYPE.equals(transition.ruleType())) {
                 PriceDeviationParameters.from(transition.parameters());
+            } else if (PositionLimitRule.RULE_TYPE.equals(transition.ruleType())) {
+                PositionLimitParameters.from(transition.parameters());
             }
         };
     }

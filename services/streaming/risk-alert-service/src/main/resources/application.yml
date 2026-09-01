@@ -53,6 +53,11 @@ risk:
       parameters:
         warn-deviation-percent: "2.0"
         critical-deviation-percent: "5.0"
+    - rule-id: position-limit
+      rule-type: position-limit
+      parameters:
+        warn-position-quantity: "10000"
+        critical-position-quantity: "50000"
 
 management:
   endpoints:
