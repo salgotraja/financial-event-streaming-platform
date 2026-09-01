@@ -84,8 +84,8 @@ public class RiskAlertKafkaConfiguration {
     }
 
     @Bean
-    RiskRuleEngine riskRuleEngine(RiskRuleRegistry registry, List<RiskRule> rules) {
-        return new RiskRuleEngine(registry, rules);
+    RiskRuleEngine riskRuleEngine(RiskRuleRegistry registry, List<RiskRule> rules, RiskPositionStore positions) {
+        return new RiskRuleEngine(registry, rules, positions);
     }
 
     @Bean
