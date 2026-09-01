@@ -9,6 +9,7 @@ import dev.engnotes.fes.events.EnrichedTradeEvent;
 import dev.engnotes.fes.events.RiskAlertEvent;
 import dev.engnotes.fes.events.RuleState;
 import dev.engnotes.fes.events.Side;
+import dev.engnotes.fes.riskalert.governance.ActiveRule;
 import dev.engnotes.fes.riskalert.governance.BootstrapRuleProperties;
 import dev.engnotes.fes.riskalert.governance.RiskRuleRegistry;
 import dev.engnotes.fes.riskalert.governance.RuleTransition;
@@ -169,6 +170,49 @@ class RiskRuleEngineTest {
         assertThat(alerts).hasSize(2)
                 .extracting(alert -> alert.getAlertType().toString())
                 .containsExactlyInAnyOrder("PRICE_DEVIATION", "POSITION_LIMIT_BREACH");
+    }
+
+    /**
+     * A registry that answers {@code inForceAt} differently on its first and second call, standing
+     * in for a reinstating {@code ACTIVE} transition landing between the guard's read and the
+     * dispatch loop's read. Before the single-snapshot fix, the guard would see call one (nothing
+     * in force, so no position applied) and the dispatch loop would see call two (the rule in
+     * force), dispatching {@code PositionLimitRule} with a null {@code NetPosition} and throwing an
+     * NPE out of {@code evaluate}. With one snapshot per call, both the guard and the dispatch loop
+     * read the same, single answer, so this scenario cannot arise even though the registry would
+     * still allow it.
+     */
+    private static final class FlippingRegistry extends RiskRuleRegistry {
+
+        private final ActiveRule reinstated;
+        private int calls;
+
+        FlippingRegistry(BootstrapRuleProperties bootstrap, ActiveRule reinstated) {
+            super(bootstrap);
+            this.reinstated = reinstated;
+        }
+
+        @Override
+        public List<ActiveRule> inForceAt(String ruleType, long instant) {
+            calls++;
+            return calls == 1 ? List.of() : List.of(reinstated);
+        }
+    }
+
+    @Test
+    void the_guard_and_the_dispatch_loop_read_one_registry_snapshot_and_cannot_disagree() {
+        BootstrapRuleProperties emptyBootstrap = new BootstrapRuleProperties(List.of());
+        ActiveRule reinstatedPositionLimit = new ActiveRule("pl-a", "position-limit", 2, LIMITS);
+        FlippingRegistry registry = new FlippingRegistry(emptyBootstrap, reinstatedPositionLimit);
+
+        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PositionLimitRule()), neverCalled());
+
+        // Without the single-snapshot fix this throws a NullPointerException: the guard's call
+        // returns empty (call 1), so post stays null, but the dispatch loop's call (call 2) returns
+        // the reinstated rule and dispatches PositionLimitRule with a null NetPosition.
+        assertThat(engine.evaluate(EnrichedTrades.withPosition(
+                "t-1", "trader-1", "RELIANCE", Side.BUY, 100L, Instant.ofEpochMilli(2_000L))))
+                .isEmpty();
     }
 
     @Test

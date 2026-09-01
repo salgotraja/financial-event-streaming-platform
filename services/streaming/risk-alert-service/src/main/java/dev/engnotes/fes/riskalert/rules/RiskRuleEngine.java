@@ -40,6 +40,14 @@ import org.slf4j.LoggerFactory;
  * through it, and rejecting here is also what stops one bad rule version from aborting evaluation
  * of every other rule for the same trade: a control-plane typo must degrade only itself, not the
  * whole trade (ADR-035).
+ *
+ * <p><strong>The registry is read exactly once per rule type per {@code evaluate} call.</strong>
+ * The fold thread that applies governance transitions runs concurrently with this one, so two
+ * independent reads of {@link RiskRuleRegistry} can disagree: a transition landing between them
+ * can make the guard see no position-aware rule in force while the dispatch loop, reading a moment
+ * later, sees one. {@code evaluate} therefore resolves every rule type's in-force list into one
+ * snapshot up front, and both the guard and the dispatch loop read from that same snapshot, so they
+ * cannot disagree.
  */
 public class RiskRuleEngine {
 
@@ -59,11 +67,17 @@ public class RiskRuleEngine {
     public List<RiskAlertEvent> evaluate(EnrichedTradeEvent trade) {
         long instant = trade.getTrade().getEventTimestamp().toEpochMilli();
 
-        NetPosition post = anyPositionRuleInForceAt(instant) ? positions.apply(trade) : null;
+        // One snapshot of the registry for this call. The guard and the dispatch loop below both
+        // read from it, never from the registry directly, so a transition applied by the fold
+        // thread mid-call cannot make them disagree.
+        Map<String, List<ActiveRule>> governedByType = rulesByType.keySet().stream()
+                .collect(Collectors.toMap(Function.identity(), ruleType -> registry.inForceAt(ruleType, instant)));
+
+        NetPosition post = anyPositionRuleInForce(governedByType) ? positions.apply(trade) : null;
 
         List<RiskAlertEvent> alerts = new ArrayList<>();
         for (RiskRule rule : rulesByType.values()) {
-            for (ActiveRule governed : registry.inForceAt(rule.ruleType(), instant)) {
+            for (ActiveRule governed : governedByType.getOrDefault(rule.ruleType(), List.of())) {
                 try {
                     evaluateOne(rule, trade, governed, post).ifPresent(alerts::add);
                 } catch (InvalidRuleParametersException e) {
@@ -81,21 +95,22 @@ public class RiskRuleEngine {
                                                  ActiveRule governed,
                                                  NetPosition post) {
 
-        // post is non-null on every path that reaches here with a position-aware rule, because the
-        // guard below asks the registry exactly the question this branch answers.
+        // post is non-null on every path that reaches here with a position-aware rule: the guard
+        // and this dispatch both read the same snapshot, so a rule found in force here was also
+        // found in force by the guard that decided whether to apply the trade.
         return rule instanceof PositionAwareRiskRule positionAware
                 ? positionAware.evaluate(trade, governed, post)
                 : rule.evaluate(trade, governed);
     }
 
     /**
-     * The guard. {@code RiskRuleRegistry} needs no change: {@code inForceAt(ruleType, instant)}
-     * already answers this, and asking it is cheaper than a database round trip.
+     * The guard, evaluated against the snapshot rather than the registry directly so it cannot
+     * disagree with the dispatch loop that reads the same snapshot.
      */
-    private boolean anyPositionRuleInForceAt(long instant) {
+    private boolean anyPositionRuleInForce(Map<String, List<ActiveRule>> governedByType) {
         for (RiskRule rule : rulesByType.values()) {
             if (rule instanceof PositionAwareRiskRule
-                    && !registry.inForceAt(rule.ruleType(), instant).isEmpty()) {
+                    && !governedByType.getOrDefault(rule.ruleType(), List.of()).isEmpty()) {
                 return true;
             }
         }
