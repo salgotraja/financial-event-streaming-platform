@@ -307,11 +307,23 @@ because it is one trade applied repeatedly within one transaction rather than a 
 would stay invisible until a second position rule was governed, then corrupt every position silently.
 `the_trade_is_applied_exactly_once_even_when_two_position_rules_are_in_force` asserts a call count.
 
-**Applying only behind the guard.** Without it every trade would write two rows even where
-`PRICE_DEVIATION` is the only rule deployed, and a database outage would pause a service with no
-reason to depend on a database.
+**Applying only behind the guard.** The store is consulted only when a position-aware rule is
+actually in force, so a deployment governing no position rule writes nothing and takes no database
+dependency at all.
 `the_position_store_is_not_consulted_when_only_a_stateless_rule_is_in_force` uses a store that throws
 if called, so the test fails rather than passes if the guard is removed.
+
+Be clear about what that buys today, though: the shipped `application.yml` bootstraps a
+`position-limit` rule, so in the default configuration the guard never short-circuits and PostgreSQL
+is a hard dependency from the first trade. The guard matters for a deployment that removes the
+bootstrap entry or retires the rule through governance, and it is what keeps that deployment
+possible rather than describing how this one runs.
+
+Both readers take one snapshot. `evaluate` resolves every rule type's in-force list once and the
+guard and the dispatch loop both read that snapshot, never the registry directly. Two independent
+reads could disagree, because the rule fold runs on another thread: a transition landing between them
+could leave the guard seeing no position rule while the dispatch loop found one, and a rule would be
+handed a position that was never computed.
 
 Rules read the position and never write it. `PositionAwareRiskRule` is a subtype of `RiskRule` rather
 than a widening of it, specifically so `PriceDeviationRule` and every test written against it stayed

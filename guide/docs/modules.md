@@ -6,7 +6,7 @@ Click to zoom. Source: `guide/docs/diagrams/modules.drawio`.
 
 ## What is in the build
 
-`settings.gradle` is the complete list. Nine entries, and the comment block above them names the
+`settings.gradle` is the complete list. Ten entries, and the comment block above them names the
 services that will land later without including them.
 
 ```groovy
