@@ -131,14 +131,19 @@ services:
       # here), so risk_alert_service is created separately, as a real non-superuser role, by
       # ./postgres/init-risk-alert-role.sql. The bootstrap superuser has no pg_hba.conf entry for
       # network access, only the local socket the entrypoint's own init scripts use.
+      #
+      # Two independent secrets, not one shared between the two roles. Sharing would be a latent
+      # trap: a later pg_hba.conf edit that gave "postgres" any network route would then also grant
+      # network superuser access under a credential already handled as risk_alert_service's.
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${FES_POSTGRES_RISK_ALERT_SECRET}
+      POSTGRES_PASSWORD: ${FES_POSTGRES_BOOTSTRAP_SECRET}
+      RISK_ALERT_SERVICE_PASSWORD: ${FES_POSTGRES_RISK_ALERT_SECRET}
     healthcheck:
       # sslmode=verify-ca rather than pg_isready: the healthcheck proves the TLS listener works and
       # the CA verifies, not merely that the port is open. PGPASSWORD is required: pg_hba.conf has
       # no trust line, so an unauthenticated psql would fail for the same reason a real client's
       # missing credential would.
-      test: ["CMD-SHELL", "PGPASSWORD=$$POSTGRES_PASSWORD psql 'postgresql://risk_alert_service@localhost/risk_alert?sslmode=verify-ca&sslrootcert=/etc/postgresql/tls/ca.pem' -c 'SELECT 1' >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "PGPASSWORD=$$RISK_ALERT_SERVICE_PASSWORD psql 'postgresql://risk_alert_service@localhost/risk_alert?sslmode=verify-ca&sslrootcert=/etc/postgresql/tls/ca.pem' -c 'SELECT 1' >/dev/null 2>&1"]
       interval: 5s
       timeout: 5s
       retries: 20

@@ -11,13 +11,16 @@
 -- attribute", confirmed against postgres:16-alpine). So risk_alert_service is created here instead,
 -- as a genuinely separate, non-superuser role, rather than hardened in place after the fact.
 --
--- The role's password is read from the container's own POSTGRES_PASSWORD environment variable via
--- \getenv, so the secret the overlay's environment: block already carries is the one this role
--- gets, and no credential is ever written to this tracked file.
+-- The role's password is read from the container's own RISK_ALERT_SERVICE_PASSWORD environment
+-- variable via \getenv, deliberately distinct from POSTGRES_PASSWORD (the bootstrap role's own
+-- secret): sharing one secret between the bootstrap superuser and this least-privilege role would
+-- be a latent trap, since a single later pg_hba.conf edit granting "postgres" a network route would
+-- then also grant network superuser access under a credential already handled as service-level.
+-- No credential is ever written to this tracked file either way.
 --
 -- Flyway still needs DDL on this schema, because the migration runs as the service at startup.
 
-\getenv risk_alert_password POSTGRES_PASSWORD
+\getenv risk_alert_password RISK_ALERT_SERVICE_PASSWORD
 
 CREATE ROLE risk_alert_service LOGIN PASSWORD :'risk_alert_password'
     NOSUPERUSER NOCREATEDB NOCREATEROLE;
