@@ -26,6 +26,21 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation libs.confluent.kafka.avro.serializer
 
+    // Increment 2: the first relational store in this repository. Spring Data JDBC rather than JPA
+    // per .claude/rules/database.md. The store itself uses JdbcClient directly, because its three
+    // statements are an ON CONFLICT ... RETURNING upsert that a CrudRepository would only obscure;
+    // the starter is what supplies the DataSource, JdbcClient and transaction manager.
+    // All four are managed by the Spring Boot BOM, so none of them carry a version here.
+    implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    // Spring Boot 4 split Flyway's autoconfiguration out of spring-boot-autoconfigure into its own
+    // module. org.flywaydb:flyway-core alone (the brief's original dependency, correct for Boot 3)
+    // puts Flyway on the classpath but not FlywayAutoConfiguration, so migrations silently never
+    // ran. spring-boot-starter-flyway is the BOM-managed replacement: it pulls in flyway-core and
+    // the autoconfiguration module together.
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
     testImplementation 'io.micrometer:micrometer-registry-prometheus'

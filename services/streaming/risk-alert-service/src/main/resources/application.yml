@@ -1,6 +1,15 @@
 spring:
   application:
     name: risk-alert-service
+  datasource:
+    url: ${RISK_ALERT_DB_URL:jdbc:postgresql://localhost:5432/risk_alert}
+    username: ${RISK_ALERT_DB_USER:risk_alert_service}
+    password: ${RISK_ALERT_DB_PASSWORD:risk_alert_service}
+  flyway:
+    # Flyway runs at startup and before the readiness gate opens, so a service that cannot migrate
+    # never begins consuming trades against a schema it does not have.
+    enabled: true
+    locations: classpath:db/migration
   kafka:
     properties:
       schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}

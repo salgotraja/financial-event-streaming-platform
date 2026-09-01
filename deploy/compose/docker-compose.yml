@@ -126,6 +126,31 @@ services:
       timeout: 3s
       retries: 20
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: fes-postgres
+    # The first relational store in the platform, owned by risk-alert-service alone (ADR-028).
+    # A volume is mounted because this is a store of record, unlike the Redis cache above: losing
+    # it loses position state that only a full replay of trades.enriched could rebuild, and that
+    # rebuild is a recorded deferral rather than something the service can do today.
+    #
+    # Unauthenticated beyond this password, on the private compose network, on the same terms as
+    # every other dev-profile listener. The strict-security overlay is where TLS and a
+    # least-privilege role become mandatory.
+    environment:
+      POSTGRES_DB: risk_alert
+      POSTGRES_USER: risk_alert_service
+      POSTGRES_PASSWORD: risk_alert_service
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U risk_alert_service -d risk_alert"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   # AWS emulation for the audit evidence path. S3 and KMS are the two services that path needs: an
   # object store under Object Lock, and a customer-managed key the manifest is signed with (ADR-012).
   #
@@ -222,3 +247,4 @@ volumes:
   loki-data:
   grafana-data:
   localstack-data:
+  postgres-data:
