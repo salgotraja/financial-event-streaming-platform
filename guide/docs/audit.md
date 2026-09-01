@@ -91,7 +91,9 @@ nothing failing anywhere, which is the worst failure mode an archive can have.
 
 ## Retry and quarantine
 
-`AuditKafkaConfiguration` sets what a failure costs.
+`AuditKafkaConfiguration` decides which failures retry. What a retry costs is not its to choose:
+it calls `PoisonRecordPolicy.poisonBackOff()` in `platform-common`, which every consumer that
+quarantines per record shares.
 
 ```java
 private static final long MAX_RETRIES = 2;          // three attempts in total
@@ -101,7 +103,9 @@ private static final long MAX_ELAPSED_MS = 5_000;
 ```
 
 Three attempts, because the failures worth retrying here are transient sink and registry errors, and a
-longer sequence holds up the partition without changing the outcome.
+longer sequence holds up the partition without changing the outcome. The bound is shared rather than
+per service because it decides how long one bad record holds its partition, and a service that quietly
+widened it would turn a bounded quarantine into unbounded lag on a topic nobody is watching.
 
 ```java
 errorHandler.addNotRetryableExceptions(AuditDecodeException.class);

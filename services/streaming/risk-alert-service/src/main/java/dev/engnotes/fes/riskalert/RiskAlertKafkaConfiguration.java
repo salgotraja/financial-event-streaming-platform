@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.common.kafka.FailureTracker;
 import dev.engnotes.fes.common.kafka.KafkaSaslProfile;
+import dev.engnotes.fes.common.kafka.PoisonRecordPolicy;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import dev.engnotes.fes.riskalert.governance.BootstrapRuleProperties;
 import dev.engnotes.fes.riskalert.governance.RiskRuleRegistry;
@@ -32,8 +33,6 @@ import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.DeserializationException;
-import org.springframework.util.backoff.BackOff;
-import org.springframework.util.backoff.ExponentialBackOff;
 
 /**
  * Rules-consumer wiring, the readiness gate for the governed rule fold (ADR-035), and the
@@ -66,12 +65,6 @@ import org.springframework.util.backoff.ExponentialBackOff;
 public class RiskAlertKafkaConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RiskAlertKafkaConfiguration.class);
-
-    // Three attempts total, so two retries after the first failure, matching FR-03.4's shape.
-    private static final long MAX_RETRIES = 2;
-    private static final long INITIAL_BACKOFF_MS = 100;
-    private static final long MAX_BACKOFF_MS = 5_000;
-    private static final long MAX_ELAPSED_MS = 5_000;
 
     @Bean
     RiskRuleRegistry riskRuleRegistry(BootstrapRuleProperties bootstrap) {
@@ -119,7 +112,7 @@ public class RiskAlertKafkaConfiguration {
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
                 (record, exception) -> quarantine(deadLetterPublisher, metrics, record, exception),
-                poisonBackOff());
+                PoisonRecordPolicy.poisonBackOff());
 
         // Retrying either of these does not help. A DeserializationException's bytes do not improve
         // on a second attempt. An IllegalArgumentException is a validation verdict on the payload
@@ -278,7 +271,7 @@ public class RiskAlertKafkaConfiguration {
 
         @SuppressWarnings("unchecked")
         ConsumerRecord<String, ?> failed = (ConsumerRecord<String, ?>) record;
-        publisher.publish(failed, originalPayload(failed, exception), exception).join();
+        publisher.publish(failed, PoisonRecordPolicy.originalPayload(failed, exception), exception).join();
 
         // The dead letter is already published by the time this runs. setAckAfterHandle(true) means
         // a metrics failure here would prevent the ack and redeliver the record, quarantining it a
@@ -290,25 +283,5 @@ public class RiskAlertKafkaConfiguration {
             log.warn("Metrics recording failed for quarantined topic={} partition={} offset={}",
                     failed.topic(), failed.partition(), failed.offset(), e);
         }
-    }
-
-    private static byte[] originalPayload(ConsumerRecord<String, ?> record, Throwable failure) {
-        for (Throwable cause = failure; cause != null && cause != cause.getCause();
-             cause = cause.getCause()) {
-            if (cause instanceof DeserializationException deserialization) {
-                return deserialization.getData();
-            }
-        }
-        return record.value() instanceof byte[] bytes ? bytes : null;
-    }
-
-    private static BackOff poisonBackOff() {
-        ExponentialBackOff backOff = new ExponentialBackOff();
-        backOff.setInitialInterval(INITIAL_BACKOFF_MS);
-        backOff.setMultiplier(2.0);
-        backOff.setMaxInterval(MAX_BACKOFF_MS);
-        backOff.setMaxElapsedTime(MAX_ELAPSED_MS);
-        backOff.setMaxAttempts(MAX_RETRIES);
-        return backOff;
     }
 }

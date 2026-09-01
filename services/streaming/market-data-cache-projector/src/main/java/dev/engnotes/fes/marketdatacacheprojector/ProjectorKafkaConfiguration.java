@@ -2,6 +2,7 @@ package dev.engnotes.fes.marketdatacacheprojector;
 
 import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.common.kafka.FailureTracker;
+import dev.engnotes.fes.common.kafka.PoisonRecordPolicy;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,8 +18,6 @@ import org.springframework.kafka.listener.ListenerContainerRegistry;
 import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.util.backoff.BackOff;
-import org.springframework.util.backoff.ExponentialBackOff;
 import org.springframework.util.backoff.FixedBackOff;
 
 /**
@@ -28,9 +27,10 @@ import org.springframework.util.backoff.FixedBackOff;
  * DeserializationException} is registered as not retryable, so the recoverer runs on the first
  * attempt and publishes to {@code {topic}.dlq}, and the offset advances so the partition keeps
  * moving. Retrying a decode failure does not help: the bytes do not improve. The bounded
- * {@link #poisonBackOff()} exists for the listener failures that are not a decode failure and not a
- * Redis outage, so a transient bug elsewhere in the listener still gets a few bounded attempts
- * before quarantine rather than being retried forever or quarantined on the first failure.
+ * {@link PoisonRecordPolicy#poisonBackOff()} exists for the listener failures that are not a decode
+ * failure and not a Redis outage, so a transient bug elsewhere in the listener still gets a few
+ * bounded attempts before quarantine rather than being retried forever or quarantined on the first
+ * failure.
  *
  * <p><strong>A Redis outage pauses the container.</strong> The back-off function returns an
  * unlimited-attempt back-off for a connection failure or a command timeout, so the recoverer is never
@@ -49,12 +49,6 @@ import org.springframework.util.backoff.FixedBackOff;
  */
 @Configuration(proxyBeanMethods = false)
 public class ProjectorKafkaConfiguration {
-
-    // Three attempts total, so two retries after the first failure.
-    private static final long MAX_RETRIES = 2;
-    private static final long INITIAL_BACKOFF_MS = 100;
-    private static final long MAX_BACKOFF_MS = 5_000;
-    private static final long MAX_ELAPSED_MS = 5_000;
 
     // How long the container stays paused between attempts while Redis is down.
     private static final long OUTAGE_PAUSE_MS = 5_000;
@@ -94,13 +88,13 @@ public class ProjectorKafkaConfiguration {
 
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(
                 (record, exception) -> quarantine(deadLetterPublisher, record, exception),
-                poisonBackOff(),
+                PoisonRecordPolicy.poisonBackOff(),
                 pausing);
 
         errorHandler.setBackOffFunction((record, exception) ->
                 isRedisOutage(exception)
                         ? new FixedBackOff(OUTAGE_PAUSE_MS, FixedBackOff.UNLIMITED_ATTEMPTS)
-                        : poisonBackOff());
+                        : PoisonRecordPolicy.poisonBackOff());
 
         errorHandler.addNotRetryableExceptions(DeserializationException.class);
         errorHandler.setRetryListeners(failureTracker);
@@ -132,26 +126,6 @@ public class ProjectorKafkaConfiguration {
 
         @SuppressWarnings("unchecked")
         ConsumerRecord<String, ?> failed = (ConsumerRecord<String, ?>) record;
-        publisher.publish(failed, originalPayload(failed, exception), exception).join();
-    }
-
-    private static byte[] originalPayload(ConsumerRecord<String, ?> record, Throwable failure) {
-        for (Throwable cause = failure; cause != null && cause != cause.getCause();
-             cause = cause.getCause()) {
-            if (cause instanceof DeserializationException deserialization) {
-                return deserialization.getData();
-            }
-        }
-        return record.value() instanceof byte[] bytes ? bytes : null;
-    }
-
-    private static BackOff poisonBackOff() {
-        ExponentialBackOff backOff = new ExponentialBackOff();
-        backOff.setInitialInterval(INITIAL_BACKOFF_MS);
-        backOff.setMultiplier(2.0);
-        backOff.setMaxInterval(MAX_BACKOFF_MS);
-        backOff.setMaxElapsedTime(MAX_ELAPSED_MS);
-        backOff.setMaxAttempts(MAX_RETRIES);
-        return backOff;
+        publisher.publish(failed, PoisonRecordPolicy.originalPayload(failed, exception), exception).join();
     }
 }
