@@ -26,6 +26,7 @@ Schema Registry API, where hand-rolled quoting would be a bug waiting to happen.
 | `fes-schema-registry` | `confluentinc/cp-schema-registry:7.9.1` | 8081 |
 | `fes-kafka-ui` | `provectuslabs/kafka-ui:v0.7.2` | 8080 |
 | `fes-redis` | `redis:8.10.1-alpine` | 6379 |
+| `fes-postgres` | `postgres:16-alpine` | 5432 |
 | `fes-localstack` | `localstack/localstack:4.14.0` | 4566 |
 | `fes-otel-collector` | `otel/opentelemetry-collector-contrib:0.158.0` | 4317 grpc, 4318 http |
 | `fes-prometheus` | `prom/prometheus:v3.13.2` | 9090 |
@@ -114,6 +115,22 @@ and read by the same parser. Per-identity client configuration is written to
 Bringing it up asserts both halves of least privilege before printing the banner. See
 [Workload authorization](authorization.md#enforcement-is-verified-at-provisioning-time-too).
 
+## PostgreSQL, the first store of record
+
+`fes-postgres` arrived with [the risk alert service](risk-alerts.md#the-position-limit-rule-and-the-state-it-needs)'s
+position state, the first relational store anywhere in the platform. It runs `postgres:16-alpine` on
+`localhost:5432` with database `risk_alert`.
+
+It mounts a named volume where the Redis container beside it deliberately does not, and the
+difference is the point. Redis holds a cache projected from `market-data.ticks`, so losing it costs a
+replay. PostgreSQL holds position state that nothing can currently rebuild, so losing it loses data.
+
+Under `strict-security` the same container is a different proposition. The listener requires TLS
+against the development CA, `pg_hba.conf` admits only `hostssl` connections, and the service connects
+as a role that owns its own schema and holds no superuser, createdb or createrole privilege. That is
+the profile NFR-05.1 is written about; the dev profile above is plaintext on purpose and is not
+evidence of anything.
+
 ## LocalStack, ahead of its first caller
 
 `fes-localstack` runs S3 and KMS on `localhost:4566`. Those are the two AWS services the audit
@@ -162,8 +179,7 @@ machine and says nothing about how the platform authenticates.
 
 ## What is not in the stack yet
 
-PostgreSQL. It joins when the Phase 2 services that need it land, so FR-09.1 is partly met rather
-than met. Redis arrived with [the market cache projector](projector.md): unauthenticated in the dev
+Redis arrived with [the market cache projector](projector.md): unauthenticated in the dev
 profile, and in `strict-security` behind an ACL file with `user default off` and one user per
 workload, scoped to the key space that workload owns. `trade-enrichment-service` is the second such
 user; its grant holds `+eval`, `+evalsha` and `+hgetall` and no write command at all, since it only
