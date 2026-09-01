@@ -97,8 +97,10 @@ class RiskPositionFlywayLeastPrivilegeIntegrationTest {
             }
 
             assertThat(tables)
-                    .as("the migration must create both tables in the risk_alert schema, not public")
-                    .contains("risk_position", "risk_position_applied_trade");
+                    .as("the migration, and Flyway's own bookkeeping table, must land in the "
+                            + "risk_alert schema under the least-privilege role, not public")
+                    .containsExactlyInAnyOrder(
+                            "flyway_schema_history", "risk_position", "risk_position_applied_trade");
         }
     }
 
