@@ -62,6 +62,41 @@ rm -f broker.csr broker.cnf ca.srl
 
 log "wrote deploy/compose/tls: ca.pem (truststore), broker.keystore.pem (broker identity)"
 
+# PostgreSQL's server certificate, signed by the same development CA. ca.pem is the one truststore
+# a client needs for either service, so nothing new is required on that side.
+log "generating the postgres certificate"
+cat > postgres.cnf <<'CNF'
+[req]
+distinguished_name = dn
+req_extensions = ext
+prompt = no
+
+[dn]
+CN = postgres
+O = financial-event-streaming-platform
+OU = local-only
+
+[ext]
+subjectAltName = DNS:postgres, DNS:localhost, IP:127.0.0.1
+extendedKeyUsage = serverAuth
+CNF
+
+openssl req -newkey rsa:2048 -nodes -keyout postgres.key -out postgres.csr -config postgres.cnf 2>/dev/null
+openssl x509 -req -in postgres.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
+  -out postgres.crt -days "$DAYS" -extfile postgres.cnf -extensions ext 2>/dev/null
+
+cat postgres.crt postgres.key > postgres.keystore.pem
+# PostgreSQL refuses to start if its key is group- or world-readable. chmod 600 here is necessary
+# but not sufficient: the compose overlay bind-mounts this file read-only, so inside the container
+# it keeps whatever ownership the host's bind-mount layer presents (root, under Docker Desktop's
+# file sharing, regardless of the host uid), and the postgres user (uid 70 in the alpine image) is
+# not that owner. A 0600 file owned by someone else is unreadable by postgres, so the overlay
+# itself copies this file into the container's own writable filesystem and chowns it there, where
+# uid mapping is native, before starting the server. See docker-compose.strict-security.yml.
+chmod 600 postgres.key postgres.keystore.pem
+rm -f postgres.csr postgres.cnf
+log "wrote deploy/compose/tls: postgres.keystore.pem (PostgreSQL server identity)"
+
 # Identities the broker accepts. Must match SecureKafkaStack.PRINCIPALS, or a service proven to be
 # least-privilege in a test would authenticate as something else in the stack.
 PRINCIPALS=(admin trade-producer market-data-simulator corporate-action-producer reference-data-service audit-service market-data-cache-projector trade-enrichment-service risk-alert-service)
@@ -89,6 +124,7 @@ log "writing SASL credentials"
 
   printf 'FES_REDIS_PROJECTOR_SECRET=%s\n' "$(secret_for market-data-cache-projector)"
   printf 'FES_REDIS_ENRICHMENT_SECRET=%s\n' "$(secret_for trade-enrichment-service)"
+  printf 'FES_POSTGRES_RISK_ALERT_SECRET=%s\n' "$(secret_for risk-alert-service)"
 } > "$REPO_ROOT/deploy/compose/.env"
 chmod 600 "$REPO_ROOT/deploy/compose/.env"
 
