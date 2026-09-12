@@ -119,11 +119,13 @@ Bringing it up asserts both halves of least privilege before printing the banner
 
 `fes-postgres` arrived with [the risk alert service](risk-alerts.md#the-position-limit-rule-and-the-state-it-needs)'s
 position state, the first relational store anywhere in the platform. It runs `postgres:16-alpine` on
-`localhost:5432` with database `risk_alert`.
+`localhost:5432` with database `risk_alert`. That schema now holds seven tables: the position total
+and its ledger, the rolling trade-quantity window with its prune cutoff and its ledger, and the
+recent-trade table the self-cross rule reads.
 
 It mounts a named volume where the Redis container beside it deliberately does not, and the
 difference is the point. Redis holds a cache projected from `market-data.ticks`, so losing it costs a
-replay. PostgreSQL holds position state that nothing can currently rebuild, so losing it loses data.
+replay. PostgreSQL holds state that nothing can currently rebuild, so losing it loses data.
 
 Under `strict-security` the same container is a different proposition. The listener requires TLS
 against the development CA, `pg_hba.conf` admits only `hostssl` connections, and the service connects

@@ -45,7 +45,7 @@ trade execution and no regulatory reporting.
 | Service identity binding, each service proven to authenticate as its own principal | Built, against a local broker with ACLs, not against MSK IAM |
 | Service container images, one per module, from buildpacks | Built |
 | Local stack, both profiles, with observability | Built |
-| Risk alerting, governed rule versions into `notifications.alerts` | Built for `PRICE_DEVIATION` only, and nothing consumes the alert stream yet |
+| Risk alerting, governed rule versions into `notifications.alerts` | Built, all four FR-04.2 rules, with `WASH_TRADE_DETECTED` narrowed to self-cross; nothing consumes the alert stream yet |
 | Deterministic streaming: position read model | Not started |
 | CDC migration, control plane, agent plane | Not started |
 | Throughput and latency evidence | Not measured |
