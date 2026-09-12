@@ -107,8 +107,9 @@ public class RiskAlertKafkaConfiguration {
     }
 
     @Bean
-    RiskRecentTradeStore riskRecentTradeStore(JdbcClient jdbcClient) {
-        return new RiskRecentTradeStore(jdbcClient, 3_600L, 200);
+    RiskRecentTradeStore riskRecentTradeStore(JdbcClient jdbcClient, RiskAlertProperties properties) {
+        return new RiskRecentTradeStore(jdbcClient, properties.recentTradeHorizonSeconds(),
+                properties.recentTradeCandidateCap());
     }
 
     @Bean

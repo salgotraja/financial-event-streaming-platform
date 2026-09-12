@@ -61,6 +61,12 @@ class RiskAlertPropertiesTest {
     }
 
     @Test
+    void the_recent_trade_horizon_and_cap_bind_from_application_yml() {
+        assertThat(properties.recentTradeHorizonSeconds()).isEqualTo(3_600L);
+        assertThat(properties.recentTradeCandidateCap()).isEqualTo(200);
+    }
+
+    @Test
     void the_bootstrap_rule_set_binds_from_application_yml() {
         assertThat(bootstrapRuleProperties.rules()).hasSize(2);
 

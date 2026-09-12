@@ -13,6 +13,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param consumerInstance    carried into every DeadLetterEvent
  * @param ruleTimelineTimeout how long startup waits for the initial fold before failing
  * @param volumeWindowSeconds the rolling volume distribution's horizon, in seconds
+ * @param recentTradeHorizonSeconds the self-cross candidate window's horizon, in seconds
+ * @param recentTradeCandidateCap the maximum prior trades returned as self-cross candidates
  */
 @ConfigurationProperties(prefix = "fes.risk-alert-service")
 public record RiskAlertProperties(String topic,
@@ -20,5 +22,7 @@ public record RiskAlertProperties(String topic,
                                   String outputTopic,
                                   String consumerInstance,
                                   Duration ruleTimelineTimeout,
-                                  @DefaultValue("3600") long volumeWindowSeconds) {
+                                  @DefaultValue("3600") long volumeWindowSeconds,
+                                  @DefaultValue("3600") long recentTradeHorizonSeconds,
+                                  @DefaultValue("200") int recentTradeCandidateCap) {
 }

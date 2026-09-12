@@ -63,6 +63,12 @@ fes:
     # error. Writer-prune and reader-fold must agree on one number, the same reason MarketCacheKeys
     # shares WINDOW_SECONDS between the projector and enrichment.
     volume-window-seconds: 3600
+    # The self-cross candidate window's horizon, in seconds, and the maximum prior trades returned
+    # for one evaluation. 200 sits well above any realistic per-(trader, ticker) trade count inside
+    # a one-hour horizon; hitting it is counted as RecentTrades.truncated rather than swallowed,
+    # because a cap that silently dropped the offsetting trade would produce no alert and no signal.
+    recent-trade-horizon-seconds: 3600
+    recent-trade-candidate-cap: 200
 
 risk:
   rules:
