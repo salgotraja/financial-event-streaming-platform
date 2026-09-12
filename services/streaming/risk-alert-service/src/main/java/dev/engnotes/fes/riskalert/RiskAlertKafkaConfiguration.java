@@ -101,11 +101,9 @@ public class RiskAlertKafkaConfiguration {
         return new RiskPositionStore(jdbcClient);
     }
 
-    // The window and horizon here are the same defaults Tasks 3 and 5 promote to
-    // fes.risk-alert-service configuration; this task only wires the constructor shape.
     @Bean
-    RiskVolumeWindowStore riskVolumeWindowStore(JdbcClient jdbcClient) {
-        return new RiskVolumeWindowStore(jdbcClient, 3_600L);
+    RiskVolumeWindowStore riskVolumeWindowStore(JdbcClient jdbcClient, RiskAlertProperties properties) {
+        return new RiskVolumeWindowStore(jdbcClient, properties.volumeWindowSeconds());
     }
 
     @Bean

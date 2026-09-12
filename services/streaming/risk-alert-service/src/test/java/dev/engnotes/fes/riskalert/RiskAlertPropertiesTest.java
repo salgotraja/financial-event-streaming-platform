@@ -56,6 +56,11 @@ class RiskAlertPropertiesTest {
     }
 
     @Test
+    void the_volume_window_horizon_binds_from_application_yml() {
+        assertThat(properties.volumeWindowSeconds()).isEqualTo(3_600L);
+    }
+
+    @Test
     void the_bootstrap_rule_set_binds_from_application_yml() {
         assertThat(bootstrapRuleProperties.rules()).hasSize(2);
 

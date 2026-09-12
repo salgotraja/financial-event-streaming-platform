@@ -57,6 +57,12 @@ fes:
     output-topic: notifications.alerts
     consumer-instance: ${HOSTNAME:risk-alert-service-local}
     rule-timeline-timeout: 60s
+    # The rolling distribution's horizon, in seconds. Configuration, not a governed rule parameter.
+    # The prune deletes buckets outside this horizon, so a governed rule carrying a longer horizon
+    # would fold a window already partly deleted and return a quietly wrong statistic rather than an
+    # error. Writer-prune and reader-fold must agree on one number, the same reason MarketCacheKeys
+    # shares WINDOW_SECONDS between the projector and enrichment.
+    volume-window-seconds: 3600
 
 risk:
   rules:
