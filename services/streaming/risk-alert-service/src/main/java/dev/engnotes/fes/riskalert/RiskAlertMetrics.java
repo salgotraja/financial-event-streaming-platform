@@ -47,6 +47,7 @@ public class RiskAlertMetrics {
     private final Map<String, Counter> rejectedRuleVersions = new ConcurrentHashMap<>();
     private final Counter quarantined;
     private final Counter candidateSetTruncated;
+    private final Counter windowBelowMinimumSample;
 
     public RiskAlertMetrics(MeterRegistry registry) {
         this.registry = registry;
@@ -60,6 +61,10 @@ public class RiskAlertMetrics {
         // hitting it is counted rather than swallowed (Task 5's self-cross candidate query).
         this.candidateSetTruncated = Counter.builder("risk.self.cross.candidates.truncated")
                 .description("Self-cross candidate queries that hit the configured row cap")
+                .register(registry);
+        this.windowBelowMinimumSample = Counter.builder("risk.volume.window.below.minimum.sample")
+                .description("Unusual-volume evaluations skipped because the window held fewer than "
+                        + "the governed minimum sample count")
                 .register(registry);
     }
 
@@ -90,6 +95,14 @@ public class RiskAlertMetrics {
      */
     public void recordCandidateSetTruncated() {
         candidateSetTruncated.increment();
+    }
+
+    /**
+     * A window held fewer than the governed minimum sample count. Skipped rather than swallowed
+     * silently: a thin window is a distinct, expected condition, not an error.
+     */
+    public void recordWindowBelowMinimumSample() {
+        windowBelowMinimumSample.increment();
     }
 
     /** Registered by the loader once the initial fold completes, so the gauge never reports a partial fold. */
