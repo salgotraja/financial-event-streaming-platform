@@ -107,6 +107,24 @@ class RiskRecentTradeStoreIntegrationTest {
     }
 
     @Test
+    void a_prior_trade_later_in_event_time_but_earlier_in_arrival_order_is_still_a_candidate() {
+        // t-1 arrives first, so its applied_seq is lower, but its event_timestamp is AFTER the
+        // triggering trade's. The upper event_timestamp bound is what admits it: it measures the
+        // horizon from the triggering trade's own timestamp forward, rather than treating that
+        // timestamp as a ceiling, so an out-of-order arrival with a later event time still
+        // qualifies as long as it falls inside the window. This is the counterpart to the replay
+        // test above: that one pins the lower bound and arrival-order exclusion, this one pins the
+        // upper bound's inclusion.
+        store.apply(trade("t-1", "trader-1", "NESTLE", Side.BUY, 100L, at("10:30:00")));
+        RecentTrades candidates = store.apply(
+                trade("t-2", "trader-1", "NESTLE", Side.SELL, 100L, at("10:00:00")));
+
+        assertThat(candidates.priorTrades())
+                .extracting(RecentTrade::tradeId)
+                .containsExactly("t-1");
+    }
+
+    @Test
     void a_redelivery_keeps_the_arrival_order_the_first_delivery_was_given() {
         EnrichedTradeEvent duplicate = trade("t-1", "trader-1", "HDFC", Side.BUY, 100L, at("10:00:00"));
 
