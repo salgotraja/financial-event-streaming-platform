@@ -16,8 +16,11 @@ spring:
         # the one that matters most: it is what converts a database that accepted the connection
         # and then stopped answering into a QueryTimeoutException, rather than an indefinite block
         # on the listener thread that never reaches backOffFor at all and eventually crosses
-        # max.poll.interval.ms instead. 10s comfortably exceeds this service's point lookups and
-        # single upsert, and Flyway's one migration, which only creates two tables at startup.
+        # max.poll.interval.ms instead. 10s is set against what a trade now costs in the default
+        # configuration: three stores applied in sequence, including the volume fold's bounded
+        # 60-row range and the self-cross candidate query's capped range, plus Flyway's two
+        # migrations creating six tables at startup. It is not a measured bound; no run has timed
+        # these statements, and the sub-5ms p99 evaluation target stays unmeasured until Phase 8.
         connectTimeout: 5
         socketTimeout: 10
   flyway:

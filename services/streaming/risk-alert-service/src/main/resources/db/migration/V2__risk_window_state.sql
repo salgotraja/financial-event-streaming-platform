@@ -37,8 +37,13 @@ CREATE TABLE risk_volume_ticker (
 );
 
 -- The replay pin. A redelivery answers from here rather than re-folding a window that has moved on.
--- Pruned at the trades.enriched retention horizon of 7 days, never at the window horizon: a record
--- older than the topic's retention cannot be redelivered, which is what makes the delete safe.
+--
+-- Nothing prunes this table today, and that is a deferral rather than a design, the same one V1
+-- recorded for risk_position_applied_trade. It could only safely be pruned at the trades.enriched
+-- retention horizon of 7 days, never at the window horizon, because a row still inside retention is
+-- a row a redelivery needs. The one column that looks like a cutoff, applied_at, is wall-clock, and
+-- ADR-035 keeps wall-clock values out of decisions that must replay identically, so the prune needs
+-- an event-time column this table does not yet carry.
 CREATE TABLE risk_volume_applied_trade (
     trade_id     VARCHAR(64)   NOT NULL,
     ticker       VARCHAR(32)   NOT NULL,

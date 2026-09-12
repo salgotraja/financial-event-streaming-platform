@@ -348,9 +348,9 @@ have left three near-identical guards in the engine and no home for a rule needi
 state.
 
 **One accepted consequence.** The order is apply, evaluate, publish, acknowledge. If publishing
-exhausts its bound and the record is quarantined, the position already counts a trade whose alert
-never fired. That stands: the position records trades that occurred, and alert delivery is a separate
-concern. A compensating write would be a second write on an already failing path that can also fail,
+exhausts its bound and the record is quarantined, every store the union applied already counts a trade
+whose alert never fired, and since increment 3 that can be three stores rather than one. That stands:
+the stores record trades that occurred, and alert delivery is a separate concern. A compensating write would be a second write on an already failing path that can also fail,
 leaving the position wrong in the other direction with no record of why. The dead letter is the audit
 trail.
 
@@ -502,13 +502,21 @@ Prices are compared by relative tolerance, never by equality. A candidate's pric
 tripped through a `NUMERIC(19,4)` column while the triggering trade's price is the unrounded `double`
 off the Avro record, so the two sides are not symmetrically precise.
 
-### The two tables prune on a different horizon from the buckets
+### Which tables actually prune, and on which horizon
 
-`risk_volume_applied_trade` and `risk_recent_trade` delete at the seven-day `trades.enriched`
-retention, not at any window. Both exist to answer a redelivery, a record older than the topic's
-retention cannot be redelivered at all, and that is what makes the delete safe. `risk_volume_bucket`
-is the one table that prunes at the window horizon, because a bucket outside the window contributes to
-no fold and deleting it changes no answer.
+Two of the four prune, and it is worth being exact about which.
+
+`risk_volume_bucket` prunes at the window horizon, because a bucket outside the window contributes to
+no fold and deleting it changes no answer. `risk_recent_trade` prunes at the seven-day
+`trades.enriched` retention rather than at any window: it exists to answer a redelivery, and a record
+older than the topic's retention cannot be redelivered at all, which is what makes that delete safe.
+Its delete is scoped to the `(trader_id, ticker)` of the trade being applied, so a key that stops
+trading stops pruning, and its rows sit there until it trades again.
+
+`risk_volume_applied_trade` is never pruned, like `risk_position_applied_trade` before it. Retention
+is the horizon it *could* use, but the only column resembling a cutoff is `applied_at`, which is
+wall-clock, and this service keeps wall-clock values out of anything that has to replay identically.
+A prune would need an event-time column the table does not carry.
 
 ## The alert identity is derived, not random
 
@@ -737,10 +745,11 @@ tests use.
   Redis cache beside it deliberately does not.
 - **The position total duplicates one FR-11 will also hold.** `position-exposure-service` will own its
   own position read model. The two will carry overlapping numbers and nothing reconciles them yet.
-- **`risk_position_applied_trade` is never pruned.** It grows with trade volume. Redelivery beyond
-  `trades.enriched`'s seven-day retention cannot happen, so older rows are dead weight rather than a
-  correctness need, but no job removes them. The two ledgers increment 3 added do prune at that
-  retention horizon, so this table is now the odd one out.
+- **Neither replay ledger is pruned.** `risk_position_applied_trade` and
+  `risk_volume_applied_trade` both grow with trade volume. Redelivery beyond `trades.enriched`'s
+  seven-day retention cannot happen, so older rows are dead weight rather than a correctness need,
+  but no job removes them and neither table carries an event-time column a prune could safely use.
+  `risk_recent_trade` does prune at that horizon, but only for keys that keep trading.
 - **`gross_buy` and `gross_sell` are written and never read.** They are carried for FR-11.2. The
   windowed rules did not end up using them: `UNUSUAL_VOLUME` folds its own distribution of trade
   quantities rather than reading the position's gross figures.
