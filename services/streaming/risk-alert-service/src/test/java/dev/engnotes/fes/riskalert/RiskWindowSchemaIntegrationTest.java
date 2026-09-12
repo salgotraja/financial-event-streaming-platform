@@ -21,6 +21,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Kafka is started too, because {@code @SpringBootTest} brings up the whole context including
  * the rule-fold readiness gate, which polls a real broker before the context reports ready.
+ *
+ * <p>{@link PostgresStack} is a dev-shaped superuser connected to whatever schema its search_path
+ * resolves to, not necessarily {@code risk_alert}: these assertions check {@code current_schema()}
+ * rather than the literal schema name. {@link RiskPositionFlywayLeastPrivilegeIntegrationTest} is
+ * what proves the tables land in {@code risk_alert} specifically, under the least-privilege role.
  */
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 @SpringBootTest(properties = {
@@ -52,7 +57,7 @@ class RiskWindowSchemaIntegrationTest {
     private DataSource dataSource;
 
     @Test
-    void v2_creates_the_four_window_and_correlation_tables_in_the_risk_alert_schema() {
+    void v2_creates_the_four_window_and_correlation_tables() {
         JdbcClient jdbc = JdbcClient.create(dataSource);
 
         List<String> tables = jdbc.sql("""
@@ -83,21 +88,63 @@ class RiskWindowSchemaIntegrationTest {
                 .query(String.class)
                 .list();
 
-        assertThat(types).containsOnly("numeric");
+        // containsOnly alone would not catch a dropped column, since a shorter list containing
+        // only "numeric" still satisfies it. The explicit size pins both columns as present.
+        assertThat(types).hasSize(2).containsOnly("numeric");
     }
 
     @Test
-    void applied_seq_is_a_unique_arrival_order_key_with_its_own_sequence() {
+    void applied_seq_is_a_unique_arrival_order_key_backed_by_its_own_sequence() {
         JdbcClient jdbc = JdbcClient.create(dataSource);
 
-        Long unique = jdbc.sql("""
-                        SELECT count(*) FROM information_schema.table_constraints
-                        WHERE table_schema = current_schema() AND table_name = 'risk_recent_trade'
-                          AND constraint_type = 'UNIQUE'
+        // Not just "some UNIQUE constraint exists on this table": that would still pass if the
+        // constraint moved to a different column. key_column_usage ties the constraint to the
+        // specific column applied_seq, which is what the replay-determinism property in Task 5
+        // actually depends on.
+        List<String> uniqueColumns = jdbc.sql("""
+                        SELECT kcu.column_name
+                        FROM information_schema.table_constraints tc
+                        JOIN information_schema.key_column_usage kcu
+                          ON kcu.constraint_name = tc.constraint_name
+                         AND kcu.table_schema = tc.table_schema
+                        WHERE tc.table_schema = current_schema() AND tc.table_name = 'risk_recent_trade'
+                          AND tc.constraint_type = 'UNIQUE'
                         """)
-                .query(Long.class)
+                .query(String.class)
+                .list();
+
+        assertThat(uniqueColumns).containsExactly("applied_seq");
+
+        // BIGSERIAL is sugar for a BIGINT column defaulted from a dedicated sequence: this is what
+        // makes applied_seq an arrival-order key rather than a plain unique column the application
+        // would have to populate itself.
+        String columnDefault = jdbc.sql("""
+                        SELECT column_default FROM information_schema.columns
+                        WHERE table_schema = current_schema() AND table_name = 'risk_recent_trade'
+                          AND column_name = 'applied_seq'
+                        """)
+                .query(String.class)
                 .single();
 
-        assertThat(unique).isEqualTo(1L);
+        assertThat(columnDefault).contains("nextval(");
+    }
+
+    @Test
+    void the_candidate_index_orders_columns_for_the_trader_ticker_lookup() {
+        // Column order matters for this index: equality on trader_id and ticker, then a descending
+        // range scan on applied_seq. Task 5's candidate query relies on exactly this order to avoid
+        // a sort at query time.
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+
+        String indexDef = jdbc.sql("""
+                        SELECT indexdef FROM pg_indexes
+                        WHERE schemaname = current_schema()
+                          AND tablename = 'risk_recent_trade'
+                          AND indexname = 'ix_risk_recent_trade_candidates'
+                        """)
+                .query(String.class)
+                .single();
+
+        assertThat(indexDef).contains("(trader_id, ticker, applied_seq DESC)");
     }
 }

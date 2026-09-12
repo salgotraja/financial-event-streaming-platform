@@ -77,7 +77,7 @@ class RiskPositionFlywayLeastPrivilegeIntegrationTest {
     }
 
     @Test
-    void the_migration_applies_and_creates_both_tables_under_the_least_privilege_role() throws Exception {
+    void the_migration_applies_and_creates_all_seven_tables_under_the_least_privilege_role() throws Exception {
         String url = "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getMappedPort(5432)
                 + "/risk_alert";
 
