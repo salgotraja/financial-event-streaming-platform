@@ -196,6 +196,11 @@ order.
 | A poison record is quarantined per record and the partition keeps moving | `RiskAlertKafkaConfiguration` | `a_malformed_record_is_quarantined_and_the_record_behind_it_is_still_evaluated`, `the_recovered_records_offset_is_acknowledged_so_the_partition_keeps_moving`, `the_quarantined_payload_comes_from_the_exception_not_the_null_record_value` |
 | A decode failure and an invalid argument are never retried | `RiskAlertKafkaConfiguration` | `a_deserialization_failure_is_not_retried`, `an_invalid_argument_is_not_retried` |
 | The meters scrape through a real Prometheus registry | `RiskAlertMetrics` | `every_meter_in_this_class_scrapes_through_a_real_prometheus_registry_without_throwing` |
+| A trader's net position breaches on the absolute value, with both bands strict | `PositionLimitRule` | `a_position_exactly_at_the_critical_band_warns_rather_than_criticals`, `a_position_exactly_at_the_warning_band_does_not_breach` |
+| A fractional position band is refused rather than truncated to a share count | `PositionLimitParameters` | `a_fractional_band_is_rejected_because_a_position_is_a_share_count` |
+| A redelivered trade is judged against the position it produced, not the current one | `RiskPositionStore` | `a_redelivery_returns_the_historical_net_not_the_current_one` |
+| A PostgreSQL outage pauses the container instead of dead-lettering a good trade | `RiskAlertKafkaConfiguration` | `should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`, `the_production_hikari_bounds_from_application_yml_actually_bind` |
+| Operator window settings that would silence a rule fail startup rather than runtime | `RiskAlertProperties` | `a_candidate_cap_of_zero_is_rejected_rather_than_silencing_the_self_cross_rule`, `a_non_positive_window_horizon_is_rejected` |
 | Only the stores a rule in force declared are applied, once each per trade | `RiskRuleEngine` | `only_the_stores_the_rules_in_force_declare_are_applied`, `the_trade_is_applied_exactly_once_even_when_two_position_rules_are_in_force`, `the_position_store_is_not_consulted_when_only_a_stateless_rule_is_in_force` |
 | The triggering trade is excluded from the distribution it is judged against | `RiskVolumeWindowStore` | `the_window_excludes_the_trade_being_evaluated`, `the_first_trade_in_a_window_sees_an_empty_distribution` |
 | A trade whose bucket was pruned is not subtracted from a fold it never entered | `RiskVolumeWindowStore` | `a_late_trade_outside_the_horizon_still_sees_the_priors_that_are_inside_it` |
@@ -228,5 +233,5 @@ order.
 Anything that would need a service that does not exist: read-model rebuild, the agent tool boundary,
 sustained throughput, and evidence integrity end to end. Enrichment and risk evaluation now have
 behavioural proof but no latency proof: no run has measured either against its budget.
-Dependency failure has one proof now, on the projector's Redis connection, and none on PostgreSQL. Those rows appear in `.claude/rules/testing.md` as required
+Dependency failure has two proofs now, on the projector's Redis connection and on the risk service's PostgreSQL connection. Those rows appear in `.claude/rules/testing.md` as required
 categories and are waiting on their subjects.

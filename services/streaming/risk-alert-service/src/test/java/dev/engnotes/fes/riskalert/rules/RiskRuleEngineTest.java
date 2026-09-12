@@ -204,7 +204,7 @@ class RiskRuleEngineTest {
     /**
      * A registry that answers {@code inForceAt} differently on its first and second call, standing
      * in for a reinstating {@code ACTIVE} transition landing between the guard's read and the
-     * dispatch loop's read. Before the single-snapshot fix, the guard would see call one (nothing
+     * dispatch loop's read. Before the single-snapshot fix, the requirements union would see call one (nothing
      * in force, so no position applied) and the dispatch loop would see call two (the rule in
      * force), dispatching {@code PositionLimitRule} with a null {@code NetPosition} and throwing an
      * NPE out of {@code evaluate}. With one snapshot per call, both the guard and the dispatch loop
@@ -236,9 +236,9 @@ class RiskRuleEngineTest {
 
         RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PositionLimitRule()), neverCalled(), metrics());
 
-        // Without the single-snapshot fix this throws a NullPointerException: the guard's call
+        // Without the single-snapshot fix this throws a NullPointerException: the union's call
         // returns empty (call 1), so post stays null, but the dispatch loop's call (call 2) returns
-        // the reinstated rule and dispatches PositionLimitRule with a null NetPosition.
+        // the reinstated rule and dispatches PositionLimitRule with a null position in its context.
         assertThat(engine.evaluate(EnrichedTrades.withPosition(
                 "t-1", "trader-1", "RELIANCE", Side.BUY, 100L, Instant.ofEpochMilli(2_000L))))
                 .isEmpty();
@@ -290,7 +290,7 @@ class RiskRuleEngineTest {
                 List.of(new PositionLimitRule()), counting(new AtomicInteger(), 60_000L), metrics());
 
         // 60,000 is over the 50,000 critical band, so the rule alerting at all proves it received a
-        // non-null NetPosition through the context rather than the old direct argument.
+        // non-null NetPosition through the TradeContext rather than the old direct argument.
         assertThat(engine.evaluate(EnrichedTrades.withPosition(
                 "t-1", "trader-1", "RELIANCE", Side.BUY, 100L, Instant.ofEpochMilli(2_000L))))
                 .singleElement()

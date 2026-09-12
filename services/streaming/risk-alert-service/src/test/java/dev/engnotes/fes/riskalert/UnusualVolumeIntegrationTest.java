@@ -30,7 +30,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code UnusualVolumeRule} against a real broker, registry and database, proving the bootstrap
  * governance path: {@code unusual-volume} is version 0 from {@code application.yml}.
  *
- * <p>Every topic is unique to this class, so another module's tests cannot race these assertions.
+ * <p>Every topic is unique to this class, so another module's tests cannot race these assertions
+ * over Kafka. The PostgreSQL tables are a different matter: this class shares them with every
+ * other test using {@code PostgresStack}, and what keeps them from colliding is that
+ * {@code integrationTest} declares no {@code maxParallelForks} and so runs serially. Topic
+ * naming buys nothing there. If anyone parallelises that task, this class needs its own
+ * schema or its own container.
  */
 @SpringBootTest(properties = {
         "management.otlp.metrics.export.enabled=false",
