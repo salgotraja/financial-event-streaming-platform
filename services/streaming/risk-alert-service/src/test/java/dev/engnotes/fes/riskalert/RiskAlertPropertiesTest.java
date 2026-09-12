@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Property binding only, against an explicit minimal configuration rather than the full
@@ -111,6 +112,30 @@ class RiskAlertPropertiesTest {
                             .containsEntry("quantity-tolerance-percent", "1.0")
                             .containsEntry("price-tolerance-percent", "1.0");
                 });
+    }
+
+    @Test
+    void a_candidate_cap_of_zero_is_rejected_rather_than_silencing_the_self_cross_rule() {
+        // The store asks for cap + 1 rows so truncation is detectable. A cap of zero therefore
+        // finds one row, calls the set truncated, and hands the rule nothing: the rule stops
+        // alerting and says so only in a counter.
+        assertThatThrownBy(() -> new RiskAlertProperties("t", "r", "o", "i",
+                Duration.ofSeconds(60), 3_600L, 3_600L, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("recent-trade-candidate-cap");
+    }
+
+    @Test
+    void a_non_positive_window_horizon_is_rejected() {
+        assertThatThrownBy(() -> new RiskAlertProperties("t", "r", "o", "i",
+                Duration.ofSeconds(60), 0L, 3_600L, 200))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("volume-window-seconds");
+
+        assertThatThrownBy(() -> new RiskAlertProperties("t", "r", "o", "i",
+                Duration.ofSeconds(60), 3_600L, -1L, 200))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("recent-trade-horizon-seconds");
     }
 
     @Configuration(proxyBeanMethods = false)
