@@ -89,3 +89,61 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  postgres:
+    # NFR-05.1: no plaintext database traffic in a cloud profile. The certificate is issued by the
+    # same development CA as the broker's, so ca.pem is the one truststore a client needs.
+    #
+    # The server key is mounted read-only from the host (./tls), so inside the container it keeps
+    # whatever ownership Docker's bind-mount layer presents rather than the host's chmod 600 owner.
+    # postgres refuses to read a key it does not own, so the entrypoint below copies it into the
+    # container's own writable filesystem and chowns it to the postgres user there, where uid
+    # mapping is native, before handing off to the image's normal entrypoint and the ssl_cert_file
+    # / ssl_key_file arguments below point at that copy rather than at the read-only mount.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        mkdir -p /var/lib/postgresql/tls
+        cp /etc/postgresql/tls/postgres.keystore.pem /var/lib/postgresql/tls/postgres.keystore.pem
+        chown postgres:postgres /var/lib/postgresql/tls/postgres.keystore.pem
+        chmod 600 /var/lib/postgresql/tls/postgres.keystore.pem
+        exec docker-entrypoint.sh "$@"
+      - --
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/var/lib/postgresql/tls/postgres.keystore.pem
+      - -c
+      - ssl_key_file=/var/lib/postgresql/tls/postgres.keystore.pem
+      - -c
+      - hba_file=/etc/postgresql/pg_hba.conf
+    volumes:
+      - ./tls:/etc/postgresql/tls:ro
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./postgres/init-risk-alert-role.sql:/docker-entrypoint-initdb.d/init-risk-alert-role.sql:ro
+    environment:
+      # postgres, not risk_alert_service: the bootstrap superuser initdb creates from POSTGRES_USER
+      # can never have SUPERUSER stripped from itself (a PostgreSQL restriction, not a choice made
+      # here), so risk_alert_service is created separately, as a real non-superuser role, by
+      # ./postgres/init-risk-alert-role.sql. The bootstrap superuser has no pg_hba.conf entry for
+      # network access, only the local socket the entrypoint's own init scripts use.
+      #
+      # Two independent secrets, not one shared between the two roles. Sharing would be a latent
+      # trap: a later pg_hba.conf edit that gave "postgres" any network route would then also grant
+      # network superuser access under a credential already handled as risk_alert_service's.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${FES_POSTGRES_BOOTSTRAP_SECRET}
+      RISK_ALERT_SERVICE_PASSWORD: ${FES_POSTGRES_RISK_ALERT_SECRET}
+    healthcheck:
+      # sslmode=verify-ca rather than pg_isready: the healthcheck proves the TLS listener works and
+      # the CA verifies, not merely that the port is open. PGPASSWORD is required: pg_hba.conf has
+      # no trust line, so an unauthenticated psql would fail for the same reason a real client's
+      # missing credential would.
+      test: ["CMD-SHELL", "PGPASSWORD=$$RISK_ALERT_SERVICE_PASSWORD psql 'postgresql://risk_alert_service@localhost/risk_alert?sslmode=verify-ca&sslrootcert=/etc/postgresql/tls/ca.pem' -c 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20

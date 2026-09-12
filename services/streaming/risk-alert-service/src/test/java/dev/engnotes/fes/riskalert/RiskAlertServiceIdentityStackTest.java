@@ -12,6 +12,8 @@ import dev.engnotes.fes.testing.ServiceIdentityContract;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import org.junit.jupiter.api.DisplayName;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 @DisplayName("risk-alert-service service identity")
 class RiskAlertServiceIdentityStackTest extends ServiceIdentityContract {
@@ -24,6 +26,20 @@ class RiskAlertServiceIdentityStackTest extends ServiceIdentityContract {
     // success line only ever appears once the trade has been evaluated and the resulting alert has
     // actually been published, not merely consumed.
     private static final double BREACHING_DEVIATION_PERCENT = 6.0;
+
+    private static final String POSTGRES_ALIAS = "postgres-identity-probe";
+
+    // Task 1 wired spring.datasource.url into application.yml with a localhost:5432 default, so
+    // the service image this test runs now fails Flyway at startup unless a database is reachable
+    // on SecureKafkaStack's own Docker network. Joined here rather than reused from PostgresStack,
+    // which is not attached to that network and is reachable only from the host.
+    private static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"))
+                    .withNetwork(SecureKafkaStack.network())
+                    .withNetworkAliases(POSTGRES_ALIAS)
+                    .withDatabaseName("risk_alert")
+                    .withUsername("risk_alert_service")
+                    .withPassword("risk_alert_service");
 
     @Override
     protected String principal() {
@@ -51,7 +67,11 @@ class RiskAlertServiceIdentityStackTest extends ServiceIdentityContract {
 
     @Override
     protected Map<String, String> extraEnvironment() {
-        return Map.of("LOGGING_LEVEL_DEV_ENGNOTES_FES_RISKALERT", "DEBUG");
+        POSTGRES.start();
+        return Map.of("LOGGING_LEVEL_DEV_ENGNOTES_FES_RISKALERT", "DEBUG",
+                "RISK_ALERT_DB_URL", "jdbc:postgresql://" + POSTGRES_ALIAS + ":5432/risk_alert",
+                "RISK_ALERT_DB_USER", "risk_alert_service",
+                "RISK_ALERT_DB_PASSWORD", "risk_alert_service");
     }
 
     @Override

@@ -15,10 +15,14 @@ stack with it, [trade enrichment](enrichment.md) is built and reads that cache o
 the rest of the queue.
 
 **position-exposure-service.** An event-driven read model, idempotent by `tradeId` and rebuildable
-from event history (ADR-017).
+from event history (ADR-017). Note that the risk service now keeps a position total of its own, for
+its position-limit rule, in its own schema. The two will overlap and nothing reconciles them yet.
+The risk service's own store is deliberately narrower: it holds a net quantity per trader and ticker,
+not the market value or exposure figures FR-11.2 names, and it cannot be rebuilt from Kafka history,
+which is a capability FR-11.5 asks of this service rather than of that one.
 
-Three of the four rules FR-04.2 names are also still absent, so FR-04 is not met even though the risk
-service is built. `POSITION_LIMIT_BREACH` and `UNUSUAL_VOLUME` are later increments of that service.
+Two of the four rules FR-04.2 names are still absent, so FR-04 is not met even though the risk
+service is built. `UNUSUAL_VOLUME` is a later increment.
 `WASH_TRADE_DETECTED` is blocked on a definition rather than on effort: `contracts/` carries
 `accountId` but no account-relationship source, so the rule as specified cannot be implemented against
 the events that exist. The sub-5ms p99 evaluation target for the rules that do exist is unmeasured.

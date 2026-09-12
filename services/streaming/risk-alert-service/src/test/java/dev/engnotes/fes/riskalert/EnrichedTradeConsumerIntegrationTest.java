@@ -12,6 +12,7 @@ import dev.engnotes.fes.events.RiskRuleLifecycleEvent;
 import dev.engnotes.fes.events.RuleState;
 import dev.engnotes.fes.events.Severity;
 import dev.engnotes.fes.testing.KafkaAvroStack;
+import dev.engnotes.fes.testing.PostgresStack;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -46,6 +47,7 @@ class EnrichedTradeConsumerIntegrationTest {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         KafkaAvroStack.start();
+        PostgresStack.start();
         // RuleTimelineLoader assigns partitions directly rather than subscribing, so the rule
         // topic must exist before the context starts: see RiskAlertTestKafka.createTopic.
         // RiskAlertTestKafka.alertConsumer does the same for the output topic, so it is created
@@ -64,6 +66,9 @@ class EnrichedTradeConsumerIntegrationTest {
         registry.add("fes.risk-alert-service.topic", () -> TRADE_TOPIC);
         registry.add("fes.risk-alert-service.rule-topic", () -> RULE_TOPIC);
         registry.add("fes.risk-alert-service.output-topic", () -> OUTPUT_TOPIC);
+        registry.add("spring.datasource.url", PostgresStack::jdbcUrl);
+        registry.add("spring.datasource.username", PostgresStack::username);
+        registry.add("spring.datasource.password", PostgresStack::password);
     }
 
     @Test
@@ -137,6 +142,7 @@ class EnrichedTradeConsumerIntegrationTest {
         // inner classes since JDK 16, which is what makes this legal here.
         @DynamicPropertySource
         static void governedProperties(DynamicPropertyRegistry registry) {
+            PostgresStack.start();
             RiskAlertTestKafka.createTopic(TRADE_TOPIC, 1);
             RiskAlertTestKafka.createTopic(RULE_TOPIC, 6);
             RiskAlertTestKafka.createTopic(OUTPUT_TOPIC, 1);
@@ -144,6 +150,9 @@ class EnrichedTradeConsumerIntegrationTest {
             registry.add("fes.risk-alert-service.topic", () -> TRADE_TOPIC);
             registry.add("fes.risk-alert-service.rule-topic", () -> RULE_TOPIC);
             registry.add("fes.risk-alert-service.output-topic", () -> OUTPUT_TOPIC);
+            registry.add("spring.datasource.url", PostgresStack::jdbcUrl);
+            registry.add("spring.datasource.username", PostgresStack::username);
+            registry.add("spring.datasource.password", PostgresStack::password);
         }
 
         @Test

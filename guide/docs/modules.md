@@ -6,7 +6,7 @@ Click to zoom. Source: `guide/docs/diagrams/modules.drawio`.
 
 ## What is in the build
 
-`settings.gradle` is the complete list. Seven entries, and the comment block above them names the
+`settings.gradle` is the complete list. Ten entries, and the comment block above them names the
 services that will land later without including them.
 
 ```groovy
@@ -19,6 +19,8 @@ include 'services:ingestion:corporate-action-producer'
 include 'services:ingestion:reference-data-service'
 include 'services:audit:audit-service'
 include 'services:streaming:market-data-cache-projector'
+include 'services:streaming:trade-enrichment-service'
+include 'services:streaming:risk-alert-service'
 ```
 
 Modules land when the work reaches them. Creating an empty module ahead of its phase produces a
@@ -44,6 +46,10 @@ deliberate breaking change gets accepted.
 | `DeadLetterPublisher` | Builds a `DeadLetterEvent` and sends it to `{topic}.dlq` |
 | `FailureTracker` | Remembers first failure time and attempt count so the DLQ event carries real numbers |
 | `PoisonRecordPolicy` | The shared retry bound before quarantine, and the bytes the dead letter carries |
+| `KafkaSecurityConfiguration` | Applies SASL and TLS settings to every autoconfigured client under the secure profile |
+| `KafkaSaslProfile` | The per-identity credentials that configuration binds, present only under that profile |
+| `IdempotencyKeys` | Derives the version-5 UUIDs that make a replayed record produce the same identity |
+| `MarketCacheKeys` | The Redis key shapes the projector writes and enrichment reads |
 
 Its test fixtures are shared too, consumed with
 `testImplementation testFixtures(project(':platform-common'))`:
@@ -55,7 +61,16 @@ Its test fixtures are shared too, consumed with
 | `KafkaAclPolicy` | Parses a service's committed `kafka-acls.yml` |
 | `KafkaAclScriptRenderer` | Renders those policies into arguments for the local stack |
 | `KafkaProducerAuthorizationContract` | The one ALLOW, two DENY contract every write-only identity satisfies |
-| `TestcontainersConfiguration` | Shared container wiring |
+| `ServiceIdentityContract` | The shared assertions that a service's image binds the identity it claims |
+| `LocalStackFixture` | The S3 and KMS endpoint the audit evidence path is written against |
+| `PostgresStack` | A real PostgreSQL, started once per JVM, used by the risk service's position tests |
+
+`TestcontainersConfiguration` is also in that package and is **not** the pattern to copy. It declares
+container beans for `@Import` into a test context, and no source file in the repository imports it.
+The convention in use is the static stack above: `KafkaAvroStack.start()` or `PostgresStack.start()`
+called from a `@DynamicPropertySource` method, with containers started once per JVM and reused across
+test classes. Importing the configuration into a test that also needs `KafkaAvroStack` would start a
+second broker.
 
 Neither shared module may hold business logic. If a change wants to add domain logic to either, it
 belongs in a service.

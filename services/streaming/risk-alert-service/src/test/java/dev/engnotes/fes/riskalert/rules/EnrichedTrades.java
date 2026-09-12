@@ -43,4 +43,44 @@ public final class EnrichedTrades {
                 .setMarketDataAgeMs(50L)
                 .build();
     }
+
+    /**
+     * A trade shaped for the position rules: the caller controls identity, side and quantity.
+     * priceDeviation is fixed at 0.0 so PriceDeviationRule never alerts on these fixtures and the
+     * position assertions stay unambiguous.
+     */
+    public static EnrichedTradeEvent withPosition(String tradeId,
+                                                  String traderId,
+                                                  String ticker,
+                                                  Side side,
+                                                  long quantity,
+                                                  Instant eventTimestamp) {
+
+        TradeEvent trade = TradeEvent.newBuilder()
+                .setTradeId(tradeId)
+                .setCorrelationId("corr-" + tradeId)
+                .setTicker(ticker)
+                .setQuantity(quantity)
+                .setPrice(2500.0)
+                .setSide(side)
+                .setTraderId(traderId)
+                .setAccountId("account-1")
+                .setEventTimestamp(eventTimestamp)
+                .setProducedAt(eventTimestamp.plusMillis(1L))
+                .setTraceContext(Map.of("traceparent",
+                        "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"))
+                .build();
+
+        return EnrichedTradeEvent.newBuilder()
+                .setTrade(trade)
+                .setMidPriceAtExecution(2500.0)
+                .setSpreadAtExecution(0.5)
+                .setVwap5Min(2500.0)
+                .setMarketCap(1_700_000.0)
+                .setPriceDeviation(0.0)
+                .setEnrichedAt(eventTimestamp.plusMillis(2L))
+                .setEnrichmentLatencyMs(1L)
+                .setMarketDataAgeMs(50L)
+                .build();
+    }
 }

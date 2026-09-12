@@ -17,8 +17,11 @@ import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.listener.ContainerPausingBackOffHandler;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.listener.ListenerContainerRegistry;
 import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,10 +81,13 @@ class RiskAlertKafkaConfigurationTest {
     }
 
     /**
-     * The two failure classes ADR-027 separates, wired for {@code trades.enriched}. This service
-     * calls no external datastore, so unlike {@code EnrichmentKafkaConfiguration} there is no
-     * dependency-outage branch and no {@code ContainerPausingBackOffHandler}: the error handler
-     * takes three arguments, not five.
+     * The two failure classes ADR-027 separates, wired for {@code trades.enriched}. Increment 2
+     * gave this service its first datastore, so the error handler now takes the same five-argument
+     * shape {@code EnrichmentKafkaConfiguration.enrichmentErrorHandler} takes, with a real
+     * {@link ContainerPausingBackOffHandler} wired in; the registry and scheduler are mocked here
+     * because none of these tests exercise the pausing path itself, only the quarantine and
+     * not-retryable wiring, which {@link RiskAlertBackOffTest} and {@code PostgresOutageIntegrationTest}
+     * cover directly.
      */
     @Nested
     @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
@@ -89,12 +95,15 @@ class RiskAlertKafkaConfigurationTest {
 
         private final DeadLetterPublisher deadLetterPublisher = mock(DeadLetterPublisher.class);
         private final RiskAlertMetrics metrics = mock(RiskAlertMetrics.class);
+        private final ListenerContainerRegistry registry = mock(ListenerContainerRegistry.class);
+        private final ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
 
         private DefaultErrorHandler errorHandler() {
             when(deadLetterPublisher.publish(any(), any(), any()))
                     .thenReturn(CompletableFuture.completedFuture(null));
+            scheduler.initialize();
             return new RiskAlertKafkaConfiguration().riskAlertErrorHandler(
-                    deadLetterPublisher, new FailureTracker(), metrics);
+                    deadLetterPublisher, new FailureTracker(), registry, scheduler, metrics);
         }
 
         @Test

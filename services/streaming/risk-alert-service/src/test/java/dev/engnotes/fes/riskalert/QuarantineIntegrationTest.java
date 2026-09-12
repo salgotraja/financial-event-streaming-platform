@@ -12,6 +12,7 @@ import dev.engnotes.fes.events.DeadLetterEvent;
 import dev.engnotes.fes.events.EnrichedTradeEvent;
 import dev.engnotes.fes.events.RiskAlertEvent;
 import dev.engnotes.fes.testing.KafkaAvroStack;
+import dev.engnotes.fes.testing.PostgresStack;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -65,6 +66,7 @@ class QuarantineIntegrationTest {
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         KafkaAvroStack.start();
+        PostgresStack.start();
         // RuleTimelineLoader assigns partitions directly rather than subscribing, so the rule
         // topic must exist before the context starts: see RiskAlertTestKafka.createTopic. The DLQ
         // topic and its subject must exist too: application.yml sets auto.register.schemas: false
@@ -85,6 +87,9 @@ class QuarantineIntegrationTest {
         registry.add("fes.risk-alert-service.topic", () -> TRADE_TOPIC);
         registry.add("fes.risk-alert-service.rule-topic", () -> RULE_TOPIC);
         registry.add("fes.risk-alert-service.output-topic", () -> OUTPUT_TOPIC);
+        registry.add("spring.datasource.url", PostgresStack::jdbcUrl);
+        registry.add("spring.datasource.username", PostgresStack::username);
+        registry.add("spring.datasource.password", PostgresStack::password);
     }
 
     private static KafkaConsumer<String, DeadLetterEvent> dlqConsumer() {

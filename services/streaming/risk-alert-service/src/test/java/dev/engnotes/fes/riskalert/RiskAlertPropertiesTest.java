@@ -57,13 +57,26 @@ class RiskAlertPropertiesTest {
 
     @Test
     void the_bootstrap_rule_set_binds_from_application_yml() {
-        assertThat(bootstrapRuleProperties.rules()).singleElement()
+        assertThat(bootstrapRuleProperties.rules()).hasSize(2);
+
+        assertThat(bootstrapRuleProperties.rules())
+                .filteredOn(rule -> rule.ruleId().equals("price-deviation"))
+                .singleElement()
                 .satisfies(rule -> {
-                    assertThat(rule.ruleId()).isEqualTo("price-deviation");
                     assertThat(rule.ruleType()).isEqualTo("price-deviation");
                     assertThat(rule.parameters())
                             .containsEntry("warn-deviation-percent", "2.0")
                             .containsEntry("critical-deviation-percent", "5.0");
+                });
+
+        assertThat(bootstrapRuleProperties.rules())
+                .filteredOn(rule -> rule.ruleId().equals("position-limit"))
+                .singleElement()
+                .satisfies(rule -> {
+                    assertThat(rule.ruleType()).isEqualTo("position-limit");
+                    assertThat(rule.parameters())
+                            .containsEntry("warn-position-quantity", "10000")
+                            .containsEntry("critical-position-quantity", "50000");
                 });
     }
 

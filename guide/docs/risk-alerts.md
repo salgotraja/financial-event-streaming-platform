@@ -7,9 +7,15 @@ of which rule was in force when each trade executed, and writes `notifications.a
 It is also the first consumer of `trades.enriched`. Until this service existed,
 [trade enrichment](enrichment.md) wrote a stream that nothing read.
 
-Increment 1 implements one rule, `PRICE_DEVIATION`. The other three rules FR-04.2 names are absent,
-so FR-04 is not met. What this increment establishes is the machinery the other three will land into:
-the governed version timeline, event-time selection, and a deterministic alert identity.
+Two of FR-04.2's four rules are implemented. `PRICE_DEVIATION` arrived in increment 1 and is
+stateless. `POSITION_LIMIT_BREACH` arrived in increment 2 and is the first rule in the platform whose
+verdict depends on state rather than on the record in front of it, which is why it also brings the
+first PostgreSQL store and the first Flyway migration anywhere in this repository.
+
+`UNUSUAL_VOLUME` and `WASH_TRADE_DETECTED` are still absent, so FR-04 is not met. Wash-trade
+detection is blocked on a definition rather than on effort: `contracts/` carries an `accountId` but
+no account-relationship source to judge two accounts related, so the rule has to be redefined against
+something that exists before it can be built.
 
 ## The problem the timeline solves
 
@@ -126,9 +132,15 @@ tell `malformed_record` from a genuine `null_value`. `an_undecodable_record_is_s
 publishes five bytes with no Confluent magic byte and asserts both that the fold completes and that
 the rejection is reported under the right reason.
 
-A `ruleType` this increment has no implementation for is accepted unvalidated rather than rejected,
-because increment 1 cannot know what increment 3's parameters look like:
-`a_governed_rule_type_this_increment_cannot_evaluate_is_still_folded`.
+A `ruleType` with no implementation here is accepted unvalidated rather than rejected, because a
+delivered increment cannot know what a later one's parameters look like:
+`a_governed_rule_type_this_increment_cannot_evaluate_is_still_folded`. The validator dispatches on
+`ruleType`, so it now checks `price-deviation` and `position-limit` bands at fold time and still waves
+`unusual-volume` through untouched.
+
+Note that `not_finite` applies only to the price-deviation bands, which are parsed as `double`.
+Position-limit bands are whole shares parsed as `long`, which cannot be `NaN` or infinite, so an
+out-of-range value there is reported as `unparseable_value` instead.
 
 ## The bootstrap set, and what suppresses it
 
@@ -144,6 +156,11 @@ risk:
       parameters:
         warn-deviation-percent: "2.0"
         critical-deviation-percent: "5.0"
+    - rule-id: position-limit
+      rule-type: position-limit
+      parameters:
+        warn-position-quantity: "10000"
+        critical-position-quantity: "50000"
 ```
 
 Bootstrap rules are version 0 by definition. The suppression rule is the part that is easy to get
@@ -181,7 +198,7 @@ One malformed governed version degrades only itself. The engine catches
 version cannot abort a trade's evaluation against every other rule:
 `a_malformed_governed_rule_version_is_skipped_and_does_not_abort_the_other_rules`.
 
-## The rule itself
+## The price deviation rule
 
 `PriceDeviationRule` is stateless. Enrichment has already computed
 `EnrichedTradeEvent.priceDeviation` as the percentage deviation of the execution price from the
@@ -209,6 +226,115 @@ band: `the_specifications_single_threshold_name_is_not_silently_accepted`.
 A non-finite `priceDeviation` throws rather than falling through. `NaN` fails every comparison, so a
 fall-through would silently produce no alert and a corrupt record would look like a clean trade:
 `a_non_finite_deviation_is_rejected_rather_than_evaluated`.
+
+## The position limit rule, and the state it needs
+
+`POSITION_LIMIT_BREACH` alerts when a trader's net position in one ticker exceeds a governed bound.
+A net position is not on the event. It is a running total over every trade that trader has executed
+in that ticker, so this rule is where the platform acquires its first relational store.
+
+```text
+magnitude = abs(netQuantity)
+magnitude > criticalQuantity  ->  CRITICAL
+magnitude > warnQuantity      ->  WARNING
+otherwise                     ->  no alert
+```
+
+**Both edges are strict here, where price deviation's are inclusive.** "Exceeds a threshold" reads as
+strict, so a position sitting exactly on a band does not breach. The two rules genuinely differ on
+this, which is easy to miss when reading them side by side, so
+`a_position_exactly_at_the_critical_band_warns_rather_than_criticals` and
+`a_position_exactly_at_the_warning_band_does_not_breach` exist to fail if anyone harmonises them.
+
+The comparison is on the absolute net, for the same reason price deviation compares magnitude: a
+10,000-share short carries the same exposure as a 10,000-share long, and comparing the signed value
+would leave every short unalerted. The signed net is still carried into `measuredValues`, so a short
+reads as a short in the alert.
+
+Bands are whole shares rather than percentages, parsed as `long`. A position is a count and
+`TradeEvent.quantity` is a `long`, so a fractional bound is rejected rather than truncated:
+`a_fractional_band_is_rejected_because_a_position_is_a_share_count`.
+
+### Two tables, and why the second one exists
+
+```sql
+risk_position               -- PK (trader_id, ticker), the running total
+risk_position_applied_trade -- PK trade_id, the idempotency ledger
+```
+
+The first holds the total. The second is what makes the total safe under at-least-once delivery, and
+it does two jobs rather than one.
+
+The obvious job is deduplication. Redelivery is normal (ADR-019), and a running sum is the first
+thing in this platform that is not naturally idempotent: applying one trade twice moves the position
+twice. `ON CONFLICT (trade_id) DO NOTHING` claims each trade once.
+
+The less obvious job is the one that matters more. The ledger row also stores `net_quantity_after`,
+the position that trade produced. A redelivery is answered from that pinned value rather than from
+the current total. Without it, deduplication would stop the double-count but not a wrong verdict: a
+trade redelivered after later trades had moved the position would be judged against a position it
+never saw, and could turn a breach into a non-breach or the reverse.
+`a_redelivery_returns_the_historical_net_not_the_current_one` is that property.
+
+Event-time reproducibility is therefore weaker here than for a stateless rule, and the guide says so
+rather than claiming parity. `PRICE_DEVIATION` replays to the same verdict from the record alone.
+`POSITION_LIMIT_BREACH` replays to the same verdict only because the ledger remembers. Against an
+empty store it agrees only if the whole partition is replayed from the same starting point.
+
+What makes the running total tractable at all is the topic key. `trade-producer` keys `trades.raw`
+on ticker and enrichment preserves that key, so every trade for a given `(traderId, ticker)` lands on
+one partition and is applied by one consumer in offset order. `last_event_timestamp` still takes
+`GREATEST` rather than assignment, because records arrive in offset order but `eventTimestamp` can go
+backwards, and a sum is order-independent where a maximum is not.
+
+Concurrency control is the upsert's row lock. A `version` column is incremented on every update for
+the audit intent of ADR-008, but it is never read as a compare-and-swap: ticker-keyed partitioning
+already makes each row single-writer within the consumer group, so a retry loop could never fire.
+
+### The trade is applied once, and only when it must be
+
+```java
+NetPosition post = anyPositionRuleInForceAt(instant) ? positions.apply(trade) : null;
+```
+
+Two separate decisions sit in that line, and both are load-bearing.
+
+**Applying outside the per-rule loop.** `RiskRuleEngine` evaluates every governed rule of a matching
+type, and several `ruleId`s may share one `ruleType` — that is how per-ticker thresholds arrive
+without a schema change. A rule that moved the position inside its own `evaluate` would move it once
+per governed rule, inside a single consume call. Deduplicating on `tradeId` would not catch that,
+because it is one trade applied repeatedly within one transaction rather than a redelivery. The bug
+would stay invisible until a second position rule was governed, then corrupt every position silently.
+`the_trade_is_applied_exactly_once_even_when_two_position_rules_are_in_force` asserts a call count.
+
+**Applying only behind the guard.** The store is consulted only when a position-aware rule is
+actually in force, so a deployment governing no position rule writes nothing and takes no database
+dependency at all.
+`the_position_store_is_not_consulted_when_only_a_stateless_rule_is_in_force` uses a store that throws
+if called, so the test fails rather than passes if the guard is removed.
+
+Be clear about what that buys today, though: the shipped `application.yml` bootstraps a
+`position-limit` rule, so in the default configuration the guard never short-circuits and PostgreSQL
+is a hard dependency from the first trade. The guard matters for a deployment that removes the
+bootstrap entry or retires the rule through governance, and it is what keeps that deployment
+possible rather than describing how this one runs.
+
+Both readers take one snapshot. `evaluate` resolves every rule type's in-force list once and the
+guard and the dispatch loop both read that snapshot, never the registry directly. Two independent
+reads could disagree, because the rule fold runs on another thread: a transition landing between them
+could leave the guard seeing no position rule while the dispatch loop found one, and a rule would be
+handed a position that was never computed.
+
+Rules read the position and never write it. `PositionAwareRiskRule` is a subtype of `RiskRule` rather
+than a widening of it, specifically so `PriceDeviationRule` and every test written against it stayed
+untouched when this landed.
+
+**One accepted consequence.** The order is apply, evaluate, publish, acknowledge. If publishing
+exhausts its bound and the record is quarantined, the position already counts a trade whose alert
+never fired. That stands: the position records trades that occurred, and alert delivery is a separate
+concern. A compensating write would be a second write on an already failing path that can also fail,
+leaving the position wrong in the other direction with no record of why. The dead letter is the audit
+trail.
 
 ## The alert identity is derived, not random
 
@@ -302,11 +428,33 @@ acknowledged so the partition keeps moving:
 `the_recovered_records_offset_is_acknowledged_so_the_partition_keeps_moving` and
 `a_malformed_record_is_quarantined_and_the_record_behind_it_is_still_evaluated`.
 
-There is no dependency-outage branch and no container-pausing back-off handler, unlike
-[trade enrichment](enrichment.md#when-a-trade-cannot-be-enriched). That machinery exists there to
-protect a Redis outage, and this service calls no external datastore, so there is no failing
-dependency for a breaker to protect. ADR-027 scopes breakers to calls against a failing dependency,
-and copying the branch in without one would be an event-type-wide breaker by another name.
+**A PostgreSQL outage pauses the container rather than dead-lettering.** Increment 1 had no
+dependency-outage branch at all, because the service called no external datastore. Increment 2 gave
+it one, so the error handler now takes the same shape
+[trade enrichment](enrichment.md#when-a-trade-cannot-be-enriched) uses for Redis.
+
+A lost connection or a statement timeout returns an unlimited-attempt back-off, so the recoverer is
+never reached and no dead letter is written for a trade that was never bad. A poison bound is for
+bytes that cannot improve; an outage bound is for a dependency that comes back. Merging them would
+quarantine good trades during a database restart.
+
+The handler is given a `ContainerPausingBackOffHandler` rather than the default, and the difference
+decides whether this works. The default sleeps the consumer thread, so `poll()` stops being called,
+and an unbounded sleep crosses `max.poll.interval.ms` and gets the consumer evicted from its group.
+That turns an outage into a rebalance storm. Pausing keeps the consumer polling and in the group
+while it declines to deliver records. `should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`
+stops the database, publishes a good trade, asserts nothing reaches the DLQ, then restarts it and
+asserts the trade is processed.
+
+A constraint violation is deliberately not treated as an outage. It is a verdict on the data, not a
+failing dependency, and pausing the whole container on one bad record would invert the two classes.
+
+The outage branch only works because the datasource binds timeouts. `application.yml` sets a Hikari
+`connection-timeout` of 5000 milliseconds and PGJDBC `connectTimeout: 5` and `socketTimeout: 10`, both
+in seconds. A refused connection fails fast on its own, but a database that accepts the socket and
+then stops answering raises nothing at all without a socket timeout: the call would block the
+listener thread indefinitely, never reach the back-off function, and cross `max.poll.interval.ms`
+anyway. The bound is what converts a hang into an exception the handler can classify.
 
 For a decode failure the quarantined payload comes from the exception rather than the null record
 value, because by the time application code sees the record the value is already gone:
@@ -342,6 +490,33 @@ out.
 `RiskAlertServiceIdentityStackTest` proves the binding rather than the policy: it runs the service's
 own container image against a broker with ACLs applied, denied and then granted.
 
+### The database identity
+
+Increment 2 added a second identity to govern, because the service now holds a store. The plain local
+stack runs PostgreSQL unauthenticated on the compose network, on the same terms as every other
+dev-profile listener. The strict-security overlay is where an absent grant becomes a denial, and it
+hardens two things.
+
+**TLS is required, not offered.** `pg_hba.conf` carries only `hostssl` lines for TCP plus one `local`
+line for the socket, and no `trust` method anywhere, so a client that negotiates no encryption is
+rejected at the connection rather than discouraged by configuration. NFR-05.1 forbids plaintext
+database traffic in cloud profiles and the overlay is this repository's cloud stand-in. The
+certificate is issued by the same development CA as the broker's, so `ca.pem` is the one truststore a
+client needs.
+
+**The service owns its schema and nothing else.** `risk_alert_service` is created `NOSUPERUSER
+NOCREATEDB NOCREATEROLE`, owning only the `risk_alert` schema, with `PUBLIC` revoked from `public`.
+The bootstrap superuser has no network line in `pg_hba.conf` at all, and since increment 2's review
+the two roles no longer share a password.
+
+`RiskAlertDatabaseSecurityIntegrationTest` proves this against a live container rather than by
+reading the compose file: a `sslmode=disable` connection is rejected, a `sslmode=verify-ca` connection
+succeeds, `pg_roles` really reports `rolsuper=false` for the service role, and the bootstrap superuser
+cannot connect over the network. The negative cases pin the specific rejection, so a dead container or
+a wrong password fails the test rather than passing it for the wrong reason.
+`RiskAlertDatabaseIdentityTest` is the cheap companion: a file-content assertion that runs without
+Docker and fails if anyone deletes `ssl=on` from the overlay.
+
 ## Metrics
 
 ```text
@@ -372,10 +547,21 @@ metric tests use.
 - **Nothing writes `risk-rules.events` in production.** `risk-rule-governance-service` is Phase 5.
   Every governed-version path here is exercised by tests that publish to the topic directly, and in a
   running system the bootstrap set is what applies today.
-- **Three of FR-04.2's four rules are absent, so FR-04 is not met.** `POSITION_LIMIT_BREACH`,
-  `UNUSUAL_VOLUME` and `WASH_TRADE_DETECTED` are later increments. Wash-trade detection is additionally
-  blocked on a definition: `contracts/` carries `accountId` but no account-relationship source, so the
-  rule as specified cannot be implemented against the events that exist.
+- **Two of FR-04.2's four rules are absent, so FR-04 is not met.** `UNUSUAL_VOLUME` and
+  `WASH_TRADE_DETECTED` are a later increment. Wash-trade detection is additionally blocked on a
+  definition: `contracts/` carries `accountId` but no account-relationship source, so the rule as
+  specified cannot be implemented against the events that exist.
+- **The position store cannot be rebuilt from Kafka history.** FR-11.5's rebuild-and-reconcile
+  requirement is written against `position-exposure-service`, which does not exist. If this store were
+  lost, nothing here reconstructs it, which is why the local compose service mounts a volume where the
+  Redis cache beside it deliberately does not.
+- **The position total duplicates one FR-11 will also hold.** `position-exposure-service` will own its
+  own position read model. The two will carry overlapping numbers and nothing reconciles them yet.
+- **`risk_position_applied_trade` is never pruned.** It grows with trade volume. Redelivery beyond
+  `trades.enriched`'s seven-day retention cannot happen, so older rows are dead weight rather than a
+  correctness need, but no job removes them.
+- **`gross_buy` and `gross_sell` are written and never read.** They are carried for FR-11.2 and for
+  the windowed rules of the next increment.
 - **No latency figure has been measured.** The sub-5ms evaluation target and the platform's
   sub-200ms and 50,000 events/sec figures remain targets until Phase 8 measures them.
 - **The fold is per-process and rebuilt on every start.** Two instances starting at different moments

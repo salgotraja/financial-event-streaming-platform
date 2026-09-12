@@ -112,8 +112,8 @@ because a name is not a reliable signal on its own: `*AuthorizationTest` extends
 fixture and `SecureKafkaStackTest` tests that fixture directly, and both start a broker.
 
 That matters more than tidiness. The split is only worth having if `test` genuinely needs no Docker,
-which is checked by running it and confirming no container appeared: 124 unit tests, zero containers
-created. 55 tests run under `integrationTest`.
+which is checked by running it and confirming no container appeared: 293 unit tests, zero containers
+created. 148 tests run under `integrationTest`.
 
 `integrationTest` also sets `forkEvery = 1`, one test class per JVM. That is a correctness setting,
 not a speed one. `SecureKafkaStack.apply` only ever creates ACLs and never revokes them, and every
