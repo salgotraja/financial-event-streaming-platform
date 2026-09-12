@@ -86,9 +86,30 @@ class UnusualVolumeRuleTest {
     }
 
     @Test
+    void a_window_exactly_at_the_governed_minimum_sample_is_allowed_to_alert() {
+        // 30 samples against a governed minimum of 30: the guard is sampleCount < minSampleCount,
+        // so equality must be on the alerting side, not the suppressed side.
+        assertThat(evaluate(1_000_000L, window(30L))).isPresent();
+    }
+
+    @Test
     void an_empty_window_does_not_alert() {
         assertThat(evaluate(1_000_000L, new VolumeWindow("RELIANCE", 0L, BigDecimal.ZERO, BigDecimal.ZERO)))
                 .isEmpty();
+    }
+
+    @Test
+    void a_window_below_the_governed_minimum_sample_increments_the_below_minimum_counter() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        RiskAlertMetrics metrics = new RiskAlertMetrics(registry);
+
+        new UnusualVolumeRule(metrics).evaluate(
+                EnrichedTrades.withPosition("t-1", "trader-1", "RELIANCE", Side.BUY, 1_000_000L,
+                        Instant.ofEpochMilli(2_000L)),
+                RULE,
+                new TradeContext(null, window(29L), null));
+
+        assertThat(registry.get("risk.volume.window.below.minimum.sample").counter().count()).isEqualTo(1.0);
     }
 
     @Test
