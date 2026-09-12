@@ -33,25 +33,25 @@ class PositionLimitRuleTest {
                 Instant.ofEpochMilli(1_000L));
     }
 
-    private static NetPosition position(long net) {
-        return new NetPosition("trader-1", "RELIANCE", net);
+    private static TradeContext context(long net) {
+        return new TradeContext(new NetPosition("trader-1", "RELIANCE", net), null, null);
     }
 
     @Test
     void a_position_inside_both_bands_raises_no_alert() {
-        assertThat(rule.evaluate(trade(), RULE, position(9_999L))).isEmpty();
+        assertThat(rule.evaluate(trade(), RULE, context(9_999L))).isEmpty();
     }
 
     @Test
     void a_position_exactly_at_the_warning_band_does_not_breach() {
-        assertThat(rule.evaluate(trade(), RULE, position(10_000L)))
+        assertThat(rule.evaluate(trade(), RULE, context(10_000L)))
                 .as("the rule is a strict exceedance: |net| > threshold")
                 .isEmpty();
     }
 
     @Test
     void a_position_above_the_warning_band_raises_a_warning() {
-        RiskAlertEvent alert = rule.evaluate(trade(), RULE, position(10_001L)).orElseThrow();
+        RiskAlertEvent alert = rule.evaluate(trade(), RULE, context(10_001L)).orElseThrow();
 
         assertThat(alert.getSeverity()).isEqualTo(Severity.WARNING);
         assertThat(alert.getAlertType()).isEqualTo(AlertType.POSITION_LIMIT_BREACH);
@@ -59,14 +59,14 @@ class PositionLimitRuleTest {
 
     @Test
     void a_position_above_the_critical_band_raises_a_critical() {
-        RiskAlertEvent alert = rule.evaluate(trade(), RULE, position(50_001L)).orElseThrow();
+        RiskAlertEvent alert = rule.evaluate(trade(), RULE, context(50_001L)).orElseThrow();
 
         assertThat(alert.getSeverity()).isEqualTo(Severity.CRITICAL);
     }
 
     @Test
     void a_position_exactly_at_the_critical_band_warns_rather_than_criticals() {
-        RiskAlertEvent alert = rule.evaluate(trade(), RULE, position(50_000L)).orElseThrow();
+        RiskAlertEvent alert = rule.evaluate(trade(), RULE, context(50_000L)).orElseThrow();
 
         assertThat(alert.getSeverity())
                 .as("strict exceedance: exactly at the band is not above it")
@@ -75,8 +75,8 @@ class PositionLimitRuleTest {
 
     @Test
     void a_short_position_breaches_at_the_same_magnitude_as_a_long_one() {
-        Optional<RiskAlertEvent> shortSide = rule.evaluate(trade(), RULE, position(-50_001L));
-        Optional<RiskAlertEvent> longSide = rule.evaluate(trade(), RULE, position(50_001L));
+        Optional<RiskAlertEvent> shortSide = rule.evaluate(trade(), RULE, context(-50_001L));
+        Optional<RiskAlertEvent> longSide = rule.evaluate(trade(), RULE, context(50_001L));
 
         assertThat(shortSide).isPresent();
         assertThat(shortSide.orElseThrow().getSeverity())
@@ -85,7 +85,7 @@ class PositionLimitRuleTest {
 
     @Test
     void the_signed_net_is_carried_so_a_short_reads_as_a_short() {
-        RiskAlertEvent alert = rule.evaluate(trade(), RULE, position(-50_001L)).orElseThrow();
+        RiskAlertEvent alert = rule.evaluate(trade(), RULE, context(-50_001L)).orElseThrow();
 
         assertThat(alert.getMeasuredValues())
                 .containsEntry("net-position-quantity", "-50001")
@@ -94,7 +94,7 @@ class PositionLimitRuleTest {
 
     @Test
     void the_governed_bands_are_carried_into_the_alert() {
-        RiskAlertEvent alert = rule.evaluate(trade(), RULE, position(60_000L)).orElseThrow();
+        RiskAlertEvent alert = rule.evaluate(trade(), RULE, context(60_000L)).orElseThrow();
 
         assertThat(alert.getRuleParameters())
                 .containsEntry(PositionLimitParameters.WARN_KEY, "10000")
@@ -105,15 +105,15 @@ class PositionLimitRuleTest {
 
     @Test
     void the_alert_timestamp_is_the_trades_own_event_time_not_the_wall_clock() {
-        RiskAlertEvent alert = rule.evaluate(trade(), RULE, position(60_000L)).orElseThrow();
+        RiskAlertEvent alert = rule.evaluate(trade(), RULE, context(60_000L)).orElseThrow();
 
         assertThat(alert.getAlertTimestamp()).isEqualTo(Instant.ofEpochMilli(1_000L));
     }
 
     @Test
     void the_alert_id_is_derived_so_a_replay_produces_the_same_id() {
-        RiskAlertEvent first = rule.evaluate(trade(), RULE, position(60_000L)).orElseThrow();
-        RiskAlertEvent replayed = rule.evaluate(trade(), RULE, position(60_000L)).orElseThrow();
+        RiskAlertEvent first = rule.evaluate(trade(), RULE, context(60_000L)).orElseThrow();
+        RiskAlertEvent replayed = rule.evaluate(trade(), RULE, context(60_000L)).orElseThrow();
 
         assertThat(first.getAlertId()).isEqualTo(replayed.getAlertId());
         assertThat(first.getAlertId())
@@ -124,16 +124,16 @@ class PositionLimitRuleTest {
     void a_different_governed_version_derives_a_different_alert_id() {
         ActiveRule newerVersion = new ActiveRule("pl-1", "position-limit", 4L, RULE.parameters());
 
-        RiskAlertEvent original = rule.evaluate(trade(), RULE, position(60_000L)).orElseThrow();
+        RiskAlertEvent original = rule.evaluate(trade(), RULE, context(60_000L)).orElseThrow();
         RiskAlertEvent underNewerVersion =
-                rule.evaluate(trade(), newerVersion, position(60_000L)).orElseThrow();
+                rule.evaluate(trade(), newerVersion, context(60_000L)).orElseThrow();
 
         assertThat(original.getAlertId()).isNotEqualTo(underNewerVersion.getAlertId());
     }
 
     @Test
     void the_trace_context_comes_from_the_wrapped_trade() {
-        RiskAlertEvent alert = rule.evaluate(trade(), RULE, position(60_000L)).orElseThrow();
+        RiskAlertEvent alert = rule.evaluate(trade(), RULE, context(60_000L)).orElseThrow();
 
         assertThat(alert.getTraceContext()).containsKey("traceparent");
     }
@@ -143,7 +143,7 @@ class PositionLimitRuleTest {
         ActiveRule broken = new ActiveRule("pl-broken", "position-limit", 1L,
                 Map.of(PositionLimitParameters.WARN_KEY, "10000"));
 
-        assertThatThrownBy(() -> rule.evaluate(trade(), broken, position(60_000L)))
+        assertThatThrownBy(() -> rule.evaluate(trade(), broken, context(60_000L)))
                 .isInstanceOf(InvalidRuleParametersException.class);
     }
 

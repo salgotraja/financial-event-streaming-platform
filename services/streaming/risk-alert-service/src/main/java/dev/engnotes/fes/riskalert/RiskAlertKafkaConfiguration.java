@@ -10,6 +10,7 @@ import dev.engnotes.fes.common.kafka.FailureTracker;
 import dev.engnotes.fes.common.kafka.KafkaSaslProfile;
 import dev.engnotes.fes.common.kafka.PoisonRecordPolicy;
 import dev.engnotes.fes.events.DeadLetterEvent;
+import dev.engnotes.fes.riskalert.correlation.RiskRecentTradeStore;
 import dev.engnotes.fes.riskalert.governance.BootstrapRuleProperties;
 import dev.engnotes.fes.riskalert.governance.RiskRuleRegistry;
 import dev.engnotes.fes.riskalert.governance.RuleTimelineLoader;
@@ -21,6 +22,8 @@ import dev.engnotes.fes.riskalert.rules.PriceDeviationParameters;
 import dev.engnotes.fes.riskalert.rules.PriceDeviationRule;
 import dev.engnotes.fes.riskalert.rules.RiskRule;
 import dev.engnotes.fes.riskalert.rules.RiskRuleEngine;
+import dev.engnotes.fes.riskalert.rules.TradeStateStores;
+import dev.engnotes.fes.riskalert.window.RiskVolumeWindowStore;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
@@ -98,6 +101,24 @@ public class RiskAlertKafkaConfiguration {
         return new RiskPositionStore(jdbcClient);
     }
 
+    // The window and horizon here are the same defaults Tasks 3 and 5 promote to
+    // fes.risk-alert-service configuration; this task only wires the constructor shape.
+    @Bean
+    RiskVolumeWindowStore riskVolumeWindowStore(JdbcClient jdbcClient) {
+        return new RiskVolumeWindowStore(jdbcClient, 3_600L);
+    }
+
+    @Bean
+    RiskRecentTradeStore riskRecentTradeStore(JdbcClient jdbcClient) {
+        return new RiskRecentTradeStore(jdbcClient, 3_600L, 200);
+    }
+
+    @Bean
+    TradeStateStores tradeStateStores(RiskPositionStore positions, RiskVolumeWindowStore volumeWindows,
+                                      RiskRecentTradeStore recentTrades) {
+        return new TradeStateStores(positions, volumeWindows, recentTrades);
+    }
+
     @Bean
     PriceDeviationRule priceDeviationRule() {
         return new PriceDeviationRule();
@@ -109,8 +130,9 @@ public class RiskAlertKafkaConfiguration {
     }
 
     @Bean
-    RiskRuleEngine riskRuleEngine(RiskRuleRegistry registry, List<RiskRule> rules, RiskPositionStore positions) {
-        return new RiskRuleEngine(registry, rules, positions);
+    RiskRuleEngine riskRuleEngine(RiskRuleRegistry registry, List<RiskRule> rules, TradeStateStores stores,
+                                  RiskAlertMetrics metrics) {
+        return new RiskRuleEngine(registry, rules, stores, metrics);
     }
 
     @Bean
