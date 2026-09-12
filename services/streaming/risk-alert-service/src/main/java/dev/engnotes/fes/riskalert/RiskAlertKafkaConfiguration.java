@@ -22,7 +22,9 @@ import dev.engnotes.fes.riskalert.rules.PriceDeviationParameters;
 import dev.engnotes.fes.riskalert.rules.PriceDeviationRule;
 import dev.engnotes.fes.riskalert.rules.RiskRule;
 import dev.engnotes.fes.riskalert.rules.RiskRuleEngine;
+import dev.engnotes.fes.riskalert.rules.SelfCrossRule;
 import dev.engnotes.fes.riskalert.rules.TradeStateStores;
+import dev.engnotes.fes.riskalert.rules.UnusualVolumeRule;
 import dev.engnotes.fes.riskalert.window.RiskVolumeWindowStore;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -126,6 +128,16 @@ public class RiskAlertKafkaConfiguration {
     @Bean
     PositionLimitRule positionLimitRule() {
         return new PositionLimitRule();
+    }
+
+    @Bean
+    UnusualVolumeRule unusualVolumeRule(RiskAlertMetrics metrics) {
+        return new UnusualVolumeRule(metrics);
+    }
+
+    @Bean
+    SelfCrossRule selfCrossRule(RiskAlertProperties properties) {
+        return new SelfCrossRule(properties.recentTradeHorizonSeconds());
     }
 
     @Bean

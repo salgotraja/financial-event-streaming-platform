@@ -85,6 +85,23 @@ risk:
       parameters:
         warn-position-quantity: "10000"
         critical-position-quantity: "50000"
+    # Adding these to the bootstrap set means every default deployment writes to both new stores
+    # from its first trade, the same way position-limit already does. The engine's "apply only the
+    # stores a rule in force declared" property is a property of the requirements union, not of the
+    # shipped configuration: it holds for a deployment whose bootstrap set and governed timeline
+    # carry only price-deviation.
+    - rule-id: unusual-volume
+      rule-type: unusual-volume
+      parameters:
+        warn-sigma-multiplier: "3.0"
+        critical-sigma-multiplier: "5.0"
+        min-sample-count: "30"
+    - rule-id: self-cross
+      rule-type: self-cross
+      parameters:
+        window-seconds: "300"
+        quantity-tolerance-percent: "1.0"
+        price-tolerance-percent: "1.0"
 
 management:
   endpoints:

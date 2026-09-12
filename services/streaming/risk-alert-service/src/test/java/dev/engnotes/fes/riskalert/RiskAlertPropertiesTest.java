@@ -68,7 +68,7 @@ class RiskAlertPropertiesTest {
 
     @Test
     void the_bootstrap_rule_set_binds_from_application_yml() {
-        assertThat(bootstrapRuleProperties.rules()).hasSize(2);
+        assertThat(bootstrapRuleProperties.rules()).hasSize(4);
 
         assertThat(bootstrapRuleProperties.rules())
                 .filteredOn(rule -> rule.ruleId().equals("price-deviation"))
@@ -88,6 +88,28 @@ class RiskAlertPropertiesTest {
                     assertThat(rule.parameters())
                             .containsEntry("warn-position-quantity", "10000")
                             .containsEntry("critical-position-quantity", "50000");
+                });
+
+        assertThat(bootstrapRuleProperties.rules())
+                .filteredOn(rule -> rule.ruleId().equals("unusual-volume"))
+                .singleElement()
+                .satisfies(rule -> {
+                    assertThat(rule.ruleType()).isEqualTo("unusual-volume");
+                    assertThat(rule.parameters())
+                            .containsEntry("warn-sigma-multiplier", "3.0")
+                            .containsEntry("critical-sigma-multiplier", "5.0")
+                            .containsEntry("min-sample-count", "30");
+                });
+
+        assertThat(bootstrapRuleProperties.rules())
+                .filteredOn(rule -> rule.ruleId().equals("self-cross"))
+                .singleElement()
+                .satisfies(rule -> {
+                    assertThat(rule.ruleType()).isEqualTo("self-cross");
+                    assertThat(rule.parameters())
+                            .containsEntry("window-seconds", "300")
+                            .containsEntry("quantity-tolerance-percent", "1.0")
+                            .containsEntry("price-tolerance-percent", "1.0");
                 });
     }
 
