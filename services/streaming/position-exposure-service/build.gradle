@@ -1,0 +1,48 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// ADR-017: a CQRS-style read model, idempotent by tradeId, rebuildable from event history.
+// ADR-019: at-least-once, so snapshotId is derived deterministically rather than randomly.
+// ADR-027: per-record quarantine to trades.enriched.dlq, no event-type-wide breaker.
+// ADR-038: the grain is (accountId, traderId, ticker) and marketValue is mark-to-last-trade.
+// Workload identity: position-exposure-service. Consumer group: the same name.
+// Kafka permission: read trades.enriched, write positions.snapshots and trades.enriched.dlq.
+
+description = 'Maintains the position and exposure read model and publishes positions.snapshots'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation libs.confluent.kafka.avro.serializer
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation 'io.micrometer:micrometer-registry-prometheus'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Task 1 adds no business logic and therefore no unit test; PositionExposureServiceAuthorizationTest
+// is the only test class and it matches the root project's *AuthorizationTest integration-test
+// pattern, so the unit `test` task would otherwise fail with "No tests found for given includes".
+// Remove this override in the task that adds the first unit test.
+tasks.named('test') {
+    filter {
+        failOnNoMatchingTests = false
+    }
+}

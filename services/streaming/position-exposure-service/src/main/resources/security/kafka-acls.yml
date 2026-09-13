@@ -1,0 +1,27 @@
+# Least-privilege Kafka policy for the position-exposure-service workload identity.
+# See trade-producer's policy for the rules that govern this file. Everything absent is denied.
+#
+# One READ grant and one GROUP grant: this service has a single input and a single consumer group.
+#
+# There is no READ grant on positions.snapshots. This service writes that topic and never reads it;
+# rebuilding the read model replays trades.enriched, not its own output, so a read grant here would
+# widen the identity for a path that does not exist (FR-11.5, increment 2).
+#
+# Denials proved in PositionExposureServiceAuthorizationTest: it may not write the topic it
+# consumes, it may not read the topic it writes, and it may not join another workload's group.
+
+principal: position-exposure-service
+
+allowed:
+  - resourceType: TOPIC
+    name: trades.enriched
+    operations: [READ]
+  - resourceType: TOPIC
+    name: positions.snapshots
+    operations: [WRITE]
+  - resourceType: TOPIC
+    name: trades.enriched.dlq
+    operations: [WRITE]
+  - resourceType: GROUP
+    name: position-exposure-service
+    operations: [READ]

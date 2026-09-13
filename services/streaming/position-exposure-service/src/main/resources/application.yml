@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: position-exposure-service
+  datasource:
+    url: ${POSITION_EXPOSURE_DB_URL:jdbc:postgresql://localhost:5432/position_exposure}
+    username: ${POSITION_EXPOSURE_DB_USER:position_exposure_service}
+    password: ${POSITION_EXPOSURE_DB_PASSWORD:position_exposure_service}
+    hikari:
+      # Bounds acquiring a connection from the pool. Default is 30s, longer than a stalled
+      # listener thread should ever wait before backOffFor gets a chance to classify the failure
+      # (ADR-027).
+      connection-timeout: 5000
+      data-source-properties:
+        # PGJDBC connection properties, both in SECONDS (not milliseconds, unlike the Hikari
+        # setting above). connectTimeout bounds opening a new physical connection. socketTimeout is
+        # the one that matters most: it is what converts a database that accepted the connection
+        # and then stopped answering into a QueryTimeoutException, rather than an indefinite block
+        # on the listener thread that never reaches backOffFor at all and eventually crosses
+        # max.poll.interval.ms instead. These values are inherited from risk-alert-service rather
+        # than measured for this module: Task 1 adds no store and no Flyway migration, so nothing
+        # here has been timed yet.
+        connectTimeout: 5
+        socketTimeout: 10
+  flyway:
+    # Flyway runs at startup and before the readiness gate opens, so a service that cannot migrate
+    # never begins consuming trades against a schema it does not have.
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    properties:
+      schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+    consumer:
+      # The group name is the service name, fixed by the IAM policy and the KEDA query that scope
+      # it. Never suffixed.
+      group-id: position-exposure-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: io.confluent.kafka.serializers.KafkaAvroDeserializer
+        specific.avro.reader: true
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      properties:
+        schema.registry.url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+        auto.register.schemas: false
+
+# enable.auto.commit=false and MANUAL_IMMEDIATE come from platform-common's
+# ConsumerAcknowledgementConfiguration, so this service cannot ship weaker offset management by
+# omission. isolation.level is deliberately unset (ADR-019).
+
+fes:
+  position-exposure-service:
+    topic: trades.enriched
+    output-topic: positions.snapshots
+    consumer-instance: ${HOSTNAME:position-exposure-service-local}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
