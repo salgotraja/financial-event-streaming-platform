@@ -125,19 +125,28 @@ services:
       - ./tls:/etc/postgresql/tls:ro
       - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./postgres/init-risk-alert-role.sql:/docker-entrypoint-initdb.d/init-risk-alert-role.sql:ro
+      - ./postgres/init-position-exposure-role.sql:/docker-entrypoint-initdb.d/init-position-exposure-role.sql:ro
     environment:
       # postgres, not risk_alert_service: the bootstrap superuser initdb creates from POSTGRES_USER
       # can never have SUPERUSER stripped from itself (a PostgreSQL restriction, not a choice made
-      # here), so risk_alert_service is created separately, as a real non-superuser role, by
-      # ./postgres/init-risk-alert-role.sql. The bootstrap superuser has no pg_hba.conf entry for
-      # network access, only the local socket the entrypoint's own init scripts use.
+      # here), so risk_alert_service and position_exposure_service are each created separately, as
+      # real non-superuser roles, by ./postgres/init-risk-alert-role.sql and
+      # ./postgres/init-position-exposure-role.sql. The bootstrap superuser has no pg_hba.conf entry
+      # for network access, only the local socket the entrypoint's own init scripts use.
       #
-      # Two independent secrets, not one shared between the two roles. Sharing would be a latent
-      # trap: a later pg_hba.conf edit that gave "postgres" any network route would then also grant
-      # network superuser access under a credential already handled as risk_alert_service's.
+      # Three independent secrets, not one shared across roles. Sharing would be a latent trap: a
+      # later pg_hba.conf edit that gave any one of these roles a wider network route would then
+      # also grant that route under a credential already handled as another role's.
+      #
+      # FES_POSTGRES_POSITION_EXPOSURE_SECRET is not yet emitted by
+      # scripts/generate-dev-security-material.sh, which is outside this change's scope: bringing up
+      # this overlay today leaves POSITION_EXPOSURE_SERVICE_PASSWORD empty until that script's
+      # PRINCIPALS-adjacent secret block adds it alongside FES_POSTGRES_RISK_ALERT_SECRET. No test
+      # depends on this stack; every security test here starts its own container.
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${FES_POSTGRES_BOOTSTRAP_SECRET}
       RISK_ALERT_SERVICE_PASSWORD: ${FES_POSTGRES_RISK_ALERT_SECRET}
+      POSITION_EXPOSURE_SERVICE_PASSWORD: ${FES_POSTGRES_POSITION_EXPOSURE_SECRET}
     healthcheck:
       # sslmode=verify-ca rather than pg_isready: the healthcheck proves the TLS listener works and
       # the CA verifies, not merely that the port is open. PGPASSWORD is required: pg_hba.conf has
