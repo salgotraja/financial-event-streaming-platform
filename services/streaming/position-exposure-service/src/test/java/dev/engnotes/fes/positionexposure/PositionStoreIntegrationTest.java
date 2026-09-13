@@ -1,5 +1,6 @@
 package dev.engnotes.fes.positionexposure;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.Map;
@@ -17,11 +18,13 @@ import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 @SpringBootTest(properties = {
@@ -130,6 +133,70 @@ class PositionStoreIntegrationTest {
                 trade("t-2", "acc-1", "trader-1", "BAJAJ", Side.BUY, 1L, 900.0, at("10:01:00")));
 
         assertThat(position.netQuantity()).isEqualTo(101L);
+    }
+
+    @Test
+    void an_earlier_event_timestamp_delivered_later_does_not_move_last_event_timestamp_backwards() {
+        store.apply(trade("t-1", "acc-1", "trader-1", "ONGC", Side.BUY, 100L, 200.0, at("10:05:00")));
+        store.apply(trade("t-2", "acc-1", "trader-1", "ONGC", Side.BUY, 50L, 200.0, at("10:00:00")));
+
+        Instant lastEventTimestamp = JdbcClient.create(dataSource)
+                .sql("""
+                        SELECT last_event_timestamp FROM position
+                        WHERE account_id = ? AND trader_id = ? AND ticker = ?
+                        """)
+                .params("acc-1", "trader-1", "ONGC")
+                .query(Instant.class)
+                .single();
+
+        assertThat(lastEventTimestamp)
+                .as("records arrive in offset order but eventTimestamp can go backwards; GREATEST holds the max")
+                .isEqualTo(at("10:05:00"));
+    }
+
+    /**
+     * Proves {@code apply} is genuinely transactional. The method inserts a claim row into
+     * {@code position_applied_trade} and only fills in its four pinned figures after the
+     * {@code position} upsert succeeds. If the upsert fails and the claim row survives anyway, a
+     * redelivery would read a pinned row whose figures no statement ever produced, tripping the
+     * null check {@code apply} carries for exactly that case.
+     *
+     * <p>The failure is a genuine PostgreSQL constraint, not a mock: the position this trade would
+     * land on is primed with {@code Long.MAX_VALUE} net_quantity, so the store's own upsert (adding
+     * this trade's quantity to it) overflows the BIGINT column.
+     *
+     * <p>{@code store} is resolved through the Spring context, not constructed with {@code new}: the
+     * {@code @Transactional} annotation is applied by a proxy that only a container-managed bean
+     * carries, and a directly-constructed instance would let the claim insert commit on its own
+     * before the upsert fails.
+     */
+    @Test
+    void a_position_upsert_failure_after_the_claim_insert_rolls_back_the_whole_apply() {
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        jdbc.sql("""
+                        INSERT INTO position
+                            (account_id, trader_id, ticker, net_quantity, gross_buy_quantity,
+                             gross_sell_quantity, market_value, last_event_timestamp, updated_at)
+                        VALUES (?, ?, ?, ?, 0, 0, 0, ?, ?)
+                        """)
+                .params("acc-overflow", "trader-1", "OVERFLOW", Long.MAX_VALUE,
+                        Timestamp.from(at("09:00:00")), Timestamp.from(Instant.now()))
+                .update();
+
+        EnrichedTradeEvent trade = trade(
+                "t-overflow", "acc-overflow", "trader-1", "OVERFLOW", Side.BUY, 1L, 100.0, at("10:00:00"));
+
+        assertThatThrownBy(() -> store.apply(trade))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        long ledgerRows = jdbc.sql("SELECT count(*) FROM position_applied_trade WHERE trade_id = ?")
+                .param("t-overflow")
+                .query(Long.class)
+                .single();
+
+        assertThat(ledgerRows)
+                .as("the claim row must not survive a later statement's failure")
+                .isZero();
     }
 
     private static Instant at(String time) {

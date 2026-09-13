@@ -85,10 +85,13 @@ public class PositionStore {
                             rs.getBigDecimal("market_value_after")))
                     .optional();
 
-            PinnedRow row = pinned.orElseThrow();
-            if (row.netQuantityAfter == null) {
-                throw new IllegalStateException(
-                        "Ledger row for tradeId=" + tradeId + " exists but carries no net_quantity_after");
+            PinnedRow row = pinned.orElseThrow(() -> new IllegalStateException(
+                    "Ledger row for tradeId=" + tradeId + " is missing after a claim of 0 rows"));
+            if (row.netQuantityAfter == null || row.grossBuyAfter == null
+                    || row.grossSellAfter == null || row.marketValueAfter == null) {
+                throw new IllegalStateException("Ledger row for tradeId=" + tradeId
+                        + " exists but carries a null pinned figure; no committed row should carry NULL "
+                        + "in any of the four *_after columns");
             }
             return new Position(accountId, traderId, ticker, row.netQuantityAfter, row.grossBuyAfter,
                     row.grossSellAfter, row.marketValueAfter);
