@@ -46,7 +46,7 @@ trade execution and no regulatory reporting.
 | Service container images, one per module, from buildpacks | Built |
 | Local stack, both profiles, with observability | Built |
 | Risk alerting, governed rule versions into `notifications.alerts` | Built, all four FR-04.2 rules, with `WASH_TRADE_DETECTED` narrowed to self-cross; nothing consumes the alert stream yet |
-| Deterministic streaming: position read model | Not started |
+| Position and exposure read model, `trades.enriched` into `positions.snapshots` | Built, without the rebuild path or the query API; nothing consumes the snapshot stream yet |
 | CDC migration, control plane, agent plane | Not started |
 | Throughput and latency evidence | Not measured |
 

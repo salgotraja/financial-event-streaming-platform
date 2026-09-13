@@ -119,7 +119,15 @@ Bringing it up asserts both halves of least privilege before printing the banner
 
 `fes-postgres` arrived with [the risk alert service](risk-alerts.md#the-position-limit-rule-and-the-state-it-needs)'s
 position state, the first relational store anywhere in the platform. It runs `postgres:16-alpine` on
-`localhost:5432` with database `risk_alert`. That schema now holds seven tables: the position total
+`localhost:5432`. It now backs two services with a schema each (ADR-028): `risk_alert` for the risk
+service and `position_exposure` for [the position read model](positions.md).
+
+**A second database means a second init script, and those have a catch.** PostgreSQL runs the
+scripts in its entrypoint directory only when the data volume is empty, so a developer who already
+has a `postgres-data` volume will not see `position_exposure` appear until they clear that volume
+themselves. No test is affected, because every test starts its own container.
+
+The `risk_alert` schema holds seven tables: the position total
 and its ledger, the rolling trade-quantity window with its prune cutoff and its ledger, and the
 recent-trade table the self-cross rule reads.
 

@@ -9,16 +9,23 @@ the compatibility gate.
 
 ## Phase 2, deterministic streaming
 
-One service remains. [The market cache projector](projector.md) is built and Redis joined the local
-stack with it, [trade enrichment](enrichment.md) is built and reads that cache on every trade, and
-[the risk alert service](risk-alerts.md) is built and reads the enriched stream, so what follows is
-the rest of the queue.
+**Phase 2 is complete.** [The market cache projector](projector.md) is built and Redis joined the
+local stack with it, [trade enrichment](enrichment.md) is built and reads that cache on every trade,
+[the risk alert service](risk-alerts.md) reads the enriched stream, and
+[the position read model](positions.md) reads it too. What follows is what those services still do
+not do.
 
-**position-exposure-service.** An event-driven read model, idempotent by `tradeId` and rebuildable
-from event history (ADR-017). Note that the risk service now keeps a position total of its own, for
-its position-limit rule, in its own schema, alongside a rolling trade-quantity window and a recent-
-trade table for the two rules increment 3 added. The position totals will overlap and nothing
-reconciles them yet.
+**Two of FR-11's five requirements are unmet, and one of them is blocked rather than queued.**
+[The position read model](positions.md) is built and idempotent by `tradeId`, but it cannot yet
+rebuild itself from event history, so FR-11.5's rebuild-and-reconcile is absent and a lost store is
+lost. Its read-only query API (FR-11.4) is blocked on something this platform does not have: the
+requirement asks for authorised risk and compliance *users*, which is human authorisation, and
+ADR-030 puts workforce identity outside this platform's boundary by decision. The data is reachable
+today only by a consumer holding a Kafka grant on `positions.snapshots`.
+
+The risk service keeps a position total of its own as well, for its position-limit rule, narrower on
+purpose: net quantity per trader and ticker, with no account dimension and no market value. The two
+overlap and nothing reconciles them.
 The risk service's own store is deliberately narrower: it holds a net quantity per trader and ticker,
 not the market value or exposure figures FR-11.2 names, and it cannot be rebuilt from Kafka history,
 which is a capability FR-11.5 asks of this service rather than of that one.

@@ -219,6 +219,28 @@ order.
 | Both new rules fire end to end through a real broker, registry and database | `UnusualVolumeRule`, `SelfCrossRule` | `an_outsized_trade_after_a_uniform_window_raises_one_unusual_volume_alert`, `an_offsetting_pair_raises_one_wash_trade_alert_naming_the_first_trade` |
 | Risk alerting cannot write the governance topic, its own input, or join another group | `security/kafka-acls.yml` | `should_deny_writing_the_governed_rule_topic`, `should_deny_writing_the_topic_it_consumes`, `should_deny_joining_a_consumer_group_other_than_its_own`, the first watched failing with a WRITE grant added |
 
+## The position read model
+
+| Behaviour | Implementation | Proof |
+| --- | --- | --- |
+| The grain separates accounts and tickers rather than collapsing them | `PositionStore` | `the_grain_is_the_three_part_position_key`, `the_grain_separates_two_accounts_trading_one_ticker`, `the_grain_separates_one_account_trading_two_tickers` |
+| Buys and sells net, and both add to their own gross total | `PositionStore` | `a_buy_and_a_sell_net_against_each_other_and_both_add_to_gross`, `a_short_position_is_signed_rather_than_clamped` |
+| Market value is the net at the mid price of the trade that moved it | `PositionStore` | `market_value_is_the_net_at_the_mid_price_of_the_trade_that_moved_it` |
+| A trade applied twice moves the position once | `PositionStore` | `a_trade_applied_twice_moves_the_position_once` |
+| A redelivery reproduces every published figure, not just the net | `PositionStore` | `a_redelivery_reproduces_every_figure_the_first_delivery_produced`, `the_ledger_pins_every_figure_the_snapshot_publishes` |
+| A late trade cannot drag the event-time high-water mark backwards | `PositionStore` | `an_earlier_event_timestamp_delivered_later_does_not_move_last_event_timestamp_backwards` |
+| A failure after the claim insert rolls back the whole apply | `PositionStore` | `a_position_upsert_failure_after_the_claim_insert_rolls_back_the_whole_apply` |
+| Market value stays exact numeric, so a future reconciliation compares cleanly | `V1__position_read_model.sql` | `market_value_is_exact_numeric_rather_than_floating_point` |
+| One trade publishes exactly one snapshot, keyed on the position | `PositionSnapshotPublisher` | `one_trade_publishes_exactly_one_snapshot_keyed_on_the_composite_position_key`, `the_record_is_keyed_on_the_composite_position_key` |
+| The snapshot is published before the offset is acknowledged | `EnrichedTradeConsumer` | `the_snapshot_is_published_before_the_offset_is_acknowledged`, `a_metrics_failure_after_a_successful_publish_does_not_prevent_the_acknowledgement` |
+| A replayed trade republishes the same snapshot identity | `PositionSnapshotPublisher` | `the_snapshot_id_is_derived_so_a_replay_republishes_the_same_identity`, `the_snapshot_carries_the_position_and_the_trade_that_produced_it` |
+| The listener joins the configured group, not one named after its id | `EnrichedTradeConsumer` | `the_listener_id_does_not_override_the_configured_consumer_group` |
+| A poison record is quarantined and the record behind it still applies | `PositionExposureKafkaConfiguration` | `a_malformed_record_is_quarantined_and_the_record_behind_it_is_still_applied`, `a_null_valued_record_is_rejected_without_calling_the_store` |
+| A database outage pauses rather than dead-lettering, however deeply wrapped | `PositionExposureKafkaConfiguration` | `should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`, `an_outage_wrapped_several_causes_deep_is_still_recognised`, `any_other_failure_keeps_the_bounded_poison_back_off` |
+| The read model cannot write its own input or read its own output | `security/kafka-acls.yml` | `should_deny_writing_the_topic_it_consumes`, `should_deny_reading_the_topic_it_writes`, `should_deny_joining_a_consumer_group_other_than_its_own` |
+| Its database role holds no privilege beyond its own schema | `init-position-exposure-role.sql` | `the_position_exposure_service_role_holds_no_superuser_createrole_or_createdb_privilege`, `the_role_cannot_create_a_table_in_the_public_schema` |
+| TLS is required, and the bootstrap superuser has no network route | `pg_hba.conf` | `a_plaintext_connection_is_rejected_by_the_tls_only_listener`, `a_tls_connection_verified_against_the_ca_succeeds`, `the_bootstrap_superuser_cannot_connect_over_the_network_at_all` |
+
 ## Structure
 
 | Behaviour | Implementation | Proof |
