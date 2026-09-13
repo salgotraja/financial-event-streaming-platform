@@ -1,6 +1,7 @@
 package dev.engnotes.fes.positionexposure;
 
 import java.util.List;
+import java.util.Map;
 import javax.sql.DataSource;
 
 import dev.engnotes.fes.testing.PostgresStack;
@@ -88,5 +89,30 @@ class PositionSchemaIntegrationTest {
                 .list();
 
         assertThat(key).containsExactly("account_id", "trader_id", "ticker");
+    }
+
+    @Test
+    void market_value_is_exact_numeric_rather_than_floating_point() {
+        // FR-11.5's reconciliation compares this column between a live and a rebuilt model.
+        // DOUBLE PRECISION would let binary floating-point error make two equal positions compare
+        // unequal; NUMERIC(19,4) keeps the comparison exact. Pinning row count as well as content
+        // means dropping either column from the query's scope cannot leave this trivially true.
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+
+        List<Map<String, Object>> columns = jdbc.sql("""
+                        SELECT table_name, column_name, data_type, numeric_precision, numeric_scale
+                        FROM information_schema.columns
+                        WHERE table_schema = current_schema()
+                          AND ((table_name = 'position' AND column_name = 'market_value')
+                            OR (table_name = 'position_applied_trade' AND column_name = 'market_value_after'))
+                        ORDER BY table_name, column_name
+                        """)
+                .query()
+                .listOfRows();
+
+        assertThat(columns).hasSize(2);
+        assertThat(columns).extracting(row -> row.get("data_type")).containsOnly("numeric");
+        assertThat(columns).extracting(row -> row.get("numeric_precision")).containsOnly(19);
+        assertThat(columns).extracting(row -> row.get("numeric_scale")).containsOnly(4);
     }
 }
