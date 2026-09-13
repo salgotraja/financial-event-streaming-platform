@@ -103,6 +103,21 @@ class PositionFlywayLeastPrivilegeIntegrationTest {
                             + "position_exposure schema under the least-privilege role, not public")
                     .containsExactlyInAnyOrder("flyway_schema_history", "position", "position_applied_trade");
         }
+
+        try (Connection connection = connect(url);
+                ResultSet result = connection.createStatement().executeQuery(
+                        "SELECT table_name FROM information_schema.tables "
+                                + "WHERE table_schema = 'public' AND table_name IN "
+                                + "('flyway_schema_history', 'position', 'position_applied_trade')")) {
+            List<String> tablesInPublic = new ArrayList<>();
+            while (result.next()) {
+                tablesInPublic.add(result.getString("table_name"));
+            }
+
+            assertThat(tablesInPublic)
+                    .as("none of the migration's tables may also exist in the public schema")
+                    .isEmpty();
+        }
     }
 
     private static Connection connect(String url) throws Exception {

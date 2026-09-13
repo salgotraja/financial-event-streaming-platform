@@ -1,17 +1,20 @@
--- Least-privilege role for position-exposure-service in the strict-security profile.
+-- Least-privilege role for position-exposure-service, used in both the dev and strict-security
+-- profiles: unlike init-risk-alert-role.sql, this script is not strict-security-only.
 --
 -- position-exposure-service shares the same PostgreSQL instance as risk-alert-service (ADR-028):
 -- one server, one schema per service. POSTGRES_DB only creates a single database at initdb time,
 -- and that database is risk_alert's, so unlike init-risk-alert-role.sql this script also has to
 -- create the position_exposure database itself, not just its role and schema.
 --
--- The dev profile runs the service as the database superuser, which is fine for a local stack and
--- wrong for anything modelling a cloud deployment. Here the service owns its schema and nothing
--- else: no CREATEDB, no CREATEROLE, no access to any other schema (ADR-028, ADR-030). The database
--- itself stays owned by the bootstrap role rather than by position_exposure_service: owning the
--- database would make position_exposure_service the owner of its own public schema too (PostgreSQL
--- 15+ owns public via pg_database_owner), which would grant CREATE there and contradict "no access
--- to any other schema".
+-- Unlike risk-alert-service, position-exposure-service never runs as the database superuser even
+-- in the dev profile: the dev postgres service's POSTGRES_USER stays risk_alert_service (see
+-- docker-compose.yml), so this role and its restrictions apply in both profiles, and the strict
+-- overlay's only addition on top of the dev profile is TLS enforcement, not the role separation
+-- itself. The service owns its schema and nothing else: no CREATEDB, no CREATEROLE, no access to
+-- any other schema (ADR-028, ADR-030). The database itself stays owned by the bootstrap role
+-- rather than by position_exposure_service: owning the database would make position_exposure_service
+-- the owner of its own public schema too (PostgreSQL 15+ owns public via pg_database_owner), which
+-- would grant CREATE there and contradict "no access to any other schema".
 --
 -- POSTGRES_USER in the strict overlay is "postgres", not "position_exposure_service" (see
 -- docker-compose.strict-security.yml): PostgreSQL bootstraps whatever POSTGRES_USER names as the

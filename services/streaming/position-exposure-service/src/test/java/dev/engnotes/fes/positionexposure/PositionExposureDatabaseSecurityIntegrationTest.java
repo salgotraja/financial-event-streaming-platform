@@ -173,8 +173,9 @@ class PositionExposureDatabaseSecurityIntegrationTest {
 
     @Test
     void the_bootstrap_superuser_cannot_connect_over_the_network_at_all() {
-        // pg_hba.conf grants "postgres" no line of any kind: only position_exposure_service has a
-        // hostssl entry, and the bootstrap role's own init-time work happens over the local socket.
+        // pg_hba.conf grants "postgres" no line of any kind: neither hostssl line (risk_alert's or
+        // position_exposure's) matches the postgres role, so the implicit final deny rejects it,
+        // and the bootstrap role's own init-time work happens over the local socket instead.
         assertThatThrownBy(() ->
                 connect("sslmode=verify-ca&sslrootcert=" + caCert, "postgres", BOOTSTRAP_PASSWORD))
                 .as("the bootstrap superuser must have no route in from the network")
