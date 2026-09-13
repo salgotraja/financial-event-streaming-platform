@@ -37,12 +37,3 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-// Task 1 adds no business logic and therefore no unit test; PositionExposureServiceAuthorizationTest
-// is the only test class and it matches the root project's *AuthorizationTest integration-test
-// pattern, so the unit `test` task would otherwise fail with "No tests found for given includes".
-// Remove this override in the task that adds the first unit test.
-tasks.named('test') {
-    filter {
-        failOnNoMatchingTests = false
-    }
-}
