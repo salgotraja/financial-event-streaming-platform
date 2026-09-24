@@ -238,8 +238,10 @@ order.
 | A replayed trade republishes the same snapshot identity | `PositionSnapshotPublisher` | `the_snapshot_id_is_derived_so_a_replay_republishes_the_same_identity`, `the_snapshot_carries_the_position_and_the_trade_that_produced_it` |
 | The listener joins the configured group, not one named after its id | `EnrichedTradeConsumer` | `the_listener_id_does_not_override_the_configured_consumer_group` |
 | A poison record is quarantined and the record behind it still applies | `PositionExposureKafkaConfiguration` | `a_malformed_record_is_quarantined_and_the_record_behind_it_is_still_applied`, `a_null_valued_record_is_rejected_without_calling_the_store` |
+| A trade carrying the key separator is quarantined before its position moves | `EnrichedTradeConsumer` | `a_trade_carrying_the_key_separator_is_rejected_before_the_position_moves`, `a_trade_carrying_the_key_separator_is_quarantined_without_moving_its_position` |
+| An id longer than its column is quarantined rather than pausing the container | `V1__position_read_model.sql` | `a_trade_id_longer_than_its_column_is_quarantined_rather_than_pausing_the_container` |
 | A database outage pauses rather than dead-lettering, however deeply wrapped | `PositionExposureKafkaConfiguration` | `should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`, `an_outage_wrapped_several_causes_deep_is_still_recognised`, `any_other_failure_keeps_the_bounded_poison_back_off`, `a_pool_timeout_at_transaction_begin_pauses_rather_than_quarantining`, `a_connection_lost_mid_statement_pauses_rather_than_quarantining` |
-| A failed snapshot publish pauses rather than dead-lettering an applied trade | `PositionSnapshotPublisher` | `a_failed_snapshot_publish_pauses_and_retries_rather_than_dead_lettering_an_applied_trade`, `a_failed_snapshot_publish_pauses_rather_than_quarantining_an_applied_trade`, `a_snapshot_that_cannot_be_built_stays_a_payload_verdict_rather_than_a_publish_failure` |
+| A failed snapshot publish pauses rather than dead-lettering an applied trade | `PositionSnapshotPublisher` | `a_failed_snapshot_publish_pauses_and_retries_rather_than_dead_lettering_an_applied_trade`, `a_failed_snapshot_publish_pauses_rather_than_quarantining_an_applied_trade`, `a_separator_reaching_the_publisher_is_rejected_before_the_send_rather_than_wrapped_as_a_publish_failure` |
 | The read model cannot write its own input or read its own output | `security/kafka-acls.yml` | `should_deny_writing_the_topic_it_consumes`, `should_deny_reading_the_topic_it_writes`, `should_deny_joining_a_consumer_group_other_than_its_own` |
 | Its database role holds no privilege beyond its own schema | `init-position-exposure-role.sql` | `the_position_exposure_service_role_holds_no_superuser_createrole_or_createdb_privilege`, `the_role_cannot_create_a_table_in_the_public_schema` |
 | TLS is required, and the bootstrap superuser has no network route | `pg_hba.conf` | `a_plaintext_connection_is_rejected_by_the_tls_only_listener`, `a_tls_connection_verified_against_the_ca_succeeds`, `the_bootstrap_superuser_cannot_connect_over_the_network_at_all` |
@@ -258,5 +260,8 @@ order.
 Anything that would need a service or path that does not exist: read-model rebuild, the agent tool boundary,
 sustained throughput, and evidence integrity end to end. Enrichment and risk evaluation now have
 behavioural proof but no latency proof: no run has measured either against its budget.
-Dependency failure has two proofs now, on the projector's Redis connection and on the risk service's PostgreSQL connection. Those rows appear in `.claude/rules/testing.md` as required
-categories and are waiting on their subjects.
+Dependency failure has five proofs now: the projector's and the enrichment service's Redis
+connections, the risk service's PostgreSQL connection, and the position read model's PostgreSQL
+connection (`PostgresOutageIntegrationTest`) and snapshot publish (`SnapshotPublishOutageIntegrationTest`).
+The remaining gaps are required test categories, listed under [Build gates](gates.md#required-coverage-by-category), and wait on
+their subjects.

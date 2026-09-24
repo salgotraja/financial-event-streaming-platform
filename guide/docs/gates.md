@@ -152,8 +152,8 @@ A running Docker daemon is required.
 
 ## Required coverage by category
 
-From `.claude/rules/testing.md`. These follow from the requirements and are not optional for a module
-to be considered complete:
+These categories follow from the requirements and are not optional for a module to be considered
+complete:
 
 | Category | What it must show |
 | --- | --- |

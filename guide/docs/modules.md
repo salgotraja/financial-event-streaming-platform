@@ -113,7 +113,7 @@ requirement on the last of them is met.
 
 ## Layering inside a service
 
-The rules in `.claude/rules/architecture.md` are short and mechanical:
+The layering rules are short and mechanical:
 
 - **Consumer**: deserialise, delegate to a service, manage acknowledgement and the DLQ path. No
   business logic. `AuditRecordConsumer` is two statements long for this reason.

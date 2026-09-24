@@ -25,11 +25,10 @@ the route is the OIDC control plane listed under Phase 3 below (ADR-011). The da
 today only by a consumer holding a Kafka grant on `positions.snapshots`.
 
 The risk service keeps a position total of its own as well, for its position-limit rule, narrower on
-purpose: net quantity per trader and ticker, with no account dimension and no market value. The two
-overlap and nothing reconciles them.
-The risk service's own store is deliberately narrower: it holds a net quantity per trader and ticker,
-not the market value or exposure figures FR-11.2 names, and it cannot be rebuilt from Kafka history,
-which is a capability FR-11.5 asks of this service rather than of that one.
+purpose: net quantity per trader and ticker, with no account dimension and none of the market value or
+exposure figures FR-11.2 names. It cannot be rebuilt from Kafka history either, a capability FR-11.5
+asks of the position read model rather than of the risk service. The two overlap and nothing
+reconciles them.
 
 All four of the rules FR-04.2 names now exist, but one of them is narrower than the requirement.
 `WASH_TRADE_DETECTED` detects a trader crossing themselves, not related-party wash trading:
