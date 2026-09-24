@@ -41,8 +41,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Proves ADR-027's two failure classes end to end, against a real broker and the real container
  * registry: a poison record is quarantined and the record behind it on the same partition still
- * gets applied, a null-valued record is quarantined on the first attempt, and a trade carrying the
- * key separator is quarantined without moving its position.
+ * gets applied, a null-valued record is quarantined on the first attempt, a trade carrying the
+ * key separator is quarantined without moving its position, and a trade whose id overruns its column
+ * is quarantined rather than pausing the container.
  *
  * <p>Both tests share one {@code TRADE_TOPIC} and {@code DLQ_TOPIC}: {@code @DynamicPropertySource}
  * runs once for the whole class, before the one shared context starts, so a per-method topic is not
@@ -210,6 +211,35 @@ class QuarantineIntegrationTest {
                 .query(Long.class)
                 .single())
                 .as("a separator-bearing trade must not create or move a position")
+                .isZero();
+    }
+
+    @Test
+    void a_trade_id_longer_than_its_column_is_quarantined_rather_than_pausing_the_container() {
+        // position_applied_trade.trade_id is VARCHAR(64). The overrun is SQLState 22001, which
+        // Spring translates to DataIntegrityViolationException: a verdict on the record, not the
+        // database being unavailable, so it must take the bounded poison path to the DLQ. The column
+        // bound is what turns an absurd id into that verdict.
+        String overLength = "T-" + "X".repeat(63);
+        try (KafkaProducer<String, EnrichedTradeEvent> producer = PositionExposureTestKafka.producer();
+             KafkaConsumer<String, DeadLetterEvent> dlq = dlqConsumer()) {
+
+            producer.send(new ProducerRecord<>(TRADE_TOPIC, "OVERLENGTH",
+                    PositionExposureTestKafka.trade(overLength, "acc-1", "trader-1", "OVERLENGTH",
+                            Side.BUY, 10L, 100.0, Instant.ofEpochMilli(1_000L))));
+            producer.flush();
+
+            DeadLetterEvent quarantined =
+                    quarantinedRecordFor(dlq, "OVERLENGTH", Duration.ofSeconds(30));
+            assertThat(quarantined.getOriginalTopic()).hasToString(TRADE_TOPIC);
+        }
+
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        assertThat(jdbc.sql("SELECT count(*) FROM position WHERE ticker = ?")
+                .param("OVERLENGTH")
+                .query(Long.class)
+                .single())
+                .as("the failed claim insert rolls back the whole apply")
                 .isZero();
     }
 }

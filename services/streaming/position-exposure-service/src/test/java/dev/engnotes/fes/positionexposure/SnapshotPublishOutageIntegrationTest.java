@@ -126,12 +126,19 @@ class SnapshotPublishOutageIntegrationTest {
             assertThat(published.getFirst().value().getLastProcessedTradeId()).hasToString("T-PUB-OUTAGE-1");
         }
 
-        assertThat(JdbcClient.create(dataSource)
-                .sql("SELECT count(*) FROM position_applied_trade WHERE trade_id = ?")
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        assertThat(jdbc.sql("SELECT count(*) FROM position_applied_trade WHERE trade_id = ?")
                 .param("T-PUB-OUTAGE-1")
                 .query(Long.class)
                 .single())
-                .as("every retry re-ran the apply, and the ledger claim kept it to one application")
+                .as("the trade was applied and its ledger row committed; the primary key bounds it to one")
                 .isEqualTo(1L);
+        assertThat(jdbc.sql("SELECT net_quantity FROM position"
+                        + " WHERE account_id = ? AND trader_id = ? AND ticker = ?")
+                .params("acc-1", "trader-1", "PUB-OUTAGE")
+                .query(Long.class)
+                .single())
+                .as("every retry re-ran the apply, and the ledger claim kept the net to one application")
+                .isEqualTo(10L);
     }
 }
