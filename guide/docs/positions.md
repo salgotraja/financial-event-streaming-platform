@@ -101,14 +101,29 @@ order inverted, a crash between acknowledging and publishing would lose a snapsh
 already committed, and nothing would replay it.
 `the_snapshot_is_published_before_the_offset_is_acknowledged` fails if the two are swapped.
 
-The record key is `accountId|traderId|ticker`, the composite position key, not the ticker the input
-topic uses. Keying on ticker would put unrelated positions' snapshots on one partition with no
-ordering between them, and a consumer folding the topic would be at the mercy of interleaving.
-`the_record_is_keyed_on_the_composite_position_key` holds it.
+The record key is per position, not the ticker the input topic uses. Keying on ticker would put
+unrelated positions' snapshots on one partition with no ordering between them, and a consumer folding
+the topic would be at the mercy of interleaving. The key is not the three fields in clear either: it
+is `IdempotencyKeys.deterministic(accountId, traderId, ticker)`, a name-based UUID. `accountId` and
+`traderId` are marked `RESTRICTED` in `PositionSnapshotEvent.avsc`, and a record key is what Kafka
+tooling, logs and the dead-letter topic print. The hash is deterministic, so one position's snapshots
+still share a partition and stay in order. It keeps the raw values out of the key and nothing more: it
+is not a secret, and the snapshot body still carries both fields.
+`the_record_is_keyed_on_a_hash_of_the_composite_position_key` holds it, including that neither raw
+value appears in the key.
+
+The snapshot carries the consumed record's `traceparent`, `tracestate` and `correlationId` headers,
+copied as `RiskAlertPublisher` copies them, so a trace survives the hop without anyone deserialising the
+body. A header absent on the trade is not invented on the snapshot:
+`the_trace_headers_of_the_consumed_record_are_copied_onto_the_snapshot` and
+`an_absent_trace_header_is_not_invented_on_the_snapshot`.
 
 `asOf` is the trade's event time and `snapshotId` is derived from the trade and the position key, so a
 replayed trade republishes an identical snapshot rather than a new one:
 `the_snapshot_id_is_derived_so_a_replay_republishes_the_same_identity`.
+`the_same_trade_delivered_twice_applies_once_and_republishes_an_identical_snapshot` holds the whole
+path against a real broker and database: the same trade produced twice leaves one ledger row, a net
+that reflects one application, and two snapshots with the same `snapshotId` and the same figures.
 
 **Snapshot volume equals trade volume.** Every trade produces one. That is the simplest thing that
 satisfies the requirement, and with nothing consuming the topic yet there is no evidence on which to

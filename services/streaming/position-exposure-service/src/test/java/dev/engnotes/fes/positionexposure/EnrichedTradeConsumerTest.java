@@ -1,7 +1,10 @@
 package dev.engnotes.fes.positionexposure;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import dev.engnotes.fes.events.EnrichedTradeEvent;
@@ -14,9 +17,12 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -78,11 +84,11 @@ class EnrichedTradeConsumerTest {
         ConsumerRecord<String, EnrichedTradeEvent> record = record();
         when(store.apply(record.value())).thenReturn(position());
 
-        java.util.List<String> callOrder = new java.util.ArrayList<>();
+        List<String> callOrder = new ArrayList<>();
         doAnswer(invocation -> {
             callOrder.add("publish");
             return null;
-        }).when(publisher).publish(position(), record.value());
+        }).when(publisher).publish(record, position());
         doAnswer(invocation -> {
             callOrder.add("acknowledge");
             return null;
@@ -106,7 +112,7 @@ class EnrichedTradeConsumerTest {
 
         // By the time metrics runs, the snapshot is already on the topic, so letting this propagate
         // would redeliver a trade whose snapshot already went out.
-        verify(publisher, times(1)).publish(position(), record.value());
+        verify(publisher, times(1)).publish(record, position());
         verify(acknowledgment).acknowledge();
     }
 
@@ -115,19 +121,18 @@ class EnrichedTradeConsumerTest {
         ConsumerRecord<String, EnrichedTradeEvent> nullValued =
                 new ConsumerRecord<>("trades.enriched", 0, 0L, "RELIANCE", null);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> consumer.consume(nullValued, acknowledgment))
+        assertThatThrownBy(() -> consumer.consume(nullValued, acknowledgment))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        verify(publisher, never()).publish(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(publisher, never()).publish(any(), any());
         verify(acknowledgment, never()).acknowledge();
     }
 
     @Test
     void the_listener_id_does_not_override_the_configured_consumer_group() throws Exception {
-        java.lang.reflect.Method consume = EnrichedTradeConsumer.class.getMethod(
+        Method consume = EnrichedTradeConsumer.class.getMethod(
                 "consume", ConsumerRecord.class, Acknowledgment.class);
-        org.springframework.kafka.annotation.KafkaListener listener =
-                consume.getAnnotation(org.springframework.kafka.annotation.KafkaListener.class);
+        KafkaListener listener = consume.getAnnotation(KafkaListener.class);
 
         // Spring Kafka's idIsGroup defaults to true, and an explicit id silently becomes the group.
         // trade-enrichment-service shipped exactly that bug and every functional test passed.

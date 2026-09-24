@@ -18,7 +18,7 @@ Source: `deploy/compose/topics.tsv`. Replication is 3 for every topic, matching
 | `market-data.ticks` | 12 | 1 day | ticker | written by `market-data-simulator`, read by `audit-service` and `market-data-cache-projector` |
 | `corporate-actions` | 6 | 30 days | ticker | written by `corporate-action-producer`, read by `audit-service` |
 | `reference-data.instruments` | 6 | compacted | instrumentId | written by `reference-data-service`, read by `audit-service` and `trade-enrichment-service` |
-| `positions.snapshots` | 12 | 7 days | `accountId\|traderId\|ticker` | written by `position-exposure-service` |
+| `positions.snapshots` | 12 | 7 days | hash of accountId, traderId, ticker | written by `position-exposure-service` |
 | `notifications.alerts` | 6 | 3 days | ticker | written by `risk-alert-service` |
 | `risk-rules.events` | 6 | 365 days | ruleId | read by `risk-alert-service`, written by nothing yet |
 | `alert-cases.events` | 6 | 365 days | | no |

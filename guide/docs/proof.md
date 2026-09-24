@@ -231,7 +231,9 @@ order.
 | A late trade cannot drag the event-time high-water mark backwards | `PositionStore` | `an_earlier_event_timestamp_delivered_later_does_not_move_last_event_timestamp_backwards` |
 | A failure after the claim insert rolls back the whole apply | `PositionStore` | `a_position_upsert_failure_after_the_claim_insert_rolls_back_the_whole_apply` |
 | Market value stays exact numeric, so a future reconciliation compares cleanly | `V1__position_read_model.sql` | `market_value_is_exact_numeric_rather_than_floating_point` |
-| One trade publishes exactly one snapshot, keyed on the position | `PositionSnapshotPublisher` | `one_trade_publishes_exactly_one_snapshot_keyed_on_the_composite_position_key`, `the_record_is_keyed_on_the_composite_position_key` |
+| One trade publishes exactly one snapshot, keyed on a hash of the position | `PositionSnapshotPublisher` | `one_trade_publishes_exactly_one_snapshot_keyed_on_a_hash_of_the_position_key`, `the_record_is_keyed_on_a_hash_of_the_composite_position_key` |
+| The snapshot carries the consumed record's trace headers, and invents none | `PositionSnapshotPublisher` | `the_trace_headers_of_the_consumed_record_are_copied_onto_the_snapshot`, `an_absent_trace_header_is_not_invented_on_the_snapshot` |
+| The same trade delivered twice applies once and republishes an identical snapshot | `EnrichedTradeConsumer` | `the_same_trade_delivered_twice_applies_once_and_republishes_an_identical_snapshot` against a real broker |
 | The snapshot is published before the offset is acknowledged | `EnrichedTradeConsumer` | `the_snapshot_is_published_before_the_offset_is_acknowledged`, `a_metrics_failure_after_a_successful_publish_does_not_prevent_the_acknowledgement` |
 | A replayed trade republishes the same snapshot identity | `PositionSnapshotPublisher` | `the_snapshot_id_is_derived_so_a_replay_republishes_the_same_identity`, `the_snapshot_carries_the_position_and_the_trade_that_produced_it` |
 | The listener joins the configured group, not one named after its id | `EnrichedTradeConsumer` | `the_listener_id_does_not_override_the_configured_consumer_group` |

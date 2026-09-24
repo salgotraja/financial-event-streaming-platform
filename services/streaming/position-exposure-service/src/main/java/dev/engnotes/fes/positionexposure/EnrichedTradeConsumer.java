@@ -43,7 +43,8 @@ public class EnrichedTradeConsumer {
         this.metrics = metrics;
     }
 
-    // idIsGroup = false, for the reason spelled out in EnrichedTradeConsumerGroupIdTest.
+    // idIsGroup = false, for the reason spelled out in
+    // EnrichedTradeConsumerTest.the_listener_id_does_not_override_the_configured_consumer_group.
     @KafkaListener(id = LISTENER_ID,
             idIsGroup = false,
             topics = "${fes.position-exposure-service.topic}")
@@ -61,7 +62,7 @@ public class EnrichedTradeConsumer {
 
         EnrichedTradeEvent trade = record.value();
         Position position = store.apply(trade);
-        publisher.publish(position, trade);
+        publisher.publish(record, position);
 
         try {
             metrics.recordSnapshot();
