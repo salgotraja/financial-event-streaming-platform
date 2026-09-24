@@ -47,7 +47,15 @@ import org.springframework.util.backoff.FixedBackOff;
  * {@code RiskAlertKafkaConfiguration}'s; the outage classification is wider than that service's,
  * which matches only a failure to get a connection and a statement timeout. Two dependencies qualify. PostgreSQL is out
  * when the store cannot get or keep a connection: a pool timeout at transaction begin, a connection
- * lost mid-statement, or a statement timeout. The snapshot topic is out when the send fails, as a
+ * lost mid-statement, or a statement timeout. Matching {@link DataAccessResourceFailureException}
+ * is wider than connection loss: Spring's SQLState translation produces it for classes 53
+ * (insufficient resources), 54 (program limit exceeded), 57 (operator intervention) and 58 (system
+ * error) as well as 08. Those pause too. Class 53, such as a full disk, is an outage in fact. A
+ * record able to provoke a class 54 limit would pause the partition rather than be quarantined; that
+ * is accepted rather than narrowed, because a narrower match risks dead-lettering good trades during
+ * a real outage. Record-caused failures the schema can bound are bounded there instead: an id
+ * longer than its column is SQLState 22001, a {@code DataIntegrityViolationException}, and takes the
+ * poison path. The snapshot topic is out when the send fails, as a
  * {@link SnapshotPublishException}: the trade is already applied by then, so the failure says nothing
  * about the trade. For either, the back-off function returns an unlimited-attempt back-off, so the
  * recoverer is never reached. The handler is given a {@link ContainerPausingBackOffHandler} rather
@@ -140,7 +148,8 @@ public class PositionExposureKafkaConfiguration {
             // is @Transactional, so a pool timeout surfaces at transaction begin as
             // CannotCreateTransactionException, not CannotGetJdbcConnectionException. A connection
             // lost mid-statement is translated to DataAccessResourceFailureException (SQLState class
-            // 08), which also covers CannotGetJdbcConnectionException; a statement timeout to
+            // 08, though classes 53, 54, 57 and 58 translate to it too, see the class javadoc),
+            // which also covers CannotGetJdbcConnectionException; a statement timeout to
             // QueryTimeoutException. The java.sql types and the 08 class catch the same failures
             // when they arrive untranslated. A SnapshotPublishException is the snapshot topic's
             // outage: the trade is already applied and is not at fault.

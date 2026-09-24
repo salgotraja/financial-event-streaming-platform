@@ -143,7 +143,17 @@ pauses the listener container instead of dead-lettering a trade the service simp
 Because the apply is `@Transactional`, a pool timeout arrives as `CannotCreateTransactionException` at
 transaction begin, and a connection lost mid-statement as `DataAccessResourceFailureException`, so the
 classifier matches those, a statement timeout, and any `SQLException` in SQLState class `08`, anywhere
-in the cause chain. `should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`
+in the cause chain.
+
+Matching `DataAccessResourceFailureException` reaches further than connection loss. Spring's SQLState
+translation produces it for classes `53` (insufficient resources), `54` (program limit exceeded), `57`
+(operator intervention) and `58` (system error) as well as `08`, and all of those pause the container.
+A full disk is an outage in fact, but a record able to provoke a class `54` limit would pause its
+partition rather than be quarantined. That is accepted rather than narrowed, because a narrower match
+risks dead-lettering good trades during a real outage. The schema bounds the record-caused failures it
+can instead: an id longer than its `VARCHAR` column is SQLState `22001`, which Spring translates to
+`DataIntegrityViolationException`, and that takes the poison path to the dead-letter topic with nothing
+applied: `a_trade_id_longer_than_its_column_is_quarantined_rather_than_pausing_the_container`. `should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`
 holds PostgreSQL paused for well past the poison budget and watches the DLQ for the whole window,
 because every back-off pauses the container and a paused container alone proves nothing about which
 class the failure was put in.
