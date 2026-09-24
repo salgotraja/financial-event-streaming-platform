@@ -3,7 +3,7 @@
 Everything on this page exists as a design decision, a requirement, or an Avro schema, and has no
 implementation in the repository. It is here so the rest of the guide can stay free of plans.
 
-The one thing on this page you *can* open today is the schema set: eight of the sixteen files in
+The one thing on this page you *can* open today is the schema set: seven of the sixteen files in
 `contracts/src/main/avro/` are contracts for services that do not exist yet, and they are already under
 the compatibility gate.
 
@@ -18,9 +18,10 @@ not do.
 **Two of FR-11's five requirements are unmet, and one of them is blocked rather than queued.**
 [The position read model](positions.md) is built and idempotent by `tradeId`, but it cannot yet
 rebuild itself from event history, so FR-11.5's rebuild-and-reconcile is absent and a lost store is
-lost. Its read-only query API (FR-11.4) is blocked on something this platform does not have: the
-requirement asks for authorised risk and compliance *users*, which is human authorisation, and
-ADR-030 puts workforce identity outside this platform's boundary by decision. The data is reachable
+lost. Its read-only query API (FR-11.4) is sequenced after rebuild and blocked on something this
+platform does not have yet: the requirement asks for authorised risk and compliance *users*, which is
+human authorisation. ADR-030 puts workforce identity outside this platform's boundary by decision, so
+the route is the OIDC control plane listed under Phase 3 below (ADR-011). The data is reachable
 today only by a consumer holding a Kafka grant on `positions.snapshots`.
 
 The risk service keeps a position total of its own as well, for its position-limit rule, narrower on

@@ -26,7 +26,7 @@ was the right choice and what it costs.
 
 **It is not queryable over HTTP.** FR-11.4 asks for a read-only API for authorised risk and compliance
 users, and no such API exists yet. It is sequenced for a later increment, after rebuild, and gated on
-an authorisation story the platform does not have, explained under
+human authentication the platform does not have yet, explained under
 [What this does not prove](#what-this-does-not-prove).
 
 ## The grain, and why the upsert is safe
@@ -200,10 +200,11 @@ every sibling streaming service.
   full rebuild needs a longer-lived source, which ADR-038 leaves to the rebuild increment to choose.
 - **There is no query API yet.** FR-11.4 asks for a read-only API for authorised risk and compliance
   users. ADR-038 sequences it as the third increment, after rebuild, and it waits on more than effort:
-  that is human authorisation, and ADR-030 puts workforce identity outside this platform by decision
-  rather than by omission. Building the endpoint without an authorisation story would mean serving
-  `traderId` and `accountId`, both marked RESTRICTED in the schemas, with no control in front of them.
-  The data is reachable today only through a Kafka grant on `positions.snapshots`.
+  "authorised users" is human authorisation, and ADR-030 excludes workforce identity by decision, so
+  the only route to it is the OIDC control plane with its operator roles (ADR-011), which is not built
+  yet. Building the endpoint before that would mean serving `traderId` and `accountId`, both marked
+  RESTRICTED in the schemas, with no control in front of them. The data is reachable today only
+  through a Kafka grant on `positions.snapshots`.
 - **Realised and unrealised exposure are absent.** FR-11.2 asks for them "where applicable". Both need
   a cost basis, and FIFO versus average cost is an accounting policy that nothing in this platform has
   chosen. Picking one silently would present an unmade accounting decision as a derived fact.
