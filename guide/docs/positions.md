@@ -131,7 +131,9 @@ tune a material-change threshold, so none was added.
 
 ## Failure handling
 
-Unchanged from the rest of the streaming plane, which is the point rather than an omission. A
+The dead-letter and pausing mechanics are the streaming plane's shared ones. What counts as an outage
+is wider here than in `risk-alert-service`: it also covers the transaction-begin and mid-statement
+connection failures below, any SQLState class `08` failure, and a failed snapshot publish. A
 malformed record is quarantined per record to `trades.enriched.dlq` after the shared bounded retry,
 and the record behind it is still applied:
 `a_malformed_record_is_quarantined_and_the_record_behind_it_is_still_applied`. A database outage

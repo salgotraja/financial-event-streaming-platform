@@ -43,7 +43,9 @@ import org.springframework.util.backoff.FixedBackOff;
  * not decode differently on a second attempt.
  *
  * <p><strong>A dependency outage pauses the container</strong> rather than dead-lettering a good
- * trade, following {@code RiskAlertKafkaConfiguration}. Two dependencies qualify. PostgreSQL is out
+ * trade. The pausing mechanics and the dead-letter path are the same as
+ * {@code RiskAlertKafkaConfiguration}'s; the outage classification is wider than that service's,
+ * which matches only a failure to get a connection and a statement timeout. Two dependencies qualify. PostgreSQL is out
  * when the store cannot get or keep a connection: a pool timeout at transaction begin, a connection
  * lost mid-statement, or a statement timeout. The snapshot topic is out when the send fails, as a
  * {@link SnapshotPublishException}: the trade is already applied by then, so the failure says nothing
