@@ -3,7 +3,8 @@ plugins {
     id 'org.springframework.boot'
 }
 
-// ADR-017: a CQRS-style read model, idempotent by tradeId, rebuildable from event history.
+// ADR-017: a CQRS-style read model, idempotent by tradeId, designed to be rebuilt from event
+// history. The rebuild path (FR-11.5) lands in increment 2 and does not exist yet.
 // ADR-019: at-least-once, so snapshotId is derived deterministically rather than randomly.
 // ADR-027: per-record quarantine to trades.enriched.dlq, no event-type-wide breaker.
 // ADR-038: the grain is (accountId, traderId, ticker) and marketValue is mark-to-last-trade.

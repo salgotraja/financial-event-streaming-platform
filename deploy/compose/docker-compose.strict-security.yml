@@ -138,11 +138,9 @@ services:
       # later pg_hba.conf edit that gave any one of these roles a wider network route would then
       # also grant that route under a credential already handled as another role's.
       #
-      # FES_POSTGRES_POSITION_EXPOSURE_SECRET is not yet emitted by
-      # scripts/generate-dev-security-material.sh, which is outside this change's scope: bringing up
-      # this overlay today leaves POSITION_EXPOSURE_SERVICE_PASSWORD empty until that script's
-      # PRINCIPALS-adjacent secret block adds it alongside FES_POSTGRES_RISK_ALERT_SECRET. No test
-      # depends on this stack; every security test here starts its own container.
+      # All three come from deploy/compose/.env, which scripts/generate-dev-security-material.sh
+      # writes, FES_POSTGRES_POSITION_EXPOSURE_SECRET alongside FES_POSTGRES_RISK_ALERT_SECRET. No
+      # test depends on this stack; every security test here starts its own container.
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${FES_POSTGRES_BOOTSTRAP_SECRET}
       RISK_ALERT_SERVICE_PASSWORD: ${FES_POSTGRES_RISK_ALERT_SECRET}
