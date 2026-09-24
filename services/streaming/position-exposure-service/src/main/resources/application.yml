@@ -14,11 +14,11 @@ spring:
         # PGJDBC connection properties, both in SECONDS (not milliseconds, unlike the Hikari
         # setting above). connectTimeout bounds opening a new physical connection. socketTimeout is
         # the one that matters most: it is what converts a database that accepted the connection
-        # and then stopped answering into a QueryTimeoutException, rather than an indefinite block
-        # on the listener thread that never reaches backOffFor at all and eventually crosses
-        # max.poll.interval.ms instead. These values are inherited from risk-alert-service rather
-        # than measured for this module: Task 1 adds no store and no Flyway migration, so nothing
-        # here has been timed yet.
+        # and then stopped answering into an I/O failure with SQLState 08006, which Spring translates
+        # to DataAccessResourceFailureException and backOffFor classifies as an outage, rather than an
+        # indefinite block on the listener thread that never reaches backOffFor at all and eventually
+        # crosses max.poll.interval.ms instead. These values are inherited from risk-alert-service
+        # rather than measured for this module: nothing here has been timed yet.
         connectTimeout: 5
         socketTimeout: 10
   flyway:
