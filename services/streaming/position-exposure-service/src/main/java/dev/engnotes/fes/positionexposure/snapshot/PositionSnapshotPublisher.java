@@ -25,9 +25,10 @@ import org.springframework.kafka.core.KafkaTemplate;
  * logs and the dead-letter topic print. The hash is deterministic, so every snapshot of one position
  * still lands on one partition in order. It keeps raw values out of the key; it is not a secret, and
  * the snapshot body still carries both fields for consumers entitled to read them. Building the key
- * also puts the three components through the separator guard, so a component carrying the reserved
- * separator is a payload verdict before anything is sent. {@code snapshotId} is derived separately,
- * from the trade and the same three components.
+ * also puts the three components through the separator guard. {@code EnrichedTradeConsumer} runs
+ * that guard before the store applies the trade, so a separator-bearing trade never reaches here;
+ * this one is defence in depth and still throws before anything is sent. {@code snapshotId} is
+ * derived separately, from the trade and the same three components.
  *
  * <p>The trace headers are copied from the consumed record, following {@code RiskAlertPublisher} in
  * {@code risk-alert-service}: {@code traceparent}, {@code tracestate} and {@code correlationId} have to
@@ -86,8 +87,9 @@ public class PositionSnapshotPublisher {
             }
         }
         // Only the send is wrapped. Building the snapshot above stays outside, so a separator
-        // character rejected by IdempotencyKeys remains an IllegalArgumentException, a verdict on
-        // the payload, rather than being mistaken for the topic or registry being unavailable.
+        // character rejected by IdempotencyKeys remains an IllegalArgumentException rather than
+        // being mistaken for the topic or registry being unavailable. The consumer rejects such a
+        // trade before the apply; this is the backstop should a caller ever skip that check.
         try {
             kafkaTemplate.send(record).join();
         } catch (RuntimeException e) {

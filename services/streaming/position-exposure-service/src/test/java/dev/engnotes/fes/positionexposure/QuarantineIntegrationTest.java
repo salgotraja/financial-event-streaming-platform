@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import javax.sql.DataSource;
 
 import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.events.DeadLetterEvent;
@@ -29,7 +30,9 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -38,7 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Proves ADR-027's two failure classes end to end, against a real broker and the real container
  * registry: a poison record is quarantined and the record behind it on the same partition still
- * gets applied, and a null-valued record is quarantined on the first attempt.
+ * gets applied, a null-valued record is quarantined on the first attempt, and a trade carrying the
+ * key separator is quarantined without moving its position.
  *
  * <p>Both tests share one {@code TRADE_TOPIC} and {@code DLQ_TOPIC}: {@code @DynamicPropertySource}
  * runs once for the whole class, before the one shared context starts, so a per-method topic is not
@@ -78,6 +82,9 @@ class QuarantineIntegrationTest {
         registry.add("spring.datasource.username", PostgresStack::username);
         registry.add("spring.datasource.password", PostgresStack::password);
     }
+
+    @Autowired
+    private DataSource dataSource;
 
     private static KafkaConsumer<String, DeadLetterEvent> dlqConsumer() {
         Properties properties = new Properties();
@@ -168,5 +175,41 @@ class QuarantineIntegrationTest {
                             + "first attempt rather than spending the bounded back-off")
                     .isEqualTo(1);
         }
+    }
+
+    @Test
+    void a_trade_carrying_the_key_separator_is_quarantined_without_moving_its_position() {
+        try (KafkaProducer<String, EnrichedTradeEvent> producer = PositionExposureTestKafka.producer();
+             KafkaConsumer<String, DeadLetterEvent> dlq = dlqConsumer()) {
+
+            // The separator sits in accountId, never in the record key, so the dead letter itself
+            // stays publishable.
+            producer.send(new ProducerRecord<>(TRADE_TOPIC, "SEPARATOR",
+                    PositionExposureTestKafka.trade("T-SEPARATOR-1", "acc\u001F1", "trader-1", "SEPARATOR",
+                            Side.BUY, 10L, 100.0, Instant.ofEpochMilli(1_000L))));
+            producer.flush();
+
+            DeadLetterEvent quarantined =
+                    quarantinedRecordFor(dlq, "SEPARATOR", Duration.ofSeconds(30));
+            assertThat(quarantined.getExceptionClass())
+                    .isEqualTo(IllegalArgumentException.class.getName());
+            assertThat(quarantined.getRetryCount()).isEqualTo(1);
+        }
+
+        // Rejected after the apply, this trade would have committed a ledger row and a position with
+        // no snapshot to show for it, and replaying the dead letter would fail the same way.
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        assertThat(jdbc.sql("SELECT count(*) FROM position_applied_trade WHERE trade_id = ?")
+                .param("T-SEPARATOR-1")
+                .query(Long.class)
+                .single())
+                .as("a separator-bearing trade must be rejected before it is applied")
+                .isZero();
+        assertThat(jdbc.sql("SELECT count(*) FROM position WHERE ticker = ?")
+                .param("SEPARATOR")
+                .query(Long.class)
+                .single())
+                .as("a separator-bearing trade must not create or move a position")
+                .isZero();
     }
 }

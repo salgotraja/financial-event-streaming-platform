@@ -1,6 +1,8 @@
 package dev.engnotes.fes.positionexposure;
 
+import dev.engnotes.fes.common.idempotency.IdempotencyKeys;
 import dev.engnotes.fes.events.EnrichedTradeEvent;
+import dev.engnotes.fes.events.TradeEvent;
 import dev.engnotes.fes.positionexposure.position.Position;
 import dev.engnotes.fes.positionexposure.position.PositionStore;
 import dev.engnotes.fes.positionexposure.snapshot.PositionSnapshotPublisher;
@@ -61,6 +63,17 @@ public class EnrichedTradeConsumer {
         }
 
         EnrichedTradeEvent trade = record.value();
+        TradeEvent source = trade.getTrade();
+        // The publisher derives the snapshot's key and snapshotId from these four components, and
+        // IdempotencyKeys rejects one carrying its reserved separator. Found there, after the apply
+        // had committed, the position would move with no snapshot and a replayed dead letter would
+        // fail the same way. Running the same derivation first rejects the trade while the
+        // position is still untouched, as the IllegalArgumentException the error handler already
+        // quarantines on the first attempt. The separator constant is private to IdempotencyKeys,
+        // so the derivation itself is the check.
+        IdempotencyKeys.deterministic(source.getTradeId().toString(), source.getAccountId().toString(),
+                source.getTraderId().toString(), source.getTicker().toString());
+
         Position position = store.apply(trade);
         publisher.publish(record, position);
 

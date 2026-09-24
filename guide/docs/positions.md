@@ -154,9 +154,19 @@ so the failure says nothing about the trade: `PositionSnapshotPublisher` rethrow
 `a_failed_snapshot_publish_pauses_and_retries_rather_than_dead_lettering_an_applied_trade` starts the
 service with the output topic's schema subject unregistered, which fails every send because the service
 runs with `auto.register.schemas=false`, and asserts nothing is dead-lettered and that the snapshot
-arrives once the subject is registered. Building the snapshot stays outside that wrap, so a key the
-idempotency guard rejects is still a payload verdict:
-`a_snapshot_that_cannot_be_built_stays_a_payload_verdict_rather_than_a_publish_failure`.
+arrives once the subject is registered.
+
+The snapshot's key and `snapshotId` are both `IdempotencyKeys.deterministic` derivations, and that
+guard rejects a component carrying its reserved separator character. Found at publish time, the trade
+would already be applied: the position would move with no snapshot, and replaying the dead letter
+would fail the same way. So `EnrichedTradeConsumer` runs the same derivation over `tradeId`,
+`accountId`, `traderId` and `ticker` before the store sees the trade, and a separator-bearing trade is
+quarantined on the first attempt as an `IllegalArgumentException` with its position untouched:
+`a_trade_carrying_the_key_separator_is_rejected_before_the_position_moves` in the consumer's unit test,
+and `a_trade_carrying_the_key_separator_is_quarantined_without_moving_its_position` against a real
+broker and database, which asserts no ledger row and no position row. The publisher keeps its own
+check as a backstop outside the send wrap, so the same failure could never be mistaken for an outage:
+`a_separator_reaching_the_publisher_is_rejected_before_the_send_rather_than_wrapped_as_a_publish_failure`.
 
 The apply is one transaction. `a_position_upsert_failure_after_the_claim_insert_rolls_back_the_whole_apply`
 forces a failure between the claim row and the figures being filled in, and asserts no orphaned ledger

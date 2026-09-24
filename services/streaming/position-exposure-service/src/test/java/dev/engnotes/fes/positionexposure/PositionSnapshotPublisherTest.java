@@ -205,7 +205,10 @@ class PositionSnapshotPublisherTest {
     }
 
     @Test
-    void a_snapshot_that_cannot_be_built_stays_a_payload_verdict_rather_than_a_publish_failure() {
+    void a_separator_reaching_the_publisher_is_rejected_before_the_send_rather_than_wrapped_as_a_publish_failure() {
+        // EnrichedTradeConsumer rejects such a trade before the apply, so in the service this is
+        // unreachable. The boundary still matters: wrapped as SnapshotPublishException, it would
+        // pause the container forever on a record no retry can fix.
         Position position = new Position("acc\u001F1", "trader-1", "RELIANCE", 60L, 60L, 0L,
                 new BigDecimal("150000.0000"));
 

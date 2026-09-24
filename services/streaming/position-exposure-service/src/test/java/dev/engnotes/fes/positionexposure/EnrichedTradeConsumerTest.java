@@ -17,6 +17,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 
@@ -124,6 +126,32 @@ class EnrichedTradeConsumerTest {
         assertThatThrownBy(() -> consumer.consume(nullValued, acknowledgment))
                 .isInstanceOf(IllegalArgumentException.class);
 
+        verify(publisher, never()).publish(any(), any());
+        verify(acknowledgment, never()).acknowledge();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"tradeId", "accountId", "traderId", "ticker"})
+    void a_trade_carrying_the_key_separator_is_rejected_before_the_position_moves(String field) {
+        EnrichedTradeEvent trade = trade();
+        TradeEvent source = trade.getTrade();
+        switch (field) {
+            case "tradeId" -> source.setTradeId("t\u001F1");
+            case "accountId" -> source.setAccountId("acc\u001F1");
+            case "traderId" -> source.setTraderId("trader\u001F1");
+            case "ticker" -> source.setTicker("REL\u001FIANCE");
+            default -> throw new IllegalStateException(field);
+        }
+        ConsumerRecord<String, EnrichedTradeEvent> record =
+                new ConsumerRecord<>("trades.enriched", 0, 0L, "RELIANCE", trade);
+
+        // The snapshot key and snapshotId would reject this component after the apply had
+        // committed, leaving a moved position with no snapshot and a dead letter whose replay
+        // fails the same way. Rejecting it first keeps the position untouched.
+        assertThatThrownBy(() -> consumer.consume(record, acknowledgment))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(store, never()).apply(any());
         verify(publisher, never()).publish(any(), any());
         verify(acknowledgment, never()).acknowledge();
     }
