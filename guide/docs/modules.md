@@ -108,7 +108,8 @@ new group moves the count by two, the group and the leaf, which is why it went f
 when `market-data-cache-projector` landed. `trade-enrichment-service` and then `risk-alert-service`
 landed under the same `:services:streaming` group that `market-data-cache-projector` already created,
 so each moved the count by one rather than two, to ten and then to eleven. `position-exposure-service`
-did the same, taking it to twelve and completing the streaming plane.
+did the same, taking it to twelve: every streaming-plane service now exists, though not every
+requirement on the last of them is met.
 
 ## Layering inside a service
 

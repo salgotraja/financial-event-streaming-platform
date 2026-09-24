@@ -9,7 +9,7 @@ the compatibility gate.
 
 ## Phase 2, deterministic streaming
 
-**Phase 2 is complete.** [The market cache projector](projector.md) is built and Redis joined the
+**Every Phase 2 service now exists, and FR-11.4 and FR-11.5 remain open.** [The market cache projector](projector.md) is built and Redis joined the
 local stack with it, [trade enrichment](enrichment.md) is built and reads that cache on every trade,
 [the risk alert service](risk-alerts.md) reads the enriched stream, and
 [the position read model](positions.md) reads it too. What follows is what those services still do

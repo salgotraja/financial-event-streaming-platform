@@ -10,7 +10,8 @@ It is also the second reader of `trades.enriched`. [The risk alert service](risk
 same stream, and the two do not coordinate: they are independent consumer groups with independent
 stores.
 
-Its arrival completes Phase 2. `checkPlaneIsolation` now inspects twelve modules.
+With it, every Phase 2 service now exists, though its own FR-11.4 query API and FR-11.5
+rebuild-and-reconcile remain open. `checkPlaneIsolation` now inspects twelve modules.
 
 ## What it is not
 
