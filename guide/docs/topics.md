@@ -32,7 +32,7 @@ Source: `deploy/compose/topics.tsv`. Replication is 3 for every topic, matching
 | `remediation.requested` | 6 | 30 days | | no |
 | `precedent.graph.sync` | 6 | 7 days | | no |
 | `trades.raw.dlq` | 12 | 30 days | source key | written by `audit-service` and `trade-enrichment-service` on quarantine |
-| `trades.enriched.dlq` | 12 | 30 days | source key | written by `risk-alert-service` on quarantine |
+| `trades.enriched.dlq` | 12 | 30 days | source key | written by `risk-alert-service` and `position-exposure-service` on quarantine |
 | `market-data.ticks.dlq` | 12 | 30 days | source key | written by `audit-service` and `market-data-cache-projector` on quarantine |
 | `corporate-actions.dlq` | 6 | 30 days | source key | written by `audit-service` on quarantine |
 | `reference-data.instruments.dlq` | 6 | 30 days | source key | written by `audit-service` on quarantine |

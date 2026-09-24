@@ -216,10 +216,10 @@ was complete.
 
 ## What this does not prove
 
-- **Only one of the two intended consumers of `trades.enriched` exists.**
-  [The risk alert service](risk-alerts.md) reads this stream on every trade. The position read model
-  does not exist, so the fields it would use are still verified by tests rather than by a consumer in
-  anger.
+- **Both consumers of `trades.enriched` exist, and neither has run under sustained traffic.**
+  [The risk alert service](risk-alerts.md) and [the position read model](positions.md) read this
+  stream on every trade, and the fields they use are verified by their integration tests against a
+  real broker, not by a consumer in anger.
 - **An empty window and an expired one are indistinguishable.** The window carries a 600-second TTL and
   the tick hash carries none, so a ticker that idled past the TTL and is now repopulating looks exactly
   like one that genuinely traded nothing. Both take the `window_empty` path, so a partial window can

@@ -19,7 +19,7 @@ control-plane HTTP APIs, structured logs and audit manifest metadata.
 | `InstrumentReferenceEvent` | `reference-data.instruments` | yes |
 | `DeadLetterEvent` | every `{topic}.dlq` | yes |
 | `EnrichedTradeEvent` | `trades.enriched` | yes |
-| `PositionSnapshotEvent` | `positions.snapshots` | schema only |
+| `PositionSnapshotEvent` | `positions.snapshots` | yes |
 | `RiskAlertEvent` | `notifications.alerts` | yes |
 | `RiskRuleLifecycleEvent` | `risk-rules.events` | yes |
 | `AlertCaseEvent` | `alert-cases.events` | schema only |
@@ -30,7 +30,7 @@ control-plane HTTP APIs, structured logs and audit manifest metadata.
 | `AgentDecisionEvent` | `agent.decisions` | schema only |
 | `HumanReviewDecisionEvent` | `review.decisions` | schema only |
 
-Eight of the sixteen are contracts for services that do not exist. They are still under the
+Seven of the sixteen are contracts for services that do not exist. They are still under the
 compatibility gate, so a change to `AlertCaseEvent` today is checked with the same strictness as a
 change to `TradeEvent`, and the code generated from them compiles.
 

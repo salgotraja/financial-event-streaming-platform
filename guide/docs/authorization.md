@@ -57,7 +57,7 @@ bindings, on a real broker.
 
 **The local stack.** `./gradlew renderKafkaAcls` runs `KafkaAclScriptRenderer`, which writes one
 `kafka-acls.sh` argument line per grant into `build/kafka-acls.args`, and `scripts/local-stack.sh`
-feeds each line to the broker. Thirteen ACLs on the current policy set.
+feeds each line to the broker. Thirty ACLs on the current policy set.
 
 Because both paths go through `KafkaAclPolicy`, a grant cannot be proven in a test and missing from
 the stack, or the reverse.

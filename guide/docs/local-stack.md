@@ -108,7 +108,7 @@ KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
 
 Hostname verification stays on: the broker certificate carries every name a client may use.
 
-Thirteen ACLs, rendered from the same per-service `kafka-acls.yml` files the authorization tests apply
+Thirty ACLs, rendered from the same per-service `kafka-acls.yml` files the authorization tests apply
 and read by the same parser. Per-identity client configuration is written to
 `deploy/compose/tls/client-<identity>.properties`.
 

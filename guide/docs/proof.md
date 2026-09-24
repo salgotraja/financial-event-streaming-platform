@@ -255,7 +255,7 @@ order.
 
 ## What has no proof yet
 
-Anything that would need a service that does not exist: read-model rebuild, the agent tool boundary,
+Anything that would need a service or path that does not exist: read-model rebuild, the agent tool boundary,
 sustained throughput, and evidence integrity end to end. Enrichment and risk evaluation now have
 behavioural proof but no latency proof: no run has measured either against its budget.
 Dependency failure has two proofs now, on the projector's Redis connection and on the risk service's PostgreSQL connection. Those rows appear in `.claude/rules/testing.md` as required

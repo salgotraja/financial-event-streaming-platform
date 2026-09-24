@@ -25,7 +25,8 @@ is valued at the price it last traded at, not at anything current. The section b
 was the right choice and what it costs.
 
 **It is not queryable over HTTP.** FR-11.4 asks for a read-only API for authorised risk and compliance
-users, and no such API exists. That is a boundary rather than a backlog item, explained under
+users, and no such API exists yet. It is sequenced for a later increment, after rebuild, and gated on
+an authorisation story the platform does not have, explained under
 [What this does not prove](#what-this-does-not-prove).
 
 ## The grain, and why the upsert is safe
@@ -195,21 +196,23 @@ every sibling streaming service.
 - **The model cannot rebuild itself.** FR-11.5 asks for a full rebuild from Kafka history and a
   reconciliation result, and neither exists. If this store were lost, nothing here reconstructs it,
   which is why its compose service mounts a volume where the Redis cache beside it deliberately does
-  not.
-- **There is no query API, and that is a boundary, not a backlog item.** FR-11.4 asks for a read-only
-  API for authorised risk and compliance users. That is human authorisation, and ADR-030 puts
-  workforce identity outside this platform by decision rather than by omission. Building the endpoint
-  without it would mean serving `traderId` and `accountId`, both marked RESTRICTED in the schemas,
-  with no control in front of them. The data is reachable today only through a Kafka grant on
-  `positions.snapshots`.
+  not. A replay of `trades.enriched` alone could restore at most its seven-day retention window, so a
+  full rebuild needs a longer-lived source, which ADR-038 leaves to the rebuild increment to choose.
+- **There is no query API yet.** FR-11.4 asks for a read-only API for authorised risk and compliance
+  users. ADR-038 sequences it as the third increment, after rebuild, and it waits on more than effort:
+  that is human authorisation, and ADR-030 puts workforce identity outside this platform by decision
+  rather than by omission. Building the endpoint without an authorisation story would mean serving
+  `traderId` and `accountId`, both marked RESTRICTED in the schemas, with no control in front of them.
+  The data is reachable today only through a Kafka grant on `positions.snapshots`.
 - **Realised and unrealised exposure are absent.** FR-11.2 asks for them "where applicable". Both need
   a cost basis, and FIFO versus average cost is an accounting policy that nothing in this platform has
   chosen. Picking one silently would present an unmade accounting decision as a derived fact.
 - **Nothing consumes `positions.snapshots`.** The output is verified by tests, not by a downstream
   consumer in anger, which is the position [the risk alert service](risk-alerts.md) is still in too.
 - **These totals duplicate the risk service's, and nothing reconciles them.** That service's position
-  table is narrower on purpose, and the two will drift without anything detecting it until the rebuild
-  path exists.
+  table is narrower on purpose. FR-11.5's reconciliation, when it lands, compares this service's live
+  model with its own rebuild, not with the risk service, so the two can drift without anything
+  detecting it. ADR-038 leaves that comparison without an owner until one is assigned.
 - **`position_applied_trade` is never pruned.** It joins the two unpruned ledgers the risk service
   already carries. All three grow with trade volume, and none carries an event-time column a prune
   could safely use.
