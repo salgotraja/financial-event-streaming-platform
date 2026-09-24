@@ -12,7 +12,10 @@ import dev.engnotes.fes.events.Side;
 import dev.engnotes.fes.events.TradeEvent;
 import dev.engnotes.fes.positionexposure.position.Position;
 import dev.engnotes.fes.positionexposure.snapshot.PositionSnapshotPublisher;
+import dev.engnotes.fes.positionexposure.snapshot.SnapshotPublishException;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.errors.SerializationException;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -25,7 +28,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,7 +50,8 @@ class PositionSnapshotPublisherTest {
     @BeforeEach
     void setUp() {
         publisher = new PositionSnapshotPublisher(kafkaTemplate, "positions.snapshots");
-        when(kafkaTemplate.send(any(ProducerRecord.class)))
+        // Lenient because the separator test fails before any send is attempted.
+        lenient().when(kafkaTemplate.send(any(ProducerRecord.class)))
                 .thenReturn(CompletableFuture.completedFuture(null));
     }
 
@@ -126,5 +134,36 @@ class PositionSnapshotPublisherTest {
 
         assertThat(published.getSnapshotId()).hasToString(
                 IdempotencyKeys.deterministic("t-1", "acc-1", "trader-1", "RELIANCE").toString());
+    }
+
+    @Test
+    void a_send_that_throws_is_reported_as_a_publish_failure() {
+        SerializationException cause = new SerializationException("Error retrieving Avro schema");
+        when(kafkaTemplate.send(any(ProducerRecord.class))).thenThrow(cause);
+
+        assertThatThrownBy(() -> publisher.publish(position(), trade()))
+                .isInstanceOf(SnapshotPublishException.class)
+                .hasCause(cause);
+    }
+
+    @Test
+    void a_send_that_completes_exceptionally_is_reported_as_a_publish_failure() {
+        TimeoutException cause = new TimeoutException("Expiring 1 record(s)");
+        when(kafkaTemplate.send(any(ProducerRecord.class)))
+                .thenReturn(CompletableFuture.failedFuture(cause));
+
+        assertThatThrownBy(() -> publisher.publish(position(), trade()))
+                .isInstanceOf(SnapshotPublishException.class)
+                .hasRootCause(cause);
+    }
+
+    @Test
+    void a_snapshot_that_cannot_be_built_stays_a_payload_verdict_rather_than_a_publish_failure() {
+        Position position = new Position("acc\u001F1", "trader-1", "RELIANCE", 60L, 60L, 0L,
+                new BigDecimal("150000.0000"));
+
+        assertThatThrownBy(() -> publisher.publish(position, trade()))
+                .isExactlyInstanceOf(IllegalArgumentException.class);
+        verify(kafkaTemplate, never()).send(any(ProducerRecord.class));
     }
 }

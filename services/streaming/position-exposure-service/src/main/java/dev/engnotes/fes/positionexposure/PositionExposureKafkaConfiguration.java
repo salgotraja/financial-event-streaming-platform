@@ -1,19 +1,25 @@
 package dev.engnotes.fes.positionexposure;
 
+import java.sql.SQLException;
+import java.sql.SQLRecoverableException;
+import java.sql.SQLTransientConnectionException;
+
 import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
 import dev.engnotes.fes.common.kafka.FailureTracker;
 import dev.engnotes.fes.common.kafka.PoisonRecordPolicy;
 import dev.engnotes.fes.events.DeadLetterEvent;
 import dev.engnotes.fes.events.PositionSnapshotEvent;
 import dev.engnotes.fes.positionexposure.snapshot.PositionSnapshotPublisher;
+import dev.engnotes.fes.positionexposure.snapshot.SnapshotPublishException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.QueryTimeoutException;
-import org.springframework.jdbc.CannotGetJdbcConnectionException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ContainerPausingBackOffHandler;
 import org.springframework.kafka.listener.DefaultErrorHandler;
@@ -22,6 +28,7 @@ import org.springframework.kafka.listener.ListenerContainerRegistry;
 import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.util.backoff.BackOff;
 import org.springframework.util.backoff.FixedBackOff;
 
@@ -35,14 +42,17 @@ import org.springframework.util.backoff.FixedBackOff;
  * and the offset advances so the partition keeps moving. Retrying either does not help: the bytes do
  * not decode differently on a second attempt.
  *
- * <p><strong>A PostgreSQL outage pauses the container</strong> rather than dead-lettering a good
- * trade, following {@code RiskAlertKafkaConfiguration}. The back-off function returns an
- * unlimited-attempt back-off for a lost connection or a statement timeout, so the recoverer is never
- * reached. The handler is given a {@link ContainerPausingBackOffHandler} rather than the default one:
- * the default handler sleeps the consumer thread, which stops {@code poll()} from being called and
- * crosses {@code max.poll.interval.ms}, evicting the consumer from its group and turning an outage
- * into a rebalance storm. Pausing keeps the consumer polling and in the group while it declines to
- * deliver records.
+ * <p><strong>A dependency outage pauses the container</strong> rather than dead-lettering a good
+ * trade, following {@code RiskAlertKafkaConfiguration}. Two dependencies qualify. PostgreSQL is out
+ * when the store cannot get or keep a connection: a pool timeout at transaction begin, a connection
+ * lost mid-statement, or a statement timeout. The snapshot topic is out when the send fails, as a
+ * {@link SnapshotPublishException}: the trade is already applied by then, so the failure says nothing
+ * about the trade. For either, the back-off function returns an unlimited-attempt back-off, so the
+ * recoverer is never reached. The handler is given a {@link ContainerPausingBackOffHandler} rather
+ * than the default one: the default handler sleeps the consumer thread, which stops {@code poll()}
+ * from being called and crosses {@code max.poll.interval.ms}, evicting the consumer from its group and
+ * turning an outage into a rebalance storm. Pausing keeps the consumer polling and in the group while
+ * it declines to deliver records.
  *
  * <p>There is no readiness gate here, unlike {@code RiskAlertKafkaConfiguration}: this service folds
  * no governance topic, so it has nothing to wait for and the listener starts as soon as the context
@@ -53,7 +63,8 @@ public class PositionExposureKafkaConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(PositionExposureKafkaConfiguration.class);
 
-    // How long the container stays paused between attempts while PostgreSQL is down.
+    // How long the container stays paused between attempts while PostgreSQL or the snapshot
+    // publish is down.
     private static final long OUTAGE_PAUSE_MS = 5_000;
 
     @Bean
@@ -119,29 +130,45 @@ public class PositionExposureKafkaConfiguration {
         return errorHandler;
     }
 
-    private static boolean isPostgresOutage(Throwable failure) {
+    private static boolean isDependencyOutage(Throwable failure) {
         for (Throwable cause = failure; cause != null && cause != cause.getCause();
              cause = cause.getCause()) {
-            // Two types, because an unavailable database presents as either. A refused connection or
-            // an exhausted pool raises CannotGetJdbcConnectionException; a database that accepted the
-            // connection and then stopped answering raises a statement timeout, which Spring
-            // translates to QueryTimeoutException. Matching only the first sends a valid trade to the
-            // DLQ during exactly the outage this branch exists to survive.
-            if (cause instanceof CannotGetJdbcConnectionException
-                    || cause instanceof QueryTimeoutException) {
+            // PostgreSQL presents an outage in several shapes, and matching too few dead-letters a
+            // valid trade during exactly the outage this branch exists to survive. PositionStore.apply
+            // is @Transactional, so a pool timeout surfaces at transaction begin as
+            // CannotCreateTransactionException, not CannotGetJdbcConnectionException. A connection
+            // lost mid-statement is translated to DataAccessResourceFailureException (SQLState class
+            // 08), which also covers CannotGetJdbcConnectionException; a statement timeout to
+            // QueryTimeoutException. The java.sql types and the 08 class catch the same failures
+            // when they arrive untranslated. A SnapshotPublishException is the snapshot topic's
+            // outage: the trade is already applied and is not at fault.
+            if (cause instanceof DataAccessResourceFailureException
+                    || cause instanceof QueryTimeoutException
+                    || cause instanceof CannotCreateTransactionException
+                    || cause instanceof TransientDataAccessResourceException
+                    || cause instanceof SQLTransientConnectionException
+                    || cause instanceof SQLRecoverableException
+                    || cause instanceof SnapshotPublishException
+                    || isConnectionStateClass(cause)) {
                 return true;
             }
         }
         return false;
     }
 
+    private static boolean isConnectionStateClass(Throwable cause) {
+        return cause instanceof SQLException sql
+                && sql.getSQLState() != null
+                && sql.getSQLState().startsWith("08");
+    }
+
     /**
-     * The back-off for one listener failure, in priority order: a PostgreSQL outage always pauses the
-     * container regardless of what triggered it, then everything else falls through to the bounded
-     * {@link PoisonRecordPolicy#poisonBackOff()}.
+     * The back-off for one listener failure, in priority order: a PostgreSQL or snapshot publish
+     * outage anywhere in the cause chain always pauses the container, then everything else falls
+     * through to the bounded {@link PoisonRecordPolicy#poisonBackOff()}.
      */
     static BackOff backOffFor(Throwable exception) {
-        if (isPostgresOutage(exception)) {
+        if (isDependencyOutage(exception)) {
             return new FixedBackOff(OUTAGE_PAUSE_MS, FixedBackOff.UNLIMITED_ATTEMPTS);
         }
         return PoisonRecordPolicy.poisonBackOff();

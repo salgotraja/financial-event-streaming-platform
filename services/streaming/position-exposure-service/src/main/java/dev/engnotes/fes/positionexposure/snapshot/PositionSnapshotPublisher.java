@@ -22,6 +22,11 @@ import org.springframework.stereotype.Component;
  * a record key is hostile to all three. {@code snapshotId} below uses
  * {@link IdempotencyKeys#deterministic(String...)} separately, where the internal separator-rejection
  * guard does apply.
+ *
+ * <p>A failed send, whether thrown by {@code send} itself (a serializer that cannot find its schema
+ * subject) or surfaced by {@code join} (a broker timeout, too few in-sync replicas), is rethrown as
+ * {@link SnapshotPublishException}. The trade is already applied by then and is not at fault, so the
+ * error handler treats it as a dependency outage rather than a poison record (ADR-027).
  */
 @Component
 public class PositionSnapshotPublisher {
@@ -60,7 +65,15 @@ public class PositionSnapshotPublisher {
                 .build();
 
         ProducerRecord<String, PositionSnapshotEvent> record = new ProducerRecord<>(topic, key, snapshot);
-        kafkaTemplate.send(record).join();
+        // Only the send is wrapped. Building the snapshot above stays outside, so a separator
+        // character rejected by IdempotencyKeys remains an IllegalArgumentException, a verdict on
+        // the payload, rather than being mistaken for the topic or registry being unavailable.
+        try {
+            kafkaTemplate.send(record).join();
+        } catch (RuntimeException e) {
+            throw new SnapshotPublishException("Snapshot publish to " + topic + " failed for tradeId="
+                    + tradeId, e);
+        }
     }
 
     private static double toDouble(BigDecimal marketValue) {

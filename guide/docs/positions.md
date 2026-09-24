@@ -120,8 +120,24 @@ Unchanged from the rest of the streaming plane, which is the point rather than a
 malformed record is quarantined per record to `trades.enriched.dlq` after the shared bounded retry,
 and the record behind it is still applied:
 `a_malformed_record_is_quarantined_and_the_record_behind_it_is_still_applied`. A database outage
-pauses the listener container instead of dead-lettering a trade the service simply could not evaluate:
-`should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`.
+pauses the listener container instead of dead-lettering a trade the service simply could not evaluate.
+Because the apply is `@Transactional`, a pool timeout arrives as `CannotCreateTransactionException` at
+transaction begin, and a connection lost mid-statement as `DataAccessResourceFailureException`, so the
+classifier matches those, a statement timeout, and any `SQLException` in SQLState class `08`, anywhere
+in the cause chain. `should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`
+holds PostgreSQL paused for well past the poison budget and watches the DLQ for the whole window,
+because every back-off pauses the container and a paused container alone proves nothing about which
+class the failure was put in.
+
+A failed snapshot publish is treated the same way. The trade is already applied when the send fails,
+so the failure says nothing about the trade: `PositionSnapshotPublisher` rethrows it as a
+`SnapshotPublishException` and the container pauses until the send succeeds.
+`a_failed_snapshot_publish_pauses_and_retries_rather_than_dead_lettering_an_applied_trade` starts the
+service with the output topic's schema subject unregistered, which fails every send because the service
+runs with `auto.register.schemas=false`, and asserts nothing is dead-lettered and that the snapshot
+arrives once the subject is registered. Building the snapshot stays outside that wrap, so a key the
+idempotency guard rejects is still a payload verdict:
+`a_snapshot_that_cannot_be_built_stays_a_payload_verdict_rather_than_a_publish_failure`.
 
 The apply is one transaction. `a_position_upsert_failure_after_the_claim_insert_rolls_back_the_whole_apply`
 forces a failure between the claim row and the figures being filled in, and asserts no orphaned ledger

@@ -17,7 +17,6 @@ import dev.engnotes.fes.testing.KafkaAvroStack;
 import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -115,10 +114,17 @@ class PostgresOutageIntegrationTest {
         return consumer;
     }
 
-    private static List<String> deadLetters(KafkaConsumer<String, DeadLetterEvent> dlq) {
-        ConsumerRecords<String, DeadLetterEvent> polled = dlq.poll(Duration.ofMillis(500));
+    /**
+     * Every key that reaches the DLQ over the whole window, not one short poll: the poison budget
+     * takes several seconds to spend, so a single 500ms poll right after the trade is produced
+     * proves nothing about whether the trade is dead-lettered later.
+     */
+    private static List<String> deadLettersOver(KafkaConsumer<String, DeadLetterEvent> dlq, Duration window) {
         List<String> keys = new ArrayList<>();
-        polled.forEach(record -> keys.add(record.key()));
+        Instant deadline = Instant.now().plus(window);
+        while (Instant.now().isBefore(deadline)) {
+            dlq.poll(Duration.ofMillis(500)).forEach(record -> keys.add(record.key()));
+        }
         return keys;
     }
 
@@ -146,16 +152,20 @@ class PostgresOutageIntegrationTest {
                             dev.engnotes.fes.events.Side.BUY, 10L, 100.0, Instant.ofEpochMilli(1_000L))));
             producer.flush();
 
+            // Every back-off pauses the container, the bounded poison one included, so a paused
+            // container proves only that the listener failed and the error handler ran. It says
+            // nothing about which class the failure was put in.
             Awaitility.await()
                     .atMost(Duration.ofSeconds(30))
                     .pollInterval(Duration.ofMillis(200))
                     .untilAsserted(() -> assertThat(listenerContainer().isContainerPaused())
-                            .as("only ContainerPausingBackOffHandler pauses the container, and the "
-                                    + "error handler reaches it only by classifying a real "
-                                    + "connection failure or statement timeout as a postgres outage")
+                            .as("the listener reached the database and failed, so the error handler ran")
                             .isTrue());
 
-            assertThat(deadLetters(dlq))
+            // What proves the classification is the DLQ staying empty well past the poison budget:
+            // two retries, each waiting up to Hikari's 5s connection timeout, spend it in roughly
+            // 15 seconds. Thirty seconds of silence cannot be the poison path.
+            assertThat(deadLettersOver(dlq, Duration.ofSeconds(30)))
                     .as("a database outage must never dead-letter a trade that was never bad (ADR-027)")
                     .isEmpty();
         } finally {
