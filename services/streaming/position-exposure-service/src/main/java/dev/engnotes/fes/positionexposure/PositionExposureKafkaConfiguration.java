@@ -49,8 +49,9 @@ import org.springframework.util.backoff.FixedBackOff;
  * when the store cannot get or keep a connection: a pool timeout at transaction begin, a connection
  * lost mid-statement, or a statement timeout. Matching {@link DataAccessResourceFailureException}
  * is wider than connection loss: Spring's SQLState translation produces it for classes 53
- * (insufficient resources), 54 (program limit exceeded), 57 (operator intervention) and 58 (system
- * error) as well as 08. Those pause too. Class 53, such as a full disk, is an outage in fact. A
+ * (insufficient resources), 54 (program limit exceeded), 57 (operator intervention, except 57014,
+ * a cancelled statement, which becomes {@link QueryTimeoutException}) and 58 (system error) as well
+ * as 08. Those pause too. Class 53, such as a full disk, is an outage in fact. A
  * record able to provoke a class 54 limit would pause the partition rather than be quarantined; that
  * is accepted rather than narrowed, because a narrower match risks dead-lettering good trades during
  * a real outage. Record-caused failures the schema can bound are bounded there instead: an id

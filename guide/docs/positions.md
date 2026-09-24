@@ -147,7 +147,8 @@ in the cause chain.
 
 Matching `DataAccessResourceFailureException` reaches further than connection loss. Spring's SQLState
 translation produces it for classes `53` (insufficient resources), `54` (program limit exceeded), `57`
-(operator intervention) and `58` (system error) as well as `08`, and all of those pause the container.
+(operator intervention, except `57014`, a cancelled statement, which becomes `QueryTimeoutException`)
+and `58` (system error) as well as `08`, and all of those pause the container.
 A full disk is an outage in fact, but a record able to provoke a class `54` limit would pause its
 partition rather than be quarantined. That is accepted rather than narrowed, because a narrower match
 risks dead-lettering good trades during a real outage. The schema bounds the record-caused failures it
