@@ -9,12 +9,18 @@ import dev.engnotes.fes.events.EnrichedTradeEvent;
 import dev.engnotes.fes.events.RiskAlertEvent;
 import dev.engnotes.fes.events.RuleState;
 import dev.engnotes.fes.events.Side;
+import dev.engnotes.fes.riskalert.RiskAlertMetrics;
+import dev.engnotes.fes.riskalert.correlation.RecentTrades;
+import dev.engnotes.fes.riskalert.correlation.RiskRecentTradeStore;
 import dev.engnotes.fes.riskalert.governance.ActiveRule;
 import dev.engnotes.fes.riskalert.governance.BootstrapRuleProperties;
 import dev.engnotes.fes.riskalert.governance.RiskRuleRegistry;
 import dev.engnotes.fes.riskalert.governance.RuleTransition;
 import dev.engnotes.fes.riskalert.position.NetPosition;
 import dev.engnotes.fes.riskalert.position.RiskPositionStore;
+import dev.engnotes.fes.riskalert.window.RiskVolumeWindowStore;
+import dev.engnotes.fes.riskalert.window.VolumeWindow;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Test;
@@ -35,7 +41,7 @@ class RiskRuleEngineTest {
         RiskRuleRegistry registry = new RiskRuleRegistry(BOOTSTRAP);
         registry.apply(new RuleTransition("pd-tight", "price-deviation", 1, RuleState.ACTIVE,
                 Map.of("warn-deviation-percent", "0.5", "critical-deviation-percent", "1.0"), 5_000L));
-        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()), neverCalled());
+        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()), neverCalled(), metrics());
 
         EnrichedTradeEvent beforeGovernance = EnrichedTrades.withDeviationAt(1.0, Instant.ofEpochMilli(1_000L));
         EnrichedTradeEvent afterGovernance = EnrichedTrades.withDeviationAt(1.0, Instant.ofEpochMilli(6_000L));
@@ -51,7 +57,7 @@ class RiskRuleEngineTest {
         RiskRuleRegistry registry = new RiskRuleRegistry(BOOTSTRAP);
         registry.apply(new RuleTransition("pd-a", "price-deviation", 1, RuleState.ACTIVE, BANDS, 1_000L));
         registry.apply(new RuleTransition("pd-b", "price-deviation", 1, RuleState.ACTIVE, BANDS, 1_000L));
-        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()), neverCalled());
+        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()), neverCalled(), metrics());
 
         List<RiskAlertEvent> alerts = engine.evaluate(
                 EnrichedTrades.withDeviationAt(6.0, Instant.ofEpochMilli(2_000L)));
@@ -66,7 +72,7 @@ class RiskRuleEngineTest {
         RiskRuleRegistry registry = new RiskRuleRegistry(BOOTSTRAP);
         registry.apply(new RuleTransition("pl-1", "position-limit", 1, RuleState.ACTIVE,
                 Map.of("threshold-shares", "100000"), 1_000L));
-        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()), neverCalled());
+        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()), neverCalled(), metrics());
 
         // Increment 1 has no position-limit implementation. A governed rule ahead of its code must
         // not fail every trade.
@@ -80,7 +86,7 @@ class RiskRuleEngineTest {
         registry.apply(new RuleTransition("pd-broken", "price-deviation", 1, RuleState.ACTIVE,
                 Map.of("warn-deviation-percent", "2.0"), 1_000L));
         registry.apply(new RuleTransition("pd-ok", "price-deviation", 1, RuleState.ACTIVE, BANDS, 1_000L));
-        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()), neverCalled());
+        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PriceDeviationRule()), neverCalled(), metrics());
 
         // pd-broken is missing critical-deviation-percent, so PriceDeviationParameters.from rejects
         // it. That must not stop pd-ok, evaluated in the same loop, from alerting on the same trade.
@@ -96,35 +102,58 @@ class RiskRuleEngineTest {
             PositionLimitParameters.WARN_KEY, "10000",
             PositionLimitParameters.CRITICAL_KEY, "50000");
 
-    /**
-     * A store that fails the test if it is ever consulted. This is how the guard is proved: a
-     * PRICE_DEVIATION-only deployment must not touch PostgreSQL at all.
-     */
-    private static RiskPositionStore neverCalled() {
-        return new RiskPositionStore(null) {
-            @Override
-            public NetPosition apply(EnrichedTradeEvent event) {
-                throw new AssertionError("the position store must not be consulted when no "
-                        + "position-aware rule is in force");
-            }
-        };
+    private static RiskAlertMetrics metrics() {
+        return new RiskAlertMetrics(new SimpleMeterRegistry());
     }
 
-    private static RiskPositionStore counting(AtomicInteger calls, long net) {
-        return new RiskPositionStore(null) {
-            @Override
-            public NetPosition apply(EnrichedTradeEvent event) {
-                calls.incrementAndGet();
-                return new NetPosition("trader-1", "RELIANCE", net);
-            }
-        };
+    /**
+     * Stores that fail the test if any of them is consulted. This is how the union is proved: a
+     * PRICE_DEVIATION-only deployment must not touch PostgreSQL at all.
+     */
+    private static TradeStateStores neverCalled() {
+        return new TradeStateStores(
+                new RiskPositionStore(null) {
+                    @Override
+                    public NetPosition apply(EnrichedTradeEvent event) {
+                        throw new AssertionError("the position store must not be consulted when no "
+                                + "position-aware rule is in force");
+                    }
+                },
+                new RiskVolumeWindowStore(null, 3_600L) {
+                    @Override
+                    public VolumeWindow apply(EnrichedTradeEvent event) {
+                        throw new AssertionError("the volume window must not be consulted when no "
+                                + "windowed rule is in force");
+                    }
+                },
+                new RiskRecentTradeStore(null, 3_600L, 200) {
+                    @Override
+                    public RecentTrades apply(EnrichedTradeEvent event) {
+                        throw new AssertionError("the recent-trade store must not be consulted when "
+                                + "no correlation rule is in force");
+                    }
+                });
+    }
+
+    private static TradeStateStores counting(AtomicInteger calls, long net) {
+        TradeStateStores unusable = neverCalled();
+        return new TradeStateStores(
+                new RiskPositionStore(null) {
+                    @Override
+                    public NetPosition apply(EnrichedTradeEvent event) {
+                        calls.incrementAndGet();
+                        return new NetPosition("trader-1", "RELIANCE", net);
+                    }
+                },
+                unusable.volumeWindows(),
+                unusable.recentTrades());
     }
 
     @Test
     void the_position_store_is_not_consulted_when_only_a_stateless_rule_is_in_force() {
         RiskRuleRegistry registry = new RiskRuleRegistry(BOOTSTRAP);
         RiskRuleEngine engine = new RiskRuleEngine(registry,
-                List.of(new PriceDeviationRule(), new PositionLimitRule()), neverCalled());
+                List.of(new PriceDeviationRule(), new PositionLimitRule()), neverCalled(), metrics());
 
         // Only the price-deviation bootstrap is in force; no position-limit rule is governed.
         assertThat(engine.evaluate(EnrichedTrades.withDeviationAt(6.0, Instant.ofEpochMilli(2_000L))))
@@ -139,7 +168,7 @@ class RiskRuleEngineTest {
 
         AtomicInteger calls = new AtomicInteger();
         RiskRuleEngine engine = new RiskRuleEngine(registry,
-                List.of(new PositionLimitRule()), counting(calls, 60_000L));
+                List.of(new PositionLimitRule()), counting(calls, 60_000L), metrics());
 
         List<RiskAlertEvent> alerts = engine.evaluate(EnrichedTrades.withPosition(
                 "t-1", "trader-1", "RELIANCE", Side.BUY, 100L, Instant.ofEpochMilli(2_000L)));
@@ -159,7 +188,7 @@ class RiskRuleEngineTest {
 
         AtomicInteger calls = new AtomicInteger();
         RiskRuleEngine engine = new RiskRuleEngine(registry,
-                List.of(new PriceDeviationRule(), new PositionLimitRule()), counting(calls, 60_000L));
+                List.of(new PriceDeviationRule(), new PositionLimitRule()), counting(calls, 60_000L), metrics());
 
         // withDeviationAt fixes traderId=trader-1, ticker=RELIANCE and a 6.0 percent deviation,
         // which is over the bootstrap's 5.0 critical band, so both rules alert on one trade.
@@ -175,7 +204,7 @@ class RiskRuleEngineTest {
     /**
      * A registry that answers {@code inForceAt} differently on its first and second call, standing
      * in for a reinstating {@code ACTIVE} transition landing between the guard's read and the
-     * dispatch loop's read. Before the single-snapshot fix, the guard would see call one (nothing
+     * dispatch loop's read. Before the single-snapshot fix, the requirements union would see call one (nothing
      * in force, so no position applied) and the dispatch loop would see call two (the rule in
      * force), dispatching {@code PositionLimitRule} with a null {@code NetPosition} and throwing an
      * NPE out of {@code evaluate}. With one snapshot per call, both the guard and the dispatch loop
@@ -205,11 +234,11 @@ class RiskRuleEngineTest {
         ActiveRule reinstatedPositionLimit = new ActiveRule("pl-a", "position-limit", 2, LIMITS);
         FlippingRegistry registry = new FlippingRegistry(emptyBootstrap, reinstatedPositionLimit);
 
-        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PositionLimitRule()), neverCalled());
+        RiskRuleEngine engine = new RiskRuleEngine(registry, List.of(new PositionLimitRule()), neverCalled(), metrics());
 
-        // Without the single-snapshot fix this throws a NullPointerException: the guard's call
+        // Without the single-snapshot fix this throws a NullPointerException: the union's call
         // returns empty (call 1), so post stays null, but the dispatch loop's call (call 2) returns
-        // the reinstated rule and dispatches PositionLimitRule with a null NetPosition.
+        // the reinstated rule and dispatches PositionLimitRule with a null position in its context.
         assertThat(engine.evaluate(EnrichedTrades.withPosition(
                 "t-1", "trader-1", "RELIANCE", Side.BUY, 100L, Instant.ofEpochMilli(2_000L))))
                 .isEmpty();
@@ -228,10 +257,43 @@ class RiskRuleEngineTest {
 
         RiskRuleEngine engine = new RiskRuleEngine(registry,
                 List.of(new PriceDeviationRule(), new PositionLimitRule()),
-                counting(new AtomicInteger(), 60_000L));
+                counting(new AtomicInteger(), 60_000L), metrics());
 
         // The price-deviation rule still alerts: one bad governed version degrades only itself.
         assertThat(engine.evaluate(EnrichedTrades.withDeviationAt(6.0, Instant.ofEpochMilli(2_000L))))
                 .hasSize(1);
+    }
+
+    @Test
+    void only_the_stores_the_rules_in_force_declare_are_applied() {
+        RiskRuleRegistry registry = new RiskRuleRegistry(BOOTSTRAP);
+        registry.apply(new RuleTransition("pl-a", "position-limit", 1, RuleState.ACTIVE, LIMITS, 1_000L));
+
+        AtomicInteger positionCalls = new AtomicInteger();
+        // The volume and recent-trade stores in counting() are the never-called ones: a
+        // position-limit deployment must not touch stores no rule in force asked for.
+        RiskRuleEngine engine = new RiskRuleEngine(registry,
+                List.of(new PositionLimitRule()), counting(positionCalls, 60_000L), metrics());
+
+        engine.evaluate(EnrichedTrades.withPosition(
+                "t-1", "trader-1", "RELIANCE", Side.BUY, 100L, Instant.ofEpochMilli(2_000L)));
+
+        assertThat(positionCalls).hasValue(1);
+    }
+
+    @Test
+    void a_rule_reads_the_state_kind_it_declared_and_the_context_carries_it() {
+        RiskRuleRegistry registry = new RiskRuleRegistry(BOOTSTRAP);
+        registry.apply(new RuleTransition("pl-a", "position-limit", 1, RuleState.ACTIVE, LIMITS, 1_000L));
+
+        RiskRuleEngine engine = new RiskRuleEngine(registry,
+                List.of(new PositionLimitRule()), counting(new AtomicInteger(), 60_000L), metrics());
+
+        // 60,000 is over the 50,000 critical band, so the rule alerting at all proves it received a
+        // non-null NetPosition through the TradeContext rather than the old direct argument.
+        assertThat(engine.evaluate(EnrichedTrades.withPosition(
+                "t-1", "trader-1", "RELIANCE", Side.BUY, 100L, Instant.ofEpochMilli(2_000L))))
+                .singleElement()
+                .satisfies(alert -> assertThat(alert.getSeverity().toString()).isEqualTo("CRITICAL"));
     }
 }

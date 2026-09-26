@@ -7,15 +7,24 @@ of which rule was in force when each trade executed, and writes `notifications.a
 It is also the first consumer of `trades.enriched`. Until this service existed,
 [trade enrichment](enrichment.md) wrote a stream that nothing read.
 
-Two of FR-04.2's four rules are implemented. `PRICE_DEVIATION` arrived in increment 1 and is
-stateless. `POSITION_LIMIT_BREACH` arrived in increment 2 and is the first rule in the platform whose
-verdict depends on state rather than on the record in front of it, which is why it also brings the
-first PostgreSQL store and the first Flyway migration anywhere in this repository.
+All four of FR-04.2's rules are implemented, across three increments. `PRICE_DEVIATION` arrived in
+increment 1 and is stateless. `POSITION_LIMIT_BREACH` arrived in increment 2 and is the first rule in
+the platform whose verdict depends on state rather than on the record in front of it, which is why it
+also brings the first PostgreSQL store and the first Flyway migration anywhere in this repository.
+`UNUSUAL_VOLUME` and `WASH_TRADE_DETECTED` arrived in increment 3 with two more stores.
 
-`UNUSUAL_VOLUME` and `WASH_TRADE_DETECTED` are still absent, so FR-04 is not met. Wash-trade
-detection is blocked on a definition rather than on effort: `contracts/` carries an `accountId` but
-no account-relationship source to judge two accounts related, so the rule has to be redefined against
-something that exists before it can be built.
+**`WASH_TRADE_DETECTED` is implemented in a narrowed form, and that matters more than the count of
+rules.** It detects one trader identity crossing itself: an offsetting buy and sell on one ticker by
+the same `traderId`, inside a governed window, at a similar quantity and price. It does **not** detect
+related-party wash trading, trades between distinct but related accounts that leave beneficial
+ownership unchanged. That needs a source saying which accounts are related, and `contracts/` carries
+an `accountId` but nothing that relates two of them. ADR-030 puts that class of identity data out of
+scope by decision rather than by backlog, so the source is not coming. The rule was redefined against
+what exists rather than left unbuilt, and any later claim that FR-04 is met should say which
+definition it is met against.
+
+The service's evaluation latency is unmeasured. The sub-5ms p99 figure for rule evaluation is a
+target, and increment 3 adds two database round trips per trade to the default configuration.
 
 ## The problem the timeline solves
 
@@ -294,10 +303,16 @@ already makes each row single-writer within the consumer group, so a retry loop 
 ### The trade is applied once, and only when it must be
 
 ```java
-NetPosition post = anyPositionRuleInForceAt(instant) ? positions.apply(trade) : null;
+TradeContext context = applyRequiredStores(trade, requiredKinds(governedByType));
 ```
 
-Two separate decisions sit in that line, and both are load-bearing.
+Increment 2 wrote that line as a single guarded call to one store. Increment 3 generalised it,
+because three stateful rules do not fit one hardcoded store, but the two decisions inside it are
+unchanged and both are still load-bearing.
+
+Each stateful rule declares the state it reads, as a `Set<StateKind>`. The engine unions the kinds
+declared by the rules actually in force, applies exactly those stores once each, and passes one
+`TradeContext` carrying a field per kind.
 
 **Applying outside the per-rule loop.** `RiskRuleEngine` evaluates every governed rule of a matching
 type, and several `ruleId`s may share one `ruleType` — that is how per-ticker thresholds arrive
@@ -307,17 +322,18 @@ because it is one trade applied repeatedly within one transaction rather than a 
 would stay invisible until a second position rule was governed, then corrupt every position silently.
 `the_trade_is_applied_exactly_once_even_when_two_position_rules_are_in_force` asserts a call count.
 
-**Applying only behind the guard.** The store is consulted only when a position-aware rule is
-actually in force, so a deployment governing no position rule writes nothing and takes no database
-dependency at all.
-`the_position_store_is_not_consulted_when_only_a_stateless_rule_is_in_force` uses a store that throws
-if called, so the test fails rather than passes if the guard is removed.
+**Applying only what some rule asked for.** A store is consulted only when a rule in force declared
+its kind, so a deployment governing no stateful rule writes nothing and takes no database dependency
+at all. `the_position_store_is_not_consulted_when_only_a_stateless_rule_is_in_force` and
+`only_the_stores_the_rules_in_force_declare_are_applied` both use stores that throw if called, so
+they fail rather than pass if the union is widened.
 
-Be clear about what that buys today, though: the shipped `application.yml` bootstraps a
-`position-limit` rule, so in the default configuration the guard never short-circuits and PostgreSQL
-is a hard dependency from the first trade. The guard matters for a deployment that removes the
-bootstrap entry or retires the rule through governance, and it is what keeps that deployment
-possible rather than describing how this one runs.
+Be clear about what that buys today, though: the shipped `application.yml` bootstraps
+`position-limit`, `unusual-volume` and `self-cross`, so in the default configuration the union is
+never empty, and PostgreSQL is a hard dependency from the first trade. The property belongs to the
+requirements union, not to the shipped configuration. It matters for a deployment whose bootstrap set
+and governed timeline carry only `price-deviation`, and it is what keeps that deployment possible
+rather than describing how this one runs.
 
 Both readers take one snapshot. `evaluate` resolves every rule type's in-force list once and the
 guard and the dispatch loop both read that snapshot, never the registry directly. Two independent
@@ -325,16 +341,182 @@ reads could disagree, because the rule fold runs on another thread: a transition
 could leave the guard seeing no position rule while the dispatch loop found one, and a rule would be
 handed a position that was never computed.
 
-Rules read the position and never write it. `PositionAwareRiskRule` is a subtype of `RiskRule` rather
-than a widening of it, specifically so `PriceDeviationRule` and every test written against it stayed
-untouched when this landed.
+Rules read state and never write it. `StatefulRiskRule` is a subtype of `RiskRule` rather than a
+widening of it, so `PriceDeviationRule` and every test written against it stay untouched. It replaced
+the earlier `PositionAwareRiskRule`, which took a single position: a sibling interface per store would
+have left three near-identical guards in the engine and no home for a rule needing two kinds of
+state.
 
 **One accepted consequence.** The order is apply, evaluate, publish, acknowledge. If publishing
-exhausts its bound and the record is quarantined, the position already counts a trade whose alert
-never fired. That stands: the position records trades that occurred, and alert delivery is a separate
-concern. A compensating write would be a second write on an already failing path that can also fail,
+exhausts its bound and the record is quarantined, every store the union applied already counts a trade
+whose alert never fired, and since increment 3 that can be three stores rather than one. That stands:
+the stores record trades that occurred, and alert delivery is a separate concern. A compensating write would be a second write on an already failing path that can also fail,
 leaving the position wrong in the other direction with no record of why. The dead letter is the audit
 trail.
+
+## The unusual volume rule, and the window it folds
+
+`UNUSUAL_VOLUME` alerts when a trade's quantity sits a governed number of standard deviations above
+the mean of recent trade quantities for that ticker.
+
+**Which distribution it compares against is the whole design, and it is not the market's volume.**
+The requirement reads "trade volume exceeds 3 standard deviations above the rolling 60-minute mean
+for that ticker", and this service reads that as the distribution of *trade quantities* arriving on
+`trades.enriched`. That settles where the state lives without a judgement call:
+[the market cache projector](projector.md) consumes `market-data.ticks` and never sees a trade, so it
+was never a candidate to hold this window even though it already keeps a bucketed rolling window of
+its own shape (ADR-037).
+
+```text
+threshold = mean + multiplier * standardDeviation
+quantity > mean + criticalSigma * sd  ->  CRITICAL
+quantity > mean + warnSigma * sd      ->  WARNING
+otherwise                             ->  no alert
+```
+
+Exceedance is strict, matching the position rule:
+`a_quantity_exactly_at_the_warning_multiplier_does_not_alert`.
+
+### The window is bucketed, and the trade is not in its own distribution
+
+```sql
+risk_volume_bucket        -- PK (ticker, bucket_start), 60-second (n, sum, sumsq) rollups
+risk_volume_ticker        -- PK ticker, the monotonic prune cutoff
+risk_volume_applied_trade -- PK trade_id, the replay pin
+```
+
+Mean and standard deviation fold from `(n, Σx, Σx²)`, which is additive, so 60 buckets of 60 seconds
+fold to exactly the mean and deviation of the individual trade quantities underneath them. Bucket
+width changes the fold cost and the pruning granularity, never the statistic.
+
+**The triggering trade is excluded from its own distribution.** The store applies the trade to its
+bucket, folds, then subtracts the trade's own contribution. Without that, the first trade in a window
+would compare against a sample of one, where the deviation is zero and every value reads as
+infinitely anomalous. `the_window_excludes_the_trade_being_evaluated` pins it.
+
+The subtraction is conditional on the trade's own bucket having survived the prune, which is subtler
+than it sounds. A trade older than the cutoff has its bucket deleted before the fold runs, so it never
+entered the fold and is already excluded; subtracting it again would drive the count below the true
+prior count, and a window holding exactly one prior trade would report zero and silence the rule.
+`a_late_trade_outside_the_horizon_still_sees_the_priors_that_are_inside_it` fails if that condition is
+dropped.
+
+The prune cutoff comes from a per-ticker high-water mark that only ever advances, for the same reason
+the position store takes `GREATEST` on its event timestamp: records arrive in offset order but
+`eventTimestamp` can go backwards, and a cutoff taken from a late trade would resurrect a pruned
+bucket and change every later fold.
+`the_prune_cutoff_never_moves_backwards_when_a_late_trade_arrives` is that property.
+
+Replay is pinned the way the position is. `risk_volume_applied_trade` stores the distribution the
+trade actually evaluated against, so a redelivery answers from it rather than re-folding a window that
+has moved on: `a_redelivery_returns_the_window_the_first_delivery_saw`.
+
+### Two numbers that stop the rule making claims it cannot support
+
+**A thin window does not alert.** `min-sample-count` is governed, must be at least 2, and below it the
+rule returns no alert at any quantity. A three-sigma claim computed from a handful of samples is
+noise. `a_window_below_the_governed_minimum_sample_does_not_alert_at_any_quantity` covers the
+behaviour and `a_window_below_the_governed_minimum_sample_increments_the_below_minimum_counter`
+covers the metric, because the two could otherwise drift apart unnoticed. The alert carries the sample
+count in `measuredValues` so a reader can see what the claim rests on:
+`the_alert_carries_the_sample_the_claim_rests_on`.
+
+**The arithmetic is exact.** The two totals are `NUMERIC(38,0)` and the deviation is computed in
+`BigDecimal`. An hour of a busy ticker can push the sum of squares past the exact-integer range of a
+`double`, where the naive variance form cancels to a small negative value and its square root is
+`NaN`. That would not fail: every comparison against `NaN` is false, so the rule would quietly stop
+alerting. `large_quantities_do_not_cancel_to_a_negative_variance` is the regression test, and it uses
+deliberately large quantities because a small known distribution passes either way.
+
+### The horizon is configuration, not a governed parameter
+
+```yaml
+fes:
+  risk-alert-service:
+    volume-window-seconds: 3600
+```
+
+Governing the horizon per rule would break the window. The prune deletes buckets outside the
+horizon, so a governed rule carrying a longer one would fold a window already partly deleted and
+return a quietly wrong statistic rather than an error. Writer prune and reader fold must agree on one
+number. What stays governed is what changes a verdict and nothing else: the two sigma multipliers and
+the minimum sample.
+
+## The self-cross rule, and what it deliberately does not detect
+
+`WASH_TRADE_DETECTED` alerts when the same `traderId` crosses itself: an offsetting buy and sell on
+one ticker, inside a governed window, with quantity and price within governed tolerances.
+
+**Read the narrowing in the intro again before using this rule for anything.** It detects one identity
+trading against itself. Related-party wash trading, where distinct but related accounts leave
+beneficial ownership unchanged, is not detected and cannot be with the events this platform carries.
+`SelfCrossRule`'s own Javadoc says so too, because that is where a reader of the source will look.
+
+Scope is `traderId` rather than `accountId` for a reason that decides it rather than merely favours
+it: `RiskAlertEvent` carries a `traderId` field and has no `accountId` field, so an account-scoped
+alert could not name its own subject.
+
+Severity is `CRITICAL` with no bands. A detected self-cross is not a gradient: the round trip either
+falls inside the governed tolerances or it does not.
+
+### Candidates are bounded by arrival order, not by event time
+
+```sql
+risk_recent_trade  -- PK trade_id, UNIQUE applied_seq, index (trader_id, ticker, applied_seq DESC)
+```
+
+`applied_seq` is a `BIGSERIAL`, and the candidate query bounds on it rather than on
+`event_timestamp`. This is the part worth understanding, because the obvious choice is wrong.
+
+Bounding by event time diverges on replay. A trade at t=100 arriving *after* a trade at t=200 is
+invisible to the second trade's first delivery and visible to its replay, so the same trade would get
+two different verdicts. `applied_seq` is fixed at first insert and preserved by
+`ON CONFLICT (trade_id) DO NOTHING`, so the candidate set is identical on every delivery:
+`an_out_of_order_older_trade_applied_later_is_not_a_candidate_on_replay` and
+`a_redelivery_keeps_the_arrival_order_the_first_delivery_was_given`. That is why this rule needs no
+pinned-match column where the volume window needs its pinned totals.
+
+The query still carries an event-time window, and it is two-sided rather than one: a candidate can be
+later in event time while earlier in arrival order, and it still qualifies.
+`a_prior_trade_later_in_event_time_but_earlier_in_arrival_order_is_still_a_candidate` exists because
+without it, deleting the upper bound would leave every other test green.
+
+### The store returns candidates; the rule decides
+
+`RiskRecentTradeStore` reads no governed parameter at all. The engine applies every store before the
+dispatch loop, and therefore before any rule's parameters are in hand, so a store that filtered by a
+governed window would have to pick one governed `ruleId`'s window on behalf of all of them. The store
+returns a bounded candidate set and `SelfCrossRule` filters it.
+
+That bound is capped, and the cap is visible rather than silent. The query asks for one row more than
+the cap, so truncation is detectable, and hitting it increments a counter:
+`hitting_the_candidate_cap_is_reported_rather_than_silently_truncated`. A cap that quietly dropped the
+offsetting trade would produce no alert and no signal, the same failure shape as the `NaN` variance.
+
+For the same reason, a governed `window-seconds` wider than the configured
+`recent-trade-horizon-seconds` is rejected rather than accepted and quietly truncated:
+`a_governed_window_wider_than_the_configured_horizon_is_rejected`, with
+`a_window_equal_to_the_configured_horizon_is_accepted` pinning the boundary.
+
+Prices are compared by relative tolerance, never by equality. A candidate's price has been round-
+tripped through a `NUMERIC(19,4)` column while the triggering trade's price is the unrounded `double`
+off the Avro record, so the two sides are not symmetrically precise.
+
+### Which tables actually prune, and on which horizon
+
+Two of the four prune, and it is worth being exact about which.
+
+`risk_volume_bucket` prunes at the window horizon, because a bucket outside the window contributes to
+no fold and deleting it changes no answer. `risk_recent_trade` prunes at the seven-day
+`trades.enriched` retention rather than at any window: it exists to answer a redelivery, and a record
+older than the topic's retention cannot be redelivered at all, which is what makes that delete safe.
+Its delete is scoped to the `(trader_id, ticker)` of the trade being applied, so a key that stops
+trading stops pruning, and its rows sit there until it trades again.
+
+`risk_volume_applied_trade` is never pruned, like `risk_position_applied_trade` before it. Retention
+is the horizon it *could* use, but the only column resembling a cutoff is `applied_at`, which is
+wall-clock, and this service keeps wall-clock values out of anything that has to replay identically.
+A prune would need an event-time column the table does not carry.
 
 ## The alert identity is derived, not random
 
@@ -520,11 +702,17 @@ Docker and fails if anyone deletes `ssl=on` from the overlay.
 ## Metrics
 
 ```text
-risk_alerts_fired_total{alert_type, severity}    alerts published to notifications.alerts
-risk_rule_versions_rejected_total{reason}        governed versions rejected during the fold
-risk_alert_trades_quarantined_total              enriched trades sent to the dead-letter topic
-risk_rule_timelines                              rule timelines folded from risk-rules.events
+risk_alerts_fired_total{alert_type, severity}         alerts published to notifications.alerts
+risk_rule_versions_rejected_total{reason}             governed versions rejected during the fold
+risk_alert_trades_quarantined_total                   enriched trades sent to the dead-letter topic
+risk_rule_timelines                                   rule timelines folded from risk-rules.events
+risk_volume_window_below_minimum_sample_total         windowed evaluations declined for a thin window
+risk_self_cross_candidates_truncated_total            candidate queries that hit their row cap
 ```
+
+The last two exist because both conditions are silent otherwise. A window below its governed minimum
+produces no alert, and a truncated candidate set can drop the very offsetting trade that would have
+matched; without a counter, each looks exactly like a quiet market.
 
 Those are the rendered Prometheus names. The meters are registered with dot-delimited names,
 `risk.alerts.fired` and so on, matching every meter in the two sibling streaming services; the
@@ -535,9 +723,9 @@ carries the full reasoning.
 `risk_rule_timelines` is bound only after the initial fold completes, so it never reports a partial
 fold. It counts what was folded from the log, which is not a claim the log was complete.
 
-`every_meter_in_this_class_scrapes_through_a_real_prometheus_registry_without_throwing` exercises all
-four through an actual `PrometheusMeterRegistry` scrape rather than the in-memory registry the other
-metric tests use.
+`every_meter_in_this_class_scrapes_through_a_real_prometheus_registry_without_throwing` exercises them
+through an actual `PrometheusMeterRegistry` scrape rather than the in-memory registry the other metric
+tests use.
 
 ## What this does not prove
 
@@ -547,21 +735,27 @@ metric tests use.
 - **Nothing writes `risk-rules.events` in production.** `risk-rule-governance-service` is Phase 5.
   Every governed-version path here is exercised by tests that publish to the topic directly, and in a
   running system the bootstrap set is what applies today.
-- **Two of FR-04.2's four rules are absent, so FR-04 is not met.** `UNUSUAL_VOLUME` and
-  `WASH_TRADE_DETECTED` are a later increment. Wash-trade detection is additionally blocked on a
-  definition: `contracts/` carries `accountId` but no account-relationship source, so the rule as
-  specified cannot be implemented against the events that exist.
+- **`WASH_TRADE_DETECTED` detects self-cross only, not related-party wash trading.** All four of
+  FR-04.2's rules now exist, but this one is implemented against a narrowed definition, because
+  `contracts/` carries `accountId` and no source relating two accounts. Treat a clean run of this rule
+  as evidence that no trader crossed themselves, never as evidence that no wash trading occurred.
 - **The position store cannot be rebuilt from Kafka history.** FR-11.5's rebuild-and-reconcile
   requirement is written against `position-exposure-service`, which does not exist. If this store were
   lost, nothing here reconstructs it, which is why the local compose service mounts a volume where the
   Redis cache beside it deliberately does not.
 - **The position total duplicates one FR-11 will also hold.** `position-exposure-service` will own its
   own position read model. The two will carry overlapping numbers and nothing reconciles them yet.
-- **`risk_position_applied_trade` is never pruned.** It grows with trade volume. Redelivery beyond
-  `trades.enriched`'s seven-day retention cannot happen, so older rows are dead weight rather than a
-  correctness need, but no job removes them.
-- **`gross_buy` and `gross_sell` are written and never read.** They are carried for FR-11.2 and for
-  the windowed rules of the next increment.
+- **Neither replay ledger is pruned.** `risk_position_applied_trade` and
+  `risk_volume_applied_trade` both grow with trade volume. Redelivery beyond `trades.enriched`'s
+  seven-day retention cannot happen, so older rows are dead weight rather than a correctness need,
+  but no job removes them and neither table carries an event-time column a prune could safely use.
+  `risk_recent_trade` does prune at that horizon, but only for keys that keep trading.
+- **`gross_buy` and `gross_sell` are written and never read.** They are carried for FR-11.2. The
+  windowed rules did not end up using them: `UNUSUAL_VOLUME` folds its own distribution of trade
+  quantities rather than reading the position's gross figures.
+- **No throughput figure covers the three database round trips a default deployment now makes.**
+  Bootstrapping `position-limit`, `unusual-volume` and `self-cross` means every trade touches all
+  three stores before any rule runs.
 - **No latency figure has been measured.** The sub-5ms evaluation target and the platform's
   sub-200ms and 50,000 events/sec figures remain targets until Phase 8 measures them.
 - **The fold is per-process and rebuilt on every start.** Two instances starting at different moments

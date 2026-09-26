@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.ActiveProfiles;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Property binding only, against an explicit minimal configuration rather than the full
@@ -56,8 +57,19 @@ class RiskAlertPropertiesTest {
     }
 
     @Test
+    void the_volume_window_horizon_binds_from_application_yml() {
+        assertThat(properties.volumeWindowSeconds()).isEqualTo(3_600L);
+    }
+
+    @Test
+    void the_recent_trade_horizon_and_cap_bind_from_application_yml() {
+        assertThat(properties.recentTradeHorizonSeconds()).isEqualTo(3_600L);
+        assertThat(properties.recentTradeCandidateCap()).isEqualTo(200);
+    }
+
+    @Test
     void the_bootstrap_rule_set_binds_from_application_yml() {
-        assertThat(bootstrapRuleProperties.rules()).hasSize(2);
+        assertThat(bootstrapRuleProperties.rules()).hasSize(4);
 
         assertThat(bootstrapRuleProperties.rules())
                 .filteredOn(rule -> rule.ruleId().equals("price-deviation"))
@@ -78,6 +90,52 @@ class RiskAlertPropertiesTest {
                             .containsEntry("warn-position-quantity", "10000")
                             .containsEntry("critical-position-quantity", "50000");
                 });
+
+        assertThat(bootstrapRuleProperties.rules())
+                .filteredOn(rule -> rule.ruleId().equals("unusual-volume"))
+                .singleElement()
+                .satisfies(rule -> {
+                    assertThat(rule.ruleType()).isEqualTo("unusual-volume");
+                    assertThat(rule.parameters())
+                            .containsEntry("warn-sigma-multiplier", "3.0")
+                            .containsEntry("critical-sigma-multiplier", "5.0")
+                            .containsEntry("min-sample-count", "30");
+                });
+
+        assertThat(bootstrapRuleProperties.rules())
+                .filteredOn(rule -> rule.ruleId().equals("self-cross"))
+                .singleElement()
+                .satisfies(rule -> {
+                    assertThat(rule.ruleType()).isEqualTo("self-cross");
+                    assertThat(rule.parameters())
+                            .containsEntry("window-seconds", "300")
+                            .containsEntry("quantity-tolerance-percent", "1.0")
+                            .containsEntry("price-tolerance-percent", "1.0");
+                });
+    }
+
+    @Test
+    void a_candidate_cap_of_zero_is_rejected_rather_than_silencing_the_self_cross_rule() {
+        // The store asks for cap + 1 rows so truncation is detectable. A cap of zero therefore
+        // finds one row, calls the set truncated, and hands the rule nothing: the rule stops
+        // alerting and says so only in a counter.
+        assertThatThrownBy(() -> new RiskAlertProperties("t", "r", "o", "i",
+                Duration.ofSeconds(60), 3_600L, 3_600L, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("recent-trade-candidate-cap");
+    }
+
+    @Test
+    void a_non_positive_window_horizon_is_rejected() {
+        assertThatThrownBy(() -> new RiskAlertProperties("t", "r", "o", "i",
+                Duration.ofSeconds(60), 0L, 3_600L, 200))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("volume-window-seconds");
+
+        assertThatThrownBy(() -> new RiskAlertProperties("t", "r", "o", "i",
+                Duration.ofSeconds(60), 3_600L, -1L, 200))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("recent-trade-horizon-seconds");
     }
 
     @Configuration(proxyBeanMethods = false)

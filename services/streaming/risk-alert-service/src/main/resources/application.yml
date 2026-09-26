@@ -16,8 +16,11 @@ spring:
         # the one that matters most: it is what converts a database that accepted the connection
         # and then stopped answering into a QueryTimeoutException, rather than an indefinite block
         # on the listener thread that never reaches backOffFor at all and eventually crosses
-        # max.poll.interval.ms instead. 10s comfortably exceeds this service's point lookups and
-        # single upsert, and Flyway's one migration, which only creates two tables at startup.
+        # max.poll.interval.ms instead. 10s is set against what a trade now costs in the default
+        # configuration: three stores applied in sequence, including the volume fold's bounded
+        # 60-row range and the self-cross candidate query's capped range, plus Flyway's two
+        # migrations creating six tables at startup. It is not a measured bound; no run has timed
+        # these statements, and the sub-5ms p99 evaluation target stays unmeasured until Phase 8.
         connectTimeout: 5
         socketTimeout: 10
   flyway:
@@ -57,6 +60,18 @@ fes:
     output-topic: notifications.alerts
     consumer-instance: ${HOSTNAME:risk-alert-service-local}
     rule-timeline-timeout: 60s
+    # The rolling distribution's horizon, in seconds. Configuration, not a governed rule parameter.
+    # The prune deletes buckets outside this horizon, so a governed rule carrying a longer horizon
+    # would fold a window already partly deleted and return a quietly wrong statistic rather than an
+    # error. Writer-prune and reader-fold must agree on one number, the same reason MarketCacheKeys
+    # shares WINDOW_SECONDS between the projector and enrichment.
+    volume-window-seconds: 3600
+    # The self-cross candidate window's horizon, in seconds, and the maximum prior trades returned
+    # for one evaluation. 200 sits well above any realistic per-(trader, ticker) trade count inside
+    # a one-hour horizon; hitting it is counted as RecentTrades.truncated rather than swallowed,
+    # because a cap that silently dropped the offsetting trade would produce no alert and no signal.
+    recent-trade-horizon-seconds: 3600
+    recent-trade-candidate-cap: 200
 
 risk:
   rules:
@@ -73,6 +88,23 @@ risk:
       parameters:
         warn-position-quantity: "10000"
         critical-position-quantity: "50000"
+    # Adding these to the bootstrap set means every default deployment writes to both new stores
+    # from its first trade, the same way position-limit already does. The engine's "apply only the
+    # stores a rule in force declared" property is a property of the requirements union, not of the
+    # shipped configuration: it holds for a deployment whose bootstrap set and governed timeline
+    # carry only price-deviation.
+    - rule-id: unusual-volume
+      rule-type: unusual-volume
+      parameters:
+        warn-sigma-multiplier: "3.0"
+        critical-sigma-multiplier: "5.0"
+        min-sample-count: "30"
+    - rule-id: self-cross
+      rule-type: self-cross
+      parameters:
+        window-seconds: "300"
+        quantity-tolerance-percent: "1.0"
+        price-tolerance-percent: "1.0"
 
 management:
   endpoints:

@@ -46,6 +46,8 @@ public class RiskAlertMetrics {
     private final Map<String, Counter> alerts = new ConcurrentHashMap<>();
     private final Map<String, Counter> rejectedRuleVersions = new ConcurrentHashMap<>();
     private final Counter quarantined;
+    private final Counter candidateSetTruncated;
+    private final Counter windowBelowMinimumSample;
 
     public RiskAlertMetrics(MeterRegistry registry) {
         this.registry = registry;
@@ -54,6 +56,15 @@ public class RiskAlertMetrics {
         // which is a different measurement under a confusingly similar name.
         this.quarantined = Counter.builder("risk.alert.trades.quarantined")
                 .description("Enriched trades this service quarantined to trades.enriched.dlq")
+                .register(registry);
+        // A cap that silently dropped the offsetting trade would produce no alert and no signal, so
+        // hitting it is counted rather than swallowed (Task 5's self-cross candidate query).
+        this.candidateSetTruncated = Counter.builder("risk.self.cross.candidates.truncated")
+                .description("Self-cross candidate queries that hit the configured row cap")
+                .register(registry);
+        this.windowBelowMinimumSample = Counter.builder("risk.volume.window.below.minimum.sample")
+                .description("Unusual-volume evaluations skipped because the window held fewer than "
+                        + "the governed minimum sample count")
                 .register(registry);
     }
 
@@ -76,6 +87,22 @@ public class RiskAlertMetrics {
 
     public void recordQuarantined() {
         quarantined.increment();
+    }
+
+    /**
+     * The self-cross candidate query hit its row cap. A truncated set can drop the offsetting trade
+     * and produce no alert, so the condition is counted rather than swallowed.
+     */
+    public void recordCandidateSetTruncated() {
+        candidateSetTruncated.increment();
+    }
+
+    /**
+     * A window held fewer than the governed minimum sample count. Skipped rather than swallowed
+     * silently: a thin window is a distinct, expected condition, not an error.
+     */
+    public void recordWindowBelowMinimumSample() {
+        windowBelowMinimumSample.increment();
     }
 
     /** Registered by the loader once the initial fold completes, so the gauge never reports a partial fold. */

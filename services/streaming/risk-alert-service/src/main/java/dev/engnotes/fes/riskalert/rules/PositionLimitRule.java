@@ -2,6 +2,7 @@ package dev.engnotes.fes.riskalert.rules;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import dev.engnotes.fes.common.idempotency.IdempotencyKeys;
 import dev.engnotes.fes.events.AlertType;
@@ -10,7 +11,6 @@ import dev.engnotes.fes.events.RiskAlertEvent;
 import dev.engnotes.fes.events.Severity;
 import dev.engnotes.fes.events.TradeEvent;
 import dev.engnotes.fes.riskalert.governance.ActiveRule;
-import dev.engnotes.fes.riskalert.position.NetPosition;
 
 /**
  * FR-04.2's position-limit rule: a single trader's net position in a ticker exceeding a configurable
@@ -24,7 +24,7 @@ import dev.engnotes.fes.riskalert.position.NetPosition;
  * <p>Strict exceedance: a position exactly at the band does not breach, matching the plain reading
  * of "exceeds".
  */
-public class PositionLimitRule implements PositionAwareRiskRule {
+public class PositionLimitRule implements StatefulRiskRule {
 
     public static final String RULE_TYPE = "position-limit";
 
@@ -34,9 +34,14 @@ public class PositionLimitRule implements PositionAwareRiskRule {
     }
 
     @Override
-    public Optional<RiskAlertEvent> evaluate(EnrichedTradeEvent trade, ActiveRule rule, NetPosition post) {
+    public Set<StateKind> requires() {
+        return Set.of(StateKind.POSITION);
+    }
+
+    @Override
+    public Optional<RiskAlertEvent> evaluate(EnrichedTradeEvent trade, ActiveRule rule, TradeContext context) {
         PositionLimitParameters bands = PositionLimitParameters.from(rule.parameters());
-        long net = post.netQuantity();
+        long net = context.position().netQuantity();
         long magnitude = Math.abs(net);
 
         Severity severity;

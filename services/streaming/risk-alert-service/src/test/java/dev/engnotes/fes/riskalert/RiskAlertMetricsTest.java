@@ -135,6 +135,8 @@ class RiskAlertMetricsTest {
         prometheusMetrics.recordAlert(alert(AlertType.PRICE_DEVIATION, Severity.CRITICAL));
         prometheusMetrics.recordRejectedRuleVersion("missing_parameter");
         prometheusMetrics.recordQuarantined();
+        prometheusMetrics.recordCandidateSetTruncated();
+        prometheusMetrics.recordWindowBelowMinimumSample();
         prometheusMetrics.bindRuleRegistry(rules);
 
         // PrometheusMeterRegistry builds a counter's metadata lazily inside the collector invoked
@@ -146,5 +148,7 @@ class RiskAlertMetricsTest {
         assertThat(scraped).contains("risk_rule_versions_rejected_total");
         assertThat(scraped).contains("risk_alert_trades_quarantined_total");
         assertThat(scraped).contains("risk_rule_timelines");
+        assertThat(scraped).contains("risk_self_cross_candidates_truncated_total");
+        assertThat(scraped).contains("risk_volume_window_below_minimum_sample_total");
     }
 }
