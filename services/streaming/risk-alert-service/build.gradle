@@ -24,6 +24,7 @@ dependencies {
     implementation project(':platform-common')
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation libs.springdoc.webmvc.scalar
     implementation libs.confluent.kafka.avro.serializer
 
     // Increment 2: the first relational store in this repository. Spring Data JDBC rather than JPA

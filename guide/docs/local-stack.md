@@ -202,7 +202,8 @@ the ACL file correctly. That is what `EnrichmentRedisAclIntegrationTest` proves 
 the committed template with a test password and authenticating against a real Redis, the same
 substitution `scripts/generate-dev-security-material.sh` performs.
 
-The services themselves, in this stack. They still run from Gradle or an IDE against it. Each service
+The services themselves, in this stack. They still run from Gradle or an IDE against it, under the
+`dev` profile described in [Running a service](running.md). Each service
 now builds an image, and [service identity](identity.md) proves the binding to a Kafka principal by
 running that image against a separate strict-security broker fixture in `integrationTest`; this
 compose stack does not run the services themselves.

@@ -71,6 +71,21 @@ containers, so the first run pulls images and takes a few minutes.
 ./gradlew :contracts:test          # schema compatibility gate on its own
 ```
 
+### Run a service
+
+Bring up the local stack, then start a service under the `dev` profile, which points it at the stack's
+brokers, gives it its own port (8091 to 8099) and turns on its API docs at `/scalar`:
+
+```bash
+scripts/local-stack.sh up dev
+SPRING_PROFILES_ACTIVE=dev ./gradlew :services:streaming:risk-alert-service:bootRun
+open http://localhost:8097/scalar
+```
+
+Every service's command, port and store requirements are in the
+[Running a service](https://salgotraja.github.io/financial-event-streaming-platform/running/) chapter
+of the learning guide.
+
 ## Build gates
 
 Two rules fail the build rather than warn, and both run on every pull request.

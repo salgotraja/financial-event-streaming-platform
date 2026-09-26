@@ -20,9 +20,11 @@ dependencies {
     implementation project(':platform-common')
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation libs.springdoc.webmvc.scalar
     implementation libs.confluent.kafka.avro.serializer
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
     testImplementation testFixtures(project(':platform-common'))
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

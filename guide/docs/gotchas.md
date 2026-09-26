@@ -3,6 +3,19 @@
 Every entry cost someone real time. Each one names where the behaviour lives so you can check it
 rather than take it on trust.
 
+## A service started from Gradle looks for Kafka on 9092; the stack listens on 29092
+
+No service sets `spring.kafka.bootstrap-servers` in its base configuration, so Spring Boot's default,
+`localhost:9092`, applies. The compose brokers advertise `localhost:29092`, `localhost:29093` and
+`localhost:29094`, one host port per broker, since three containers cannot all publish 9092.
+
+The symptom depends on the service. risk-alert-service dies after a minute with
+`Timeout expired while fetching topic metadata`, which reads like a missing topic rather than a wrong
+address. A producer starts cleanly and reports `UP`, because it contacts no broker until it sends.
+
+Start services under the `dev` profile, which sets the three addresses. See
+[Running a service](running.md).
+
 ## The native Kafka image can segfault on launch, and one crash fails the whole class
 
 `apache/kafka-native` is a GraalVM build, and on a CI runner it occasionally dies during startup:

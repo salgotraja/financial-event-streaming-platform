@@ -252,6 +252,8 @@ order.
 | --- | --- | --- |
 | No deterministic-plane module depends on the agent plane | `build.gradle` | `./gradlew checkPlaneIsolation`, verified to fail on both a project edge and a Neo4j dependency |
 | Every service commits a renderable ACL policy | `KafkaAclScriptRenderer` | `./gradlew renderKafkaAcls`, wired into `check` |
+| API docs are off by default and on only under the `dev` profile | every service's `application.yml` | `should_serve_neither_openapi_nor_scalar_when_no_profile_is_active`, `should_serve_openapi_document_including_actuator_health_when_dev_profile_is_active`, `should_serve_scalar_ui_from_springdoc_controller_when_dev_profile_is_active` |
+| Every service carries the `dev` profile, with a port no other service uses | every service's `application.yml` | `should_keep_api_docs_off_by_default_and_on_under_dev_with_a_unique_port_when_service_is_configured` |
 | Source formatting is enforced rather than reviewed | `build.gradle` | `./gradlew spotlessCheck`, wired into `check` |
 | The audit evidence path has a working local AWS endpoint | `LocalStackFixture` | `should_accept_a_bucket_on_the_emulated_s3_endpoint`, `should_expose_kms_which_the_manifest_signature_will_depend_on`, `should_report_the_endpoint_and_region_a_client_would_be_configured_with` |
 

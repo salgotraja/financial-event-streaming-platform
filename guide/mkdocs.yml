@@ -97,6 +97,7 @@ nav:
       - Service identity: identity.md
       - Build gates and CI: gates.md
       - The local stack: local-stack.md
+      - Running a service: running.md
   - Proof:
       - Code to proof map: proof.md
       - Gotchas: gotchas.md

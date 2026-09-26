@@ -82,12 +82,14 @@ belongs in a service.
 
 ```groovy
 ext.deterministicPlanePrefixes = [':services:ingestion', ':services:streaming', ':services:audit']
-ext.agentOnlyDependencyMarkers = ['org.neo4j', 'com.anthropic', 'dev.langchain4j', 'io.github.ollama4j']
+ext.agentOnlyDependencyMarkers = ['org.neo4j', 'com.anthropic', 'dev.langchain4j', 'io.github.ollama4j',
+                                  'org.springframework.ai', 'io.modelcontextprotocol']
 ```
 
 A module whose path starts with one of the three prefixes fails the build if it declares a
 `ProjectDependency` on a path starting with `:services:agent`, or any dependency whose group starts
-with one of the four markers.
+with one of the six markers. The last two, Spring AI and the Model Context Protocol SDK, arrived with
+springdoc: its 3.1 release ships an MCP starter one artifact away from the one the services use.
 
 Two implementation details are worth copying if you write a similar check.
 
