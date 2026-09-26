@@ -170,7 +170,8 @@ subprojects {
 // Nothing in the deterministic path may take a build dependency on the agent plane, on Neo4j, or on
 // an LLM provider. A violation fails the build rather than producing a review comment.
 ext.deterministicPlanePrefixes = [':services:ingestion', ':services:streaming', ':services:audit']
-ext.agentOnlyDependencyMarkers = ['org.neo4j', 'com.anthropic', 'dev.langchain4j', 'io.github.ollama4j']
+ext.agentOnlyDependencyMarkers = ['org.neo4j', 'com.anthropic', 'dev.langchain4j', 'io.github.ollama4j',
+                                  'org.springframework.ai', 'io.modelcontextprotocol']
 
 // Violations are collected at configuration time into plain serializable data. The task body must
 // not touch Project, or the configuration cache cannot store it.
