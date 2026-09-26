@@ -740,11 +740,12 @@ tests use.
   `contracts/` carries `accountId` and no source relating two accounts. Treat a clean run of this rule
   as evidence that no trader crossed themselves, never as evidence that no wash trading occurred.
 - **The position store cannot be rebuilt from Kafka history.** FR-11.5's rebuild-and-reconcile
-  requirement is written against `position-exposure-service`, which does not exist. If this store were
-  lost, nothing here reconstructs it, which is why the local compose service mounts a volume where the
-  Redis cache beside it deliberately does not.
-- **The position total duplicates one FR-11 will also hold.** `position-exposure-service` will own its
-  own position read model. The two will carry overlapping numbers and nothing reconciles them yet.
+  requirement is written against `position-exposure-service`, and even when that service's rebuild lands it rebuilds
+  that service's own model, not this store. If this store were lost, nothing reconstructs it, which is
+  why the local compose service mounts a volume where the Redis cache beside it deliberately does not.
+- **The position total duplicates one FR-11 also holds.** [The position read model](positions.md)
+  keeps its own totals by account, trader and ticker. The two carry overlapping numbers, and nothing
+  reconciles them: no service owns that comparison yet (ADR-038).
 - **Neither replay ledger is pruned.** `risk_position_applied_trade` and
   `risk_volume_applied_trade` both grow with trade volume. Redelivery beyond `trades.enriched`'s
   seven-day retention cannot happen, so older rows are dead weight rather than a correctness need,

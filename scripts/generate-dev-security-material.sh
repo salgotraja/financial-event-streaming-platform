@@ -99,7 +99,7 @@ log "wrote deploy/compose/tls: postgres.keystore.pem (PostgreSQL server identity
 
 # Identities the broker accepts. Must match SecureKafkaStack.PRINCIPALS, or a service proven to be
 # least-privilege in a test would authenticate as something else in the stack.
-PRINCIPALS=(admin trade-producer market-data-simulator corporate-action-producer reference-data-service audit-service market-data-cache-projector trade-enrichment-service risk-alert-service)
+PRINCIPALS=(admin trade-producer market-data-simulator corporate-action-producer reference-data-service audit-service market-data-cache-projector trade-enrichment-service risk-alert-service position-exposure-service)
 
 secret_for() { printf '%s-local-secret' "$1"; }
 
@@ -125,6 +125,7 @@ log "writing SASL credentials"
   printf 'FES_REDIS_PROJECTOR_SECRET=%s\n' "$(secret_for market-data-cache-projector)"
   printf 'FES_REDIS_ENRICHMENT_SECRET=%s\n' "$(secret_for trade-enrichment-service)"
   printf 'FES_POSTGRES_RISK_ALERT_SECRET=%s\n' "$(secret_for risk-alert-service)"
+  printf 'FES_POSTGRES_POSITION_EXPOSURE_SECRET=%s\n' "$(secret_for position-exposure-service)"
   printf 'FES_POSTGRES_BOOTSTRAP_SECRET=%s\n' "$(secret_for postgres-bootstrap)"
 } > "$REPO_ROOT/deploy/compose/.env"
 chmod 600 "$REPO_ROOT/deploy/compose/.env"

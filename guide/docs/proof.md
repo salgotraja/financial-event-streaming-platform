@@ -219,19 +219,51 @@ order.
 | Both new rules fire end to end through a real broker, registry and database | `UnusualVolumeRule`, `SelfCrossRule` | `an_outsized_trade_after_a_uniform_window_raises_one_unusual_volume_alert`, `an_offsetting_pair_raises_one_wash_trade_alert_naming_the_first_trade` |
 | Risk alerting cannot write the governance topic, its own input, or join another group | `security/kafka-acls.yml` | `should_deny_writing_the_governed_rule_topic`, `should_deny_writing_the_topic_it_consumes`, `should_deny_joining_a_consumer_group_other_than_its_own`, the first watched failing with a WRITE grant added |
 
+## The position read model
+
+| Behaviour | Implementation | Proof |
+| --- | --- | --- |
+| The grain separates accounts and tickers rather than collapsing them | `PositionStore` | `the_grain_is_the_three_part_position_key`, `the_grain_separates_two_accounts_trading_one_ticker`, `the_grain_separates_one_account_trading_two_tickers` |
+| Buys and sells net, and both add to their own gross total | `PositionStore` | `a_buy_and_a_sell_net_against_each_other_and_both_add_to_gross`, `a_short_position_is_signed_rather_than_clamped` |
+| Market value is the net at the mid price of the trade that moved it | `PositionStore` | `market_value_is_the_net_at_the_mid_price_of_the_trade_that_moved_it` |
+| A trade applied twice moves the position once | `PositionStore` | `a_trade_applied_twice_moves_the_position_once` |
+| A redelivery reproduces every published figure, not just the net | `PositionStore` | `a_redelivery_reproduces_every_figure_the_first_delivery_produced`, `the_ledger_pins_every_figure_the_snapshot_publishes` |
+| A late trade cannot drag the event-time high-water mark backwards | `PositionStore` | `an_earlier_event_timestamp_delivered_later_does_not_move_last_event_timestamp_backwards` |
+| A failure after the claim insert rolls back the whole apply | `PositionStore` | `a_position_upsert_failure_after_the_claim_insert_rolls_back_the_whole_apply` |
+| Market value stays exact numeric, so a future reconciliation compares cleanly | `V1__position_read_model.sql` | `market_value_is_exact_numeric_rather_than_floating_point` |
+| One trade publishes exactly one snapshot, keyed on a hash of the position | `PositionSnapshotPublisher` | `one_trade_publishes_exactly_one_snapshot_keyed_on_a_hash_of_the_position_key`, `the_record_is_keyed_on_a_hash_of_the_composite_position_key` |
+| The snapshot carries the consumed record's trace headers, and invents none | `PositionSnapshotPublisher` | `the_trace_headers_of_the_consumed_record_are_copied_onto_the_snapshot`, `an_absent_trace_header_is_not_invented_on_the_snapshot` |
+| The same trade delivered twice applies once and republishes an identical snapshot | `EnrichedTradeConsumer` | `the_same_trade_delivered_twice_applies_once_and_republishes_an_identical_snapshot` against a real broker |
+| The snapshot is published before the offset is acknowledged | `EnrichedTradeConsumer` | `the_snapshot_is_published_before_the_offset_is_acknowledged`, `a_metrics_failure_after_a_successful_publish_does_not_prevent_the_acknowledgement` |
+| A replayed trade republishes the same snapshot identity | `PositionSnapshotPublisher` | `the_snapshot_id_is_derived_so_a_replay_republishes_the_same_identity`, `the_snapshot_carries_the_position_and_the_trade_that_produced_it` |
+| The listener joins the configured group, not one named after its id | `EnrichedTradeConsumer` | `the_listener_id_does_not_override_the_configured_consumer_group` |
+| A poison record is quarantined and the record behind it still applies | `PositionExposureKafkaConfiguration` | `a_malformed_record_is_quarantined_and_the_record_behind_it_is_still_applied`, `a_null_valued_record_is_rejected_without_calling_the_store` |
+| A trade carrying the key separator is quarantined before its position moves | `EnrichedTradeConsumer` | `a_trade_carrying_the_key_separator_is_rejected_before_the_position_moves`, `a_trade_carrying_the_key_separator_is_quarantined_without_moving_its_position` |
+| An id longer than its column is quarantined rather than pausing the container | `V1__position_read_model.sql` | `a_trade_id_longer_than_its_column_is_quarantined_rather_than_pausing_the_container` |
+| A database outage pauses rather than dead-lettering, however deeply wrapped | `PositionExposureKafkaConfiguration` | `should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade`, `an_outage_wrapped_several_causes_deep_is_still_recognised`, `any_other_failure_keeps_the_bounded_poison_back_off`, `a_pool_timeout_at_transaction_begin_pauses_rather_than_quarantining`, `a_connection_lost_mid_statement_pauses_rather_than_quarantining` |
+| A failed snapshot publish pauses rather than dead-lettering an applied trade | `PositionSnapshotPublisher` | `a_failed_snapshot_publish_pauses_and_retries_rather_than_dead_lettering_an_applied_trade`, `a_failed_snapshot_publish_pauses_rather_than_quarantining_an_applied_trade`, `a_separator_reaching_the_publisher_is_rejected_before_the_send_rather_than_wrapped_as_a_publish_failure` |
+| The read model cannot write its own input or read its own output | `security/kafka-acls.yml` | `should_deny_writing_the_topic_it_consumes`, `should_deny_reading_the_topic_it_writes`, `should_deny_joining_a_consumer_group_other_than_its_own` |
+| Its database role holds no privilege beyond its own schema | `init-position-exposure-role.sql` | `the_position_exposure_service_role_holds_no_superuser_createrole_or_createdb_privilege`, `the_role_cannot_create_a_table_in_the_public_schema` |
+| TLS is required, and the bootstrap superuser has no network route | `pg_hba.conf` | `a_plaintext_connection_is_rejected_by_the_tls_only_listener`, `a_tls_connection_verified_against_the_ca_succeeds`, `the_bootstrap_superuser_cannot_connect_over_the_network_at_all` |
+
 ## Structure
 
 | Behaviour | Implementation | Proof |
 | --- | --- | --- |
 | No deterministic-plane module depends on the agent plane | `build.gradle` | `./gradlew checkPlaneIsolation`, verified to fail on both a project edge and a Neo4j dependency |
 | Every service commits a renderable ACL policy | `KafkaAclScriptRenderer` | `./gradlew renderKafkaAcls`, wired into `check` |
+| API docs are off by default and on only under the `dev` profile | every service's `application.yml` | `should_serve_neither_openapi_nor_scalar_when_no_profile_is_active`, `should_serve_openapi_document_including_actuator_health_when_dev_profile_is_active`, `should_serve_scalar_ui_from_springdoc_controller_when_dev_profile_is_active` |
+| Every service carries the `dev` profile, with a port no other service uses | every service's `application.yml` | `should_keep_api_docs_off_by_default_and_on_under_dev_with_a_unique_port_when_service_is_configured` |
 | Source formatting is enforced rather than reviewed | `build.gradle` | `./gradlew spotlessCheck`, wired into `check` |
 | The audit evidence path has a working local AWS endpoint | `LocalStackFixture` | `should_accept_a_bucket_on_the_emulated_s3_endpoint`, `should_expose_kms_which_the_manifest_signature_will_depend_on`, `should_report_the_endpoint_and_region_a_client_would_be_configured_with` |
 
 ## What has no proof yet
 
-Anything that would need a service that does not exist: read-model rebuild, the agent tool boundary,
+Anything that would need a service or path that does not exist: read-model rebuild, the agent tool boundary,
 sustained throughput, and evidence integrity end to end. Enrichment and risk evaluation now have
 behavioural proof but no latency proof: no run has measured either against its budget.
-Dependency failure has two proofs now, on the projector's Redis connection and on the risk service's PostgreSQL connection. Those rows appear in `.claude/rules/testing.md` as required
-categories and are waiting on their subjects.
+Dependency failure has five proofs now: the projector's and the enrichment service's Redis
+connections, the risk service's PostgreSQL connection, and the position read model's PostgreSQL
+connection (`PostgresOutageIntegrationTest`) and snapshot publish (`SnapshotPublishOutageIntegrationTest`).
+The remaining gaps are required test categories, listed under [Build gates](gates.md#required-coverage-by-category), and wait on
+their subjects.

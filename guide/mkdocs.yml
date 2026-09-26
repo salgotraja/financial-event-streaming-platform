@@ -92,10 +92,12 @@ nav:
       - The market cache projector: projector.md
       - The trade enrichment service: enrichment.md
       - The risk alert service: risk-alerts.md
+      - The position read model: positions.md
       - Workload authorization: authorization.md
       - Service identity: identity.md
       - Build gates and CI: gates.md
       - The local stack: local-stack.md
+      - Running a service: running.md
   - Proof:
       - Code to proof map: proof.md
       - Gotchas: gotchas.md

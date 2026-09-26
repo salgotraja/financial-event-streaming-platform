@@ -1,0 +1,41 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+}
+
+// ADR-017: a CQRS-style read model, idempotent by tradeId, designed to be rebuilt from event
+// history. The rebuild path (FR-11.5) lands in increment 2 and does not exist yet.
+// ADR-019: at-least-once, so snapshotId is derived deterministically rather than randomly.
+// ADR-027: per-record quarantine to trades.enriched.dlq, no event-type-wide breaker.
+// ADR-038: the grain is (accountId, traderId, ticker) and marketValue is mark-to-last-trade.
+// Workload identity: position-exposure-service. Consumer group: the same name.
+// Kafka permission: read trades.enriched, write positions.snapshots and trades.enriched.dlq.
+
+description = 'Maintains the position and exposure read model and publishes positions.snapshots'
+
+repositories {
+    maven {
+        url = 'https://packages.confluent.io/maven/'
+        content { includeGroupByRegex 'io\\.confluent.*' }
+    }
+}
+
+dependencies {
+    implementation project(':platform-common')
+
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation libs.springdoc.webmvc.scalar
+    implementation libs.confluent.kafka.avro.serializer
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-kafka-test'
+    testImplementation 'io.micrometer:micrometer-registry-prometheus'
+    testImplementation testFixtures(project(':platform-common'))
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+

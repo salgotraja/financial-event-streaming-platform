@@ -14,11 +14,11 @@ Source: `deploy/compose/topics.tsv`. Replication is 3 for every topic, matching
 | Topic | Partitions | Retention | Key | Used today |
 | --- | ---: | --- | --- | --- |
 | `trades.raw` | 12 | 7 days | ticker | written by `trade-producer`, read by `audit-service` and `trade-enrichment-service` |
-| `trades.enriched` | 12 | 7 days | ticker | written by `trade-enrichment-service`, read by `risk-alert-service` |
+| `trades.enriched` | 12 | 7 days | ticker | written by `trade-enrichment-service`, read by `risk-alert-service` and `position-exposure-service` |
 | `market-data.ticks` | 12 | 1 day | ticker | written by `market-data-simulator`, read by `audit-service` and `market-data-cache-projector` |
 | `corporate-actions` | 6 | 30 days | ticker | written by `corporate-action-producer`, read by `audit-service` |
 | `reference-data.instruments` | 6 | compacted | instrumentId | written by `reference-data-service`, read by `audit-service` and `trade-enrichment-service` |
-| `positions.snapshots` | 12 | 7 days | | no |
+| `positions.snapshots` | 12 | 7 days | hash of accountId, traderId, ticker | written by `position-exposure-service` |
 | `notifications.alerts` | 6 | 3 days | ticker | written by `risk-alert-service` |
 | `risk-rules.events` | 6 | 365 days | ruleId | read by `risk-alert-service`, written by nothing yet |
 | `alert-cases.events` | 6 | 365 days | | no |
@@ -32,7 +32,7 @@ Source: `deploy/compose/topics.tsv`. Replication is 3 for every topic, matching
 | `remediation.requested` | 6 | 30 days | | no |
 | `precedent.graph.sync` | 6 | 7 days | | no |
 | `trades.raw.dlq` | 12 | 30 days | source key | written by `audit-service` and `trade-enrichment-service` on quarantine |
-| `trades.enriched.dlq` | 12 | 30 days | source key | written by `risk-alert-service` on quarantine |
+| `trades.enriched.dlq` | 12 | 30 days | source key | written by `risk-alert-service` and `position-exposure-service` on quarantine |
 | `market-data.ticks.dlq` | 12 | 30 days | source key | written by `audit-service` and `market-data-cache-projector` on quarantine |
 | `corporate-actions.dlq` | 6 | 30 days | source key | written by `audit-service` on quarantine |
 | `reference-data.instruments.dlq` | 6 | 30 days | source key | written by `audit-service` on quarantine |

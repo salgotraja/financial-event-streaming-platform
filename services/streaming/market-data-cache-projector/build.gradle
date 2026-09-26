@@ -25,6 +25,7 @@ dependencies {
     implementation project(':platform-common')
 
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation libs.springdoc.webmvc.scalar
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation libs.confluent.kafka.avro.serializer
 

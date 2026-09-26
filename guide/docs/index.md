@@ -46,7 +46,7 @@ trade execution and no regulatory reporting.
 | Service container images, one per module, from buildpacks | Built |
 | Local stack, both profiles, with observability | Built |
 | Risk alerting, governed rule versions into `notifications.alerts` | Built, all four FR-04.2 rules, with `WASH_TRADE_DETECTED` narrowed to self-cross; nothing consumes the alert stream yet |
-| Deterministic streaming: position read model | Not started |
+| Position and exposure read model, `trades.enriched` into `positions.snapshots` | Built, without the rebuild path or the query API; nothing consumes the snapshot stream yet |
 | CDC migration, control plane, agent plane | Not started |
 | Throughput and latency evidence | Not measured |
 
@@ -77,7 +77,8 @@ checks stand between an edited `.avsc` and a running producer, and one of them w
 complete until it commits a least-privilege policy and proves one allowed path and two denied ones.
 
 **You want to run it.** Read [The local stack](local-stack.md). One script, two profiles, and a
-provisioning sequence that Compose alone cannot express.
+provisioning sequence that Compose alone cannot express. Then [Running a service](running.md) for the
+command, port and API docs URL of every service.
 
 **You hit something strange.** Read [Gotchas](gotchas.md). Every entry cost someone real time.
 

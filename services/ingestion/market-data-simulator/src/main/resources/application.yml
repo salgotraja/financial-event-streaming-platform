@@ -29,6 +29,14 @@ fes:
       pareto-shape: 1.5
       pareto-scale: 100
 
+# API docs (springdoc OpenAPI and the Scalar UI) are off unless the dev profile turns them on.
+# scalar.enabled is belt and braces over springdoc's own condition, so a change there cannot expose the UI.
+springdoc:
+  api-docs:
+    enabled: false
+scalar:
+  enabled: false
+
 management:
   endpoints:
     web:
@@ -43,3 +51,22 @@ logging:
   structured:
     format:
       console: ecs
+
+---
+# Running this service from Gradle or an IDE against `scripts/local-stack.sh up dev`. It does not work
+# against the strict-security stack, whose listeners need SASL_SSL client settings.
+spring:
+  config:
+    activate:
+      on-profile: dev
+  kafka:
+    bootstrap-servers: localhost:29092,localhost:29093,localhost:29094
+server:
+  port: 8092
+springdoc:
+  api-docs:
+    enabled: true
+  show-actuator: true
+scalar:
+  enabled: true
+  telemetry: false

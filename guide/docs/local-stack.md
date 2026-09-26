@@ -108,7 +108,7 @@ KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
 
 Hostname verification stays on: the broker certificate carries every name a client may use.
 
-Thirteen ACLs, rendered from the same per-service `kafka-acls.yml` files the authorization tests apply
+Thirty ACLs, rendered from the same per-service `kafka-acls.yml` files the authorization tests apply
 and read by the same parser. Per-identity client configuration is written to
 `deploy/compose/tls/client-<identity>.properties`.
 
@@ -119,7 +119,15 @@ Bringing it up asserts both halves of least privilege before printing the banner
 
 `fes-postgres` arrived with [the risk alert service](risk-alerts.md#the-position-limit-rule-and-the-state-it-needs)'s
 position state, the first relational store anywhere in the platform. It runs `postgres:16-alpine` on
-`localhost:5432` with database `risk_alert`. That schema now holds seven tables: the position total
+`localhost:5432`. It now backs two services with a schema each (ADR-028): `risk_alert` for the risk
+service and `position_exposure` for [the position read model](positions.md).
+
+**A second database means a second init script, and those have a catch.** PostgreSQL runs the
+scripts in its entrypoint directory only when the data volume is empty, so a developer who already
+has a `postgres-data` volume will not see `position_exposure` appear until they clear that volume
+themselves. No test is affected, because every test starts its own container.
+
+The `risk_alert` schema holds seven tables: the position total
 and its ledger, the rolling trade-quantity window with its prune cutoff and its ledger, and the
 recent-trade table the self-cross rule reads.
 
@@ -194,7 +202,8 @@ the ACL file correctly. That is what `EnrichmentRedisAclIntegrationTest` proves 
 the committed template with a test password and authenticating against a real Redis, the same
 substitution `scripts/generate-dev-security-material.sh` performs.
 
-The services themselves, in this stack. They still run from Gradle or an IDE against it. Each service
+The services themselves, in this stack. They still run from Gradle or an IDE against it, under the
+`dev` profile described in [Running a service](running.md). Each service
 now builds an image, and [service identity](identity.md) proves the binding to a Kafka principal by
 running that image against a separate strict-security broker fixture in `integrationTest`; this
 compose stack does not run the services themselves.

@@ -59,7 +59,7 @@ behave (ADR-023).
 The build enforces the structural half. `./gradlew checkPlaneIsolation` fails if any module under
 `services/ingestion`, `services/streaming` or `services/audit` takes a dependency on a
 `:services:agent` project, or on a library whose group starts with `org.neo4j`, `com.anthropic`,
-`dev.langchain4j` or `io.github.ollama4j`.
+`dev.langchain4j`, `io.github.ollama4j`, `org.springframework.ai` or `io.modelcontextprotocol`.
 
 The runtime half cannot be enforced yet, because there is no agent plane to isolate from. When it
 lands, the isolation will need a runtime demonstration too: a provider outage that leaves the

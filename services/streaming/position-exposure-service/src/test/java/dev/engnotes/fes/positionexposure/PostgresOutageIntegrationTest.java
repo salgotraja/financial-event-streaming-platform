@@ -1,0 +1,186 @@
+package dev.engnotes.fes.positionexposure;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+import java.util.UUID;
+import javax.sql.DataSource;
+
+import com.zaxxer.hikari.HikariDataSource;
+import dev.engnotes.fes.common.kafka.DeadLetterPublisher;
+import dev.engnotes.fes.events.DeadLetterEvent;
+import dev.engnotes.fes.events.EnrichedTradeEvent;
+import dev.engnotes.fes.events.PositionSnapshotEvent;
+import dev.engnotes.fes.testing.KafkaAvroStack;
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.listener.MessageListenerContainer;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * A PostgreSQL outage against a real broker and a real, container-local PostgreSQL (ADR-027,
+ * ADR-036): the container pauses rather than dead-letters a good trade while the database is
+ * unreachable, and resumes processing once it comes back.
+ *
+ * <p>A container local to this class, not {@code PostgresStack}: that stack is shared by every other
+ * integration test in this module, and Docker-pausing it would freeze the database out from under
+ * any other test class running in the same JVM.
+ */
+@SpringBootTest(properties = {
+        "management.otlp.metrics.export.enabled=false",
+        "management.otlp.tracing.export.enabled=false"
+})
+@DisplayName("PositionExposureKafkaConfiguration against a real broker and a real PostgreSQL outage")
+class PostgresOutageIntegrationTest {
+
+    private static final String TRADE_TOPIC = "pes-outage-it-" + UUID.randomUUID();
+    private static final String OUTPUT_TOPIC = "pes-outage-out-it-" + UUID.randomUUID();
+    private static final String DLQ_TOPIC = TRADE_TOPIC + DeadLetterPublisher.DLQ_SUFFIX;
+
+    private static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"))
+                    .withDatabaseName("position_exposure")
+                    .withUsername("position_exposure_service")
+                    .withPassword("position_exposure_service");
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Autowired
+    private KafkaListenerEndpointRegistry listenerRegistry;
+
+    @DynamicPropertySource
+    static void properties(DynamicPropertyRegistry registry) {
+        KafkaAvroStack.start();
+        POSTGRES.start();
+        PositionExposureTestKafka.createTopic(TRADE_TOPIC, 1);
+        PositionExposureTestKafka.createTopic(OUTPUT_TOPIC, 1);
+        PositionExposureTestKafka.createTopic(DLQ_TOPIC, 1);
+        PositionExposureTestKafka.registerSchema(OUTPUT_TOPIC, PositionSnapshotEvent.getClassSchema());
+        PositionExposureTestKafka.registerSchema(DLQ_TOPIC, DeadLetterEvent.getClassSchema());
+        registry.add("spring.kafka.bootstrap-servers", KafkaAvroStack::bootstrapServers);
+        registry.add("spring.kafka.properties.schema.registry.url", KafkaAvroStack::schemaRegistryUrl);
+        registry.add("spring.kafka.producer.properties.schema.registry.url",
+                KafkaAvroStack::schemaRegistryUrl);
+        registry.add("fes.position-exposure-service.topic", () -> TRADE_TOPIC);
+        registry.add("fes.position-exposure-service.output-topic", () -> OUTPUT_TOPIC);
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        // Deliberately no override of spring.datasource.hikari.*: this test relies on the same
+        // connection-timeout, connectTimeout and socketTimeout bounds application.yml gives every
+        // deployment, following PostgresOutageIntegrationTest in risk-alert-service.
+    }
+
+    @BeforeEach
+    void clearPositions() {
+        JdbcClient jdbc = JdbcClient.create(dataSource);
+        jdbc.sql("TRUNCATE TABLE position_applied_trade").update();
+        jdbc.sql("TRUNCATE TABLE position").update();
+    }
+
+    private static KafkaConsumer<String, DeadLetterEvent> dlqConsumer() {
+        Properties properties = new Properties();
+        properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaAvroStack.bootstrapServers());
+        properties.put(ConsumerConfig.GROUP_ID_CONFIG, "assert-outage-dlq-" + UUID.randomUUID());
+        properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class);
+        properties.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG,
+                KafkaAvroStack.schemaRegistryUrl());
+        properties.put("specific.avro.reader", true);
+        KafkaConsumer<String, DeadLetterEvent> consumer = new KafkaConsumer<>(properties);
+        consumer.subscribe(List.of(DLQ_TOPIC));
+        return consumer;
+    }
+
+    /**
+     * Every key that reaches the DLQ over the whole window, not one short poll: the poison budget
+     * takes several seconds to spend, so a single 500ms poll right after the trade is produced
+     * proves nothing about whether the trade is dead-lettered later.
+     */
+    private static List<String> deadLettersOver(KafkaConsumer<String, DeadLetterEvent> dlq, Duration window) {
+        List<String> keys = new ArrayList<>();
+        Instant deadline = Instant.now().plus(window);
+        while (Instant.now().isBefore(deadline)) {
+            dlq.poll(Duration.ofMillis(500)).forEach(record -> keys.add(record.key()));
+        }
+        return keys;
+    }
+
+    private MessageListenerContainer listenerContainer() {
+        return listenerRegistry.getListenerContainer(EnrichedTradeConsumer.LISTENER_ID);
+    }
+
+    @Test
+    void the_production_hikari_bounds_from_application_yml_actually_bind() {
+        HikariDataSource hikari = (HikariDataSource) dataSource;
+        assertThat(hikari.getConnectionTimeout()).isEqualTo(5_000L);
+        assertThat(hikari.getDataSourceProperties())
+                .containsEntry("connectTimeout", "5")
+                .containsEntry("socketTimeout", "10");
+    }
+
+    @Test
+    void should_pause_the_container_during_a_postgres_outage_rather_than_dead_letter_a_good_trade() {
+        POSTGRES.getDockerClient().pauseContainerCmd(POSTGRES.getContainerId()).exec();
+        try (KafkaProducer<String, EnrichedTradeEvent> producer = PositionExposureTestKafka.producer();
+             KafkaConsumer<String, DeadLetterEvent> dlq = dlqConsumer()) {
+
+            producer.send(new ProducerRecord<>(TRADE_TOPIC, "OUTAGE-TICK",
+                    PositionExposureTestKafka.trade("T-OUTAGE-1", "acc-1", "trader-1", "OUTAGE-TICK",
+                            dev.engnotes.fes.events.Side.BUY, 10L, 100.0, Instant.ofEpochMilli(1_000L))));
+            producer.flush();
+
+            // Every back-off pauses the container, the bounded poison one included, so a paused
+            // container proves only that the listener failed and the error handler ran. It says
+            // nothing about which class the failure was put in.
+            Awaitility.await()
+                    .atMost(Duration.ofSeconds(30))
+                    .pollInterval(Duration.ofMillis(200))
+                    .untilAsserted(() -> assertThat(listenerContainer().isContainerPaused())
+                            .as("the listener reached the database and failed, so the error handler ran")
+                            .isTrue());
+
+            // What proves the classification is the DLQ staying empty well past the poison budget:
+            // two retries, each waiting up to Hikari's 5s connection timeout, spend it in roughly
+            // 15 seconds. Thirty seconds of silence cannot be the poison path.
+            assertThat(deadLettersOver(dlq, Duration.ofSeconds(30)))
+                    .as("a database outage must never dead-letter a trade that was never bad (ADR-027)")
+                    .isEmpty();
+        } finally {
+            POSTGRES.getDockerClient().unpauseContainerCmd(POSTGRES.getContainerId()).exec();
+        }
+
+        Awaitility.await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
+                assertThat(JdbcClient.create(dataSource)
+                        .sql("SELECT net_quantity_after FROM position_applied_trade WHERE trade_id = ?")
+                        .param("T-OUTAGE-1")
+                        .query(Long.class)
+                        .optional())
+                        .as("the recoverer is only reached by way of the poison branch, so a row "
+                                + "here proves the trade was applied through the ordinary success "
+                                + "path once the container resumed, not quarantined")
+                        .isPresent());
+    }
+}

@@ -3,25 +3,32 @@
 Everything on this page exists as a design decision, a requirement, or an Avro schema, and has no
 implementation in the repository. It is here so the rest of the guide can stay free of plans.
 
-The one thing on this page you *can* open today is the schema set: eight of the sixteen files in
+The one thing on this page you *can* open today is the schema set: seven of the sixteen files in
 `contracts/src/main/avro/` are contracts for services that do not exist yet, and they are already under
 the compatibility gate.
 
 ## Phase 2, deterministic streaming
 
-One service remains. [The market cache projector](projector.md) is built and Redis joined the local
-stack with it, [trade enrichment](enrichment.md) is built and reads that cache on every trade, and
-[the risk alert service](risk-alerts.md) is built and reads the enriched stream, so what follows is
-the rest of the queue.
+**Every Phase 2 service now exists, and FR-11.4 and FR-11.5 remain open.** [The market cache projector](projector.md) is built and Redis joined the
+local stack with it, [trade enrichment](enrichment.md) is built and reads that cache on every trade,
+[the risk alert service](risk-alerts.md) reads the enriched stream, and
+[the position read model](positions.md) reads it too. What follows is what those services still do
+not do.
 
-**position-exposure-service.** An event-driven read model, idempotent by `tradeId` and rebuildable
-from event history (ADR-017). Note that the risk service now keeps a position total of its own, for
-its position-limit rule, in its own schema, alongside a rolling trade-quantity window and a recent-
-trade table for the two rules increment 3 added. The position totals will overlap and nothing
-reconciles them yet.
-The risk service's own store is deliberately narrower: it holds a net quantity per trader and ticker,
-not the market value or exposure figures FR-11.2 names, and it cannot be rebuilt from Kafka history,
-which is a capability FR-11.5 asks of this service rather than of that one.
+**Two of FR-11's five requirements are unmet, and one of them is blocked rather than queued.**
+[The position read model](positions.md) is built and idempotent by `tradeId`, but it cannot yet
+rebuild itself from event history, so FR-11.5's rebuild-and-reconcile is absent and a lost store is
+lost. Its read-only query API (FR-11.4) is sequenced after rebuild and blocked on something this
+platform does not have yet: the requirement asks for authorised risk and compliance *users*, which is
+human authorisation. ADR-030 puts workforce identity outside this platform's boundary by decision, so
+the route is the OIDC control plane listed under Phase 3 below (ADR-011). The data is reachable
+today only by a consumer holding a Kafka grant on `positions.snapshots`.
+
+The risk service keeps a position total of its own as well, for its position-limit rule, narrower on
+purpose: net quantity per trader and ticker, with no account dimension and none of the market value or
+exposure figures FR-11.2 names. It cannot be rebuilt from Kafka history either, a capability FR-11.5
+asks of the position read model rather than of the risk service. The two overlap and nothing
+reconciles them.
 
 All four of the rules FR-04.2 names now exist, but one of them is narrower than the requirement.
 `WASH_TRADE_DETECTED` detects a trader crossing themselves, not related-party wash trading:

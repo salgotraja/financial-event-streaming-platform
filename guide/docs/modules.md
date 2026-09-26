@@ -21,6 +21,7 @@ include 'services:audit:audit-service'
 include 'services:streaming:market-data-cache-projector'
 include 'services:streaming:trade-enrichment-service'
 include 'services:streaming:risk-alert-service'
+include 'services:streaming:position-exposure-service'
 ```
 
 Modules land when the work reaches them. Creating an empty module ahead of its phase produces a
@@ -81,12 +82,14 @@ belongs in a service.
 
 ```groovy
 ext.deterministicPlanePrefixes = [':services:ingestion', ':services:streaming', ':services:audit']
-ext.agentOnlyDependencyMarkers = ['org.neo4j', 'com.anthropic', 'dev.langchain4j', 'io.github.ollama4j']
+ext.agentOnlyDependencyMarkers = ['org.neo4j', 'com.anthropic', 'dev.langchain4j', 'io.github.ollama4j',
+                                  'org.springframework.ai', 'io.modelcontextprotocol']
 ```
 
 A module whose path starts with one of the three prefixes fails the build if it declares a
 `ProjectDependency` on a path starting with `:services:agent`, or any dependency whose group starts
-with one of the four markers.
+with one of the six markers. The last two, Spring AI and the Model Context Protocol SDK, arrived with
+springdoc: its 3.1 release ships an MCP starter one artifact away from the one the services use.
 
 Two implementation details are worth copying if you write a similar check.
 
@@ -97,7 +100,7 @@ touches `Project`, which is what keeps the task compatible with the Gradle confi
 
 ```console
 $ ./gradlew checkPlaneIsolation
-Plane isolation: 11 deterministic-plane module(s) checked
+Plane isolation: 12 deterministic-plane module(s) checked
 ```
 
 Without that line, a check that inspects nothing looks exactly like a check that found nothing. The
@@ -106,11 +109,13 @@ count runs ahead of the number of services because it includes the intermediate 
 new group moves the count by two, the group and the leaf, which is why it went from seven to nine
 when `market-data-cache-projector` landed. `trade-enrichment-service` and then `risk-alert-service`
 landed under the same `:services:streaming` group that `market-data-cache-projector` already created,
-so each moved the count by one rather than two, to ten and then to eleven.
+so each moved the count by one rather than two, to ten and then to eleven. `position-exposure-service`
+did the same, taking it to twelve: every streaming-plane service now exists, though not every
+requirement on the last of them is met.
 
 ## Layering inside a service
 
-The rules in `.claude/rules/architecture.md` are short and mechanical:
+The layering rules are short and mechanical:
 
 - **Consumer**: deserialise, delegate to a service, manage acknowledgement and the DLQ path. No
   business logic. `AuditRecordConsumer` is two statements long for this reason.
